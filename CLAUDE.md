@@ -16,6 +16,8 @@ v0.2 added:
 
 Milestones: M1 contract + Command + Deathmatch, M2 loot, M3 objectives, M4 Dungeon Runner (+ music wiring). The frozen contract and the owner-file stubs for every milestone landed in M1. The M4 integration rulings (run-end rule, descend hold, boss-cache guard, crate credit per stint, …) are listed in ARCHITECTURE.md §3.2.
 
+**GitHub:** [LawsonMode/voidswarm](https://github.com/LawsonMode/voidswarm) (**private**, branch `main`). `data/` (account/profile SQLite DBs, playtest credentials), `dist/` and `node_modules/` are gitignored — never commit them.
+
 The stack is TypeScript + Vite + PixiJS v8 on the client and an authoritative Node `ws` server. The same shared sim runs in the browser for offline play against bots. The build is contract-first: **`ARCHITECTURE.md` is canon** (frozen contract, module ownership, game design), and `src/shared/data/ships.ts` is canon for classes, skills and talents. Standalone, not 5bot.
 
 ## Version location
