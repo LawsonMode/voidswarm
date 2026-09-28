@@ -1,5 +1,6 @@
 node_modules/
-dist/
+/dist/
 *.log
 .DS_Store
-data/
+# root-only: account/profile/chat-log DBs + playtest credentials (never commit)
+/data/
