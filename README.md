@@ -347,6 +347,16 @@ Friends open that link. The page, the game connection and the accounts API all c
 
 A quick-tunnel address changes on every run. For a permanent address (a named tunnel on your own domain) and antivirus notes, see **[docs/HOSTING.md](docs/HOSTING.md)**.
 
+### Always-on server (VPS, ~$4–6/month)
+
+To host 24/7 on your own domain without leaving your PC on, rent a small Ubuntu 24.04 VPS (Hetzner, DigitalOcean or Lightsail), then run one command on it:
+
+```bash
+sudo DOMAIN=play.example.com EMAIL=you@example.com bash setup.sh
+```
+
+This gives you automatic HTTPS, a hardened service, nightly database backups and a `voidswarm-update` command. The full walkthrough, including the one DNS record to add, is in **[docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md)**.
+
 ### LAN, VPS or any other host
 
 The Node server provides the page, the WebSocket game, the accounts API and the loot database, all on one port:

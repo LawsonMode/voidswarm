@@ -9,6 +9,13 @@
       "runtimeArgs": ["tsx", "src/server/index.ts"],
       "port": 7777,
       "env": { "DB_PATH": "data/playtest.db", "PUBLIC_URL": "http://localhost:5173" }
+    },
+    {
+      "name": "server-pages-test",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "src/server/index.ts"],
+      "port": 7777,
+      "env": { "DB_PATH": "data/playtest.db", "PUBLIC_URL": "https://lawsonmode.github.io/voidswarm", "CORS_ORIGINS": "https://lawsonmode.github.io,http://localhost:5173" }
     }
   ]
 }

@@ -1,0 +1,36 @@
+[Unit]
+Description=Voidswarm game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=voidswarm
+Group=voidswarm
+WorkingDirectory=/opt/voidswarm
+EnvironmentFile=/etc/voidswarm/voidswarm.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/voidswarm/node_modules/tsx/dist/cli.mjs src/server/index.ts --serve dist
+Restart=on-failure
+RestartSec=3
+# Give leavers' loot grants time to commit on stop (the server flushes on SIGTERM).
+TimeoutStopSec=20
+
+# Hardening: the app can only write its database folder.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/voidswarm
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

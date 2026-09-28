@@ -1,0 +1,19 @@
+# Voidswarm behind Caddy: automatic HTTPS (Let's Encrypt) for the domain, and a reverse proxy to the
+# game server on 127.0.0.1:7777. Caddy proxies WebSocket upgrades (wss://) without extra config and adds
+# X-Forwarded-For, which the server trusts because TRUST_PROXY=1 and it only listens on 127.0.0.1.
+# setup.sh replaces {$DOMAIN} with your domain.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:7777
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+	log {
+		output file /var/log/caddy/voidswarm-access.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+	}
+}

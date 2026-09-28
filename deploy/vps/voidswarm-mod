@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Voidswarm moderation CLI on the VPS:  sudo voidswarm-mod <command> [args]
+# e.g.  sudo voidswarm-mod promote YourName     sudo voidswarm-mod bans     sudo voidswarm-mod log --since 2h
+set -euo pipefail
+cd /opt/voidswarm
+set -a; . /etc/voidswarm/voidswarm.env; set +a
+exec sudo -u voidswarm --preserve-env=DB_PATH,CHAT_FILTER,CHAT_LOG_RETENTION_DAYS env HOME=/opt/voidswarm npm run --silent mod -- "$@"
