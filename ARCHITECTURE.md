@@ -1,0 +1,258 @@
+# Voidswarm — Architecture & Frozen Contract
+
+Voidswarm is a browser-based, top-down arena shooter for up to 32 players. It takes its core mechanics from **SubSpace/Continuum**: Newtonian ships, energy that is both health and ammo, bounty, and attaching to teammates as turrets. It mixes in a **Vampire Survivors / Geometry Wars** PvPvE layer: neon enemy swarms, XP gems, level-up cards and auto-firing weapons.
+
+v0.3 (`0.3.0`: all four milestones landed) adds **three game types** (Dungeon Runner, Arena, Warzone) with sub-modes, a **Command** screen, and cosmetic loot with a per-account profile. The full v0.3 design is `docs/v0.3-proposal.md`, which is canon for v0.3 detail. This file is the summary contract, and wins wherever the two disagree on a frozen shape.
+
+All art and names are original.
+
+## 1. Stack & layout
+
+- TypeScript (strict), one package. **Vite** builds the client and **tsx** runs the Node server. **PixiJS v8** + **pixi-filters** handle WebGL rendering and bloom. **ws** carries the WebSocket traffic.
+- There are no asset files. Graphics are procedural vector/neon, and audio is synthesized with WebAudio: SFX in `audio/AudioFx.ts`, the soundtrack in `audio/music/*` (`MusicDirector`, its own AudioContext, created on the first gesture).
+
+```
+src/shared/            ← pure TS, runs in Node AND browser (no DOM, no Node APIs)
+  constants.ts types.ts protocol.ts version.ts        [ARCHITECT — frozen]
+  util/ (incl. util/hash.ts) data/ships.ts data/teams.ts   [ARCHITECT — frozen shape]
+  data/gameTypes.ts                                     [ARCHITECT — frozen shape; owners flip `ready`]
+  data/cosmetics.ts data/loot.ts                        [ARCHITECT — frozen shape; LOOT owns content/numbers]
+  profile/store.ts                                      [ARCHITECT — frozen interface; LOOT adds MemoryProfileStore]
+  profile/profile.ts rolls.ts service.ts                [LOOT agent]
+  sim/world.ts                                          [ARCHITECT — frozen; owners may append helpers]
+  sim/Sim.ts map.ts movement.ts combat.ts mapgen.ts floorgen.ts dungeon.ts loot.ts + any new sim/*.ts   [SIM agent]
+  sim/dungeonRules.ts                                   [SIM] rift radii / timings / helpers (leaf module: AI, RENDER, CLIENT read it)
+  sim/objectives/*                                      [OBJECTIVES agent] (rules.ts = shared tuning)
+  sim/pve/*                                             [PVE agent]
+  ai/*                                                  [AI agent]
+  room/* (incl. room/houseRooms.ts) net/codec.ts net/validate.ts   [ROOM agent]
+  smoke.ts                                              [ROOM agent] headless: Zone + 16 bots, 60 s; `--mode ctf|zones|hotpoint|all` = the objective AI-parity gates; `--rift [sec] [--floors 3|6] [--no-dropin]` = a bot rift through the Room
+src/server/*                                            [ROOM agent] ws server + static file serving
+src/server/auth/*                                       [AUTH agent] accounts API (AuthService frozen)
+src/server/profile/*                                    [AUTH agent] SQLite ProfileStore (v0.3 M2)
+src/client/
+  contracts.ts                                          [ARCHITECT — frozen]
+  index.html main.ts styles.css net/* input/* ui/* profile/*   [CLIENT agent]
+  hudInsets.ts                                          [CLIENT] HUD-measured top/bottom insets the render layer keeps edge pointers clear of
+  musicMapping.ts musicDriver.ts                        [CLIENT] scene / intensity / stinger rules (pure) + the driver main.ts feeds the MusicDirector with
+  render/* audio/* (render/rift.ts, render/demoRift.ts in M4)   [RENDER agent]
+  audio/music/*                                         [MUSIC] synth, sequencer and songs (director.ts is the API the game calls)
+```
+
+**Ownership rule:** only edit files you own. If you need something from another module, code against its frozen signature. If a contract is truly missing something, add the smallest possible thing, then list it under "Contract changes" in your final report.
+
+**v0.3 cross-module signatures** (`docs/v0.3-proposal.md` §8.8) are frozen. The ARCHITECT landed each *new* owner file as a stub with those signatures: `sim/mapgen.ts`, `sim/floorgen.ts`, `sim/dungeon.ts`, `sim/loot.ts`, `sim/objectives/{index,features,rules}.ts`, `profile/{profile,rolls,service}.ts`, `room/houseRooms.ts`. A stub either throws `'<name>: not implemented (M<k>)'` or, when it sits on the per-tick hot path (`stepObjectives`, `stepRift`, and the objective speed/recharge/turret/spawn hooks), returns its neutral "no objective" value so the sim keeps running. Owners replace the bodies, not the signatures. Since M2 the loot functions (`sim/loot.ts` `stepLoot`, `rollLoot`, `spillCarried`, `secureCarried`, `carryCap`) and `profile/*` are real; at `lootMult` 0 they are still exact no-ops (the lootMult-0 golden digest in `sim.v03.test.ts` is unchanged). Additions to files that already existed (`Sim.ts`, `map.connectPoints`, `pve/index.ts`, `ai/*`, `room/*`) are their owners' M1–M4 work.
+
+## 2. One simulation, two hosts
+
+```
+Browser (online)                    Node server                      Browser (offline)
+GameClient ─ WsTransport ──ws──▶  server/index.ts ─▶ Zone            GameClient ─ LocalTransport ─▶ Zone (in-page)
+                                                        └ Room ─▶ Sim + BotBrains                   └ Room ─▶ Sim + BotBrains
+```
+
+- `Zone` is the whole transport-agnostic server: connections, the zone chat lobby (Command), the room list, and rooms. `Room` handles one room: its players, teams, chat, bots, phases, and one `Sim` per match.
+- **Authoritative server.** Clients send `InputState` only. The server keeps an **input queue per ship** (max 8). It consumes exactly one input per sim tick in seq order; when the queue is empty it holds the last input, and a standing surplus is drained only by skipping inputs whose buttons equal the next one, so presses are never lost. `Snapshot.ackSeq` is the seq actually applied. `Sim.step()` runs at `TICK_RATE` (60 Hz), and each client gets a filtered `Snapshot` every `snapshotEvery` ticks: 3 online (20 Hz), 1 offline.
+- The server sends snapshots as binary (`net/codec.ts`). LocalTransport passes the objects directly.
+- The client interpolates remote entities about 100 ms behind (online) and **predicts its own ship** with `stepShipMovement`. It replays unacked inputs from `snapshot.ackSeq`. Attached turrets are drawn at `interpolatedHost + turretOffset(...)`.
+- **Maps are never sent over the wire.** Both sides call `buildMatchMap({ seed, gameType, subMode, teamCount, floor })` (`sim/mapgen.ts`, the only map entry point). Arena/Warzone use `generateMap(seed, teamCount)` unchanged (v0.2 maps stay byte-identical), plus `placeObjectiveFeatures` for objective sub-modes. **Rift floors are regenerated from `(seed, floor)`** with `generateFloor`, on every `floorStart`. Everything must be deterministic: `Rng` and `util/hash.ts` only, never `Math.random`.
+- The only runtime tile mutation is `applyRoomSeals(map, roomStates)` (rift doors). It is pure and idempotent, both hosts call it (the client from `match.dungeon.rooms`, floor-checked), and it bumps `map.rev` so nav caches rebuild.
+- Canonical `Sim.step()` order: `tick++ → rebuildGrid → consumeInputs → fieldRevive → pass 1 (respawn) → pass 2 → pass 3 (obj speed / recharge mults) → pveStep (rift director first) → stepDeployables → stepProjectiles → stepObjectives → stepRift → stepLoot → bounty → enterFloor (if pendingFloor) → stepMatch → prevInput copy`.
+
+## 3. Game design
+
+### 3.1 Game types (v0.3 — data/gameTypes.ts is canon)
+`GameType` (`dungeon | arena | warzone`) is orthogonal to `GameMode`, which stays allegiance-only (`ffa | teams`). Each type lists sub-modes (`SubMode`); a sub-mode is offered by Command, Create, Quick Play and house rooms only when `SUB_MODES[s].ready`. Owners flip `ready` when their sim **and** bots pass the gate test. `isLegalCombo(type, sub, mode, teams)` is the one legality check (`clampSettings` and the Sim constructor fallback both use it).
+
+| | **Dungeon Runner** (PvE) | **Arena** (PvP) | **Warzone** (PvPvE) |
+|---|---|---|---|
+| Sub-modes (ready at) | `coop` (M4) | `deathmatch` (M1), `ctf`, `zones`, `hotpoint` (M3) | `deathmatch` shown as "Classic" (M1), `zones` (M3) |
+| Reserved for v0.4 | `rival` | `escort` | — |
+| Default sub-mode | coop | ctf | deathmatch |
+| Allegiance | always teams (party = team 0) | FFA allowed in DM and Hot Point | FFA allowed in DM only |
+| Teams | coop 1 | DM 2–8 · CTF 2–4 · Zones 2–8 · Hot 2–8 | DM 2–8 · Zones 2–8 |
+| Seats (`maxPlayers`) | 1–4 (`teamCount × PARTY_SIZE`) | 2–32, default 16 | 2–32, default 32 |
+| Default bot fill | 4 (full party) | 10 | 12 |
+| Match length | untimed (always 0) | 3–20 min | 1–30 min, default 10 |
+| Swarm (`pveIntensity`) | 1–3 = Story / Veteran / Nightmare | forced 0 | 1–3 = Low / Normal / Chaos |
+| Target (`objectiveLimit`, 0 = default) | — | CTF 1–10 (3) · Zones 100–1000 (300) · Hot 60–600 (200; FFA 120) | Zones 100–1000 (300) |
+| Floors | 3 or 6, default 6 | — | — |
+| Drop-in | at the next floor start | any time | any time |
+| Loot set | Rift | Gladiator | Swarm |
+
+- `SimConfig.gameType` / `subMode` are optional for v0.2 compatibility. `gameTypeOf(config)` falls back to `pveIntensity > 0 ? 'warzone' : 'arena'` and `subModeOf` to `'deathmatch'` (`'coop'` in a dungeon); the Room always sets both. `DEFAULT_ROOM_SETTINGS` is still v0.2's Warzone Classic.
+- `matchSeconds 0` = untimed (`endTick 0`, `MatchView.timed = false`); only dungeons are untimed.
+- `DEFAULT_SETTINGS_BY_TYPE` (protocol.ts) is the base when a room switches type. House rooms (`room/houseRooms.ts`) replace the v0.2 default rooms; idle house rooms have no Sim.
+
+### 3.2 Dungeon Runner ("the Rift", co-op; landed in M4, `0.3.0`)
+- A party of 1–4 (bots fill seats) runs 3 or 6 procedural floors. Floors 1–3 are the `hive` biome, 4–6 `prism`. Every `RIFT_BOSS_EVERY` (3rd) floor ends in the Matriarch boss (`EnemyKind 'matriarch'`) and opens **Extract** beside **Descend**.
+- Every floor uses the full 200×200-tile grid (so `world.grid` stays valid across floor swaps): a 4×4 macro grid of rooms (entrance, hall, arena, treasure, key, boss) linked by corridors. `GameMap.dungeon: RiftLayout` holds the static room graph, doors and markers; `World.dungeon: RiftState` holds the run.
+- Sealable rooms (arena / key / boss) go `DORMANT → ARMING (1.5 s) → SEALED → CLEARED`. Sealing writes `TILE_WALL` over the `TILE_DOOR` gap, nudges ships out of doorways, and recalls teammates inside. A sealed room with no live sealing-party ship for `RIFT_REGROUP_SEC` resets (the downed/rescue replacement).
+- Lives are a shared party pool (`2 + 2·partySize`, difficulty-adjusted, +2 per boss, cap `RIFT_LIVES_CAP`). Any death, bots included, costs one. At 0 you wait for the next floor. A full wipe ends the run.
+- The floor swap (`Sim.enterFloor`, same Sim, ship ids unchanged) clears enemies, projectiles, gems, deployables and in-world loot, keeps XP/level/upgrades/path/carried caches, and emits `floorStart`. The Room sends `{type:'floorStart'}` before any snapshot of the new floor.
+- Outcomes: `cleared` (final boss + 45 s victory lap), `extracted`, `wiped`, `abandoned` (host `/end`). Per-ship rift flags live in `ship.skillState` (`rOut`, `rWait`, `rExtract`).
+- `world.pve.wave` is the enemy **tier** in a rift (`riftTier(f) = 1 + 2·(f − 1)`); the HUD hides the wave there.
+- **Rule decisions made in M4 integration** (the proposal §4 left them open, or its literal reading misbehaved; the owning file documents each):
+  - **One run-end rule** (`dungeon.ts checkRunEnd`, also used by `riftOnDeath`), in priority order: after the final boss (`victoryTick > 0`) the run can only be `cleared` — at the victory tick, once every human used Exit, or as soon as nobody left on the floor can continue; else no human left on the floor with ≥ 1 extraction → `extracted`, whatever the bots are doing; only then a party whose remaining members are all dead **and** waiting (`rWait`) is `wiped`. The lives pool is not read for the wipe: a boss kill can refill it while everyone left already waits for the next floor. A member whose death was paid with a life is still coming back (not a wipe).
+  - One fight at a time: a sealable room does not arm while the same party has another room arming or sealed. The seal recall leaves a pilot channelling Extract where it is. Nudged and recalled ships emit `blink`; the nudge moves caches out of the doorway too.
+  - Key / boss room = the end of the main-path walk (the deepest room). The boss room has no chest: its reward is the Matriarch's personal `bossCache`, rolled **at most once per boss room per floor** (`world.pve.mem['bossDown<room>']`, reset by the floor swap). A regroup reset after her death re-seals as an empty encounter (no second Matriarch, no second cache set, no farm).
+  - Chests: while the party has an alive human only humans open chests (bots open them in bots-only stretches); drops are personal for every non-extracted human; Treasure Hunter counts humans only. A chest can roll nothing (no gem consolation: that was the pre-M2 fallback).
+  - Lives are counted lazily, once per party, when it first has ships (the Room adds every seat before the first step); late joins do not recount.
+  - **Descend:** "every alive human is in the zone" is vacuously true with no alive human, so a bots-only party departs in 3 s. A human already inside the zone when it opens (the boss / key fight ends on top of it) starts nothing until it leaves and re-enters, or `RIFT_PORTAL_HOLD_SEC` (10 s) passes, so the bank-or-push-deeper choice stays open on boss floors.
+  - **Instability belongs to PVE** (`pve/rift.ts`): `instability {sec: 25}` fires at the 420 s onset (always) and with every hunter pack that actually spawns (`sec` = time to the next pack). The 360 s warning is the HUD's own, from `RiftView.floorSec` (`RIFT_INSTABILITY_WARN_SEC`). Hunter packs spawn on precomputed open ground of the floor (room markers, centres, door in-points and a 3-tile grid of open 3 × 3 blocks), 700–1100 px from a random eligible ship, then any other ship, then the nearest spot ≥ 700 px (≤ 1600 px): a rift floor is mostly rock, and blind ring samples skipped about half the packs. Instability HP is continuous (+10% per extra minute).
+  - **Encounter sizes are budgets in drone-equivalents** (`RIFT_KIND_COST`: splitter / spinner 2, brute 5, blackhole 6), ratified: §4.4's "pulse size (8 + 2f)" is the budget, so a pulse never becomes six brutes. Key rooms get their normal pulses plus one mini-boss pulse. Party scaling also applies to hall packs and hunters. The Matriarch's death splash is r 300 (the Hive keeps r 260: golden digest).
+  - A body shoved deep into solid tiles is rescued once to the nearest open tile (`map.collideCircle`, deterministic ring search; both hosts), and in a rift an enemy's contact push-out is resolved against walls: rift floors are solid rock outside the rooms, and a chained face-by-face push-out used to march a pinned ship off the map.
+  - **Room layer:** extraction ends that pilot's run: its connection and account keys are remembered for the run, so a leave + rejoin only watches (never a second drop-in). Crate floor credit counts only floors cleared **while flying** the current stint (`RoomPlayer.riftJoinFloor`; `fullClear` only for a stint begun on floor 1), so a late drop-in or a spectate-then-drop-in gets none of the floors bots cleared. Quick Play skips a rift whose portal is departing (the Zone asks the room: `RoomLive` is frozen and carries no portal).
+  - **Client:** a rift snapshot without `you` is spectating (the extracted wreck that stays in `world.ships` is not "own"; the camera follows and cycles the party). A `blink` on the own ship (seal recall / nudge) snaps the predictor instead of sliding it through the sealed door. At a floor swap, queued rift events tied to the old layout (room / chest / portal / boss) are dropped; floor-free globals (kill feed, lives, extractions) stay. RiftHud keeps who extracted across a same-run `matchStart` (a drop-in's second one). A fog change redraws the minimap texture in place (no texture destroyed while a bind group may hold it).
+  - **Bots:** with a human leader alive, bots neither chase into nor linger in a dormant sealable room the leader isn't in (`riftForbiddenRoom`), so they never trip a seal and the whole-party recall. The class complement exists twice with the same rule: `room/rift.ts riftBotClass` (the Room) and `ai/riftGoals.ts riftFillClass` (the gate).
+  - **Music** (`musicMapping.ts`): `title` / `command` / `lobby` by screen; `match` in Arena / Warzone and on rift floors, `boss` while `RiftView.boss` is set; `victory` / `defeat` on the results (your team / party won; FFA: a top-3 finish), then back to `lobby`. Intensity = 0.3 + wave / floor tier + enemies and hostiles near the focus + low own energy + overtime / sudden death + a boss, clamped to 1 and smoothed (τ 1.5 s). Stingers: `waveStart` (a boss wave and the rift's `bossIntro` → boss incoming) and your own `levelUp`. Settings: Music 0–100 (default 60) + Mute music, persisted; music is muted while the tab is hidden.
+  - Open levers (unchanged by integration): Veteran is lenient for bot-filled parties (4 normal bots clear 6 floors in ≈ 22 min with ≤ 1 death, against the ≈ 30 min target; the knobs are `pve/riftRules.ts` and the `MATRIARCH_*` constants); nav rebuilds fully on each seal / unseal (≈ 1.4 ms, a few times a floor); a late joiner cannot see who extracted before it joined (no wire field for it).
+
+### 3.3 Objective sub-modes (Arena / Warzone; landed in M3, `0.3.0-m3`)
+- **CTF** (2–4 teams): steal the enemy pennant and bring it to your own stand while yours is home. Carriers are slower, keep at most one gunner turret, blink shorter, and overload after 60 s.
+- **Control Zones** (2–8 teams): pads tick points for their owner. In Warzone, `ZONE_SWARM_BLOCK` enemies on a pad freeze capture progress.
+- **Hot Point** (2–8 teams or FFA): one pad that relocates every 60 s; uncontested holders score.
+- Geometry is `GameMap.features: MapFeature[]` (never on the wire). Dynamic state is `World.objective: ObjectiveState` → `MatchView.objective: ObjectiveView`. Objective points are mirrored into `match.teamScores` and are **never rebuilt from `ship.score`**; results never fall back to kill sums.
+- `SHIPFLAG_CARRIER` (128, the last free u8 flag bit) marks a flag carrier; `carrierSpeedMult(flags)` (objectives/rules.ts) keeps client prediction in step.
+- **Rule decisions made in M3 integration** (the proposal §5.3–§5.5 left them open or was ambiguous; `objectives/rules.ts` documents each):
+  - The carrier's ×0.88 applies to Ram Charge too (`skills.ts stepCharge` × `objSpeedMult`; `moveSkillsFor` mirrors it), so a Juggernaut's charge is no full-speed escape. Client prediction also models Flag Overload's recharge ×0.5 / ×0 (`PredictCtx.rechargeMult`, carry clock from the first snapshot with the carrier bit).
+  - Flag Overload's clock survives a live release (class / team swap, leave): the releasing team re-taking that flag before it goes home keeps the old clock (`ctf.ts keepCarry`), so neither the swapper nor a teammate beside it can reset it; a death drop starts fresh. `CTF_REPICK_SEC` (2 s) still keeps the swapper off it briefly.
+  - Sudden death ("next capture wins") ends on the first capture that leaves one team on top; with 2 teams that is simply the next capture. In 3–4 team CTF a trailing team's capture that only joins the tie does not end it; a sudden-death time-out is a draw.
+  - Hot Point: an owner scores +1/s only while on the point with no other side inside. A move due at or after the time-out never happens (every length is a multiple of 60 s, so the last move used to land on `endTick`, reset the point and make overtime unreachable): the final minute keeps its point, with no T−10 s warning; the HUD shows FINAL POINT, and HOLD IT in overtime (no next-site ghost either). The next-site pick and FFA respawn picks hash in the server-only `lootSeed`, so a client with `mapSeed` can't precompute the relocation order.
+  - A carrier is never cloaked (its flag position is public in the shared ObjectiveView).
+  - Open design lever (unchanged): with 16 bots, CTF pace depends heavily on the team count — 4 teams reach the default 3-capture limit in ≈ 1.5–2 min, 2 teams average ≈ 2.7 captures in 3 min. A per-team-count default limit / length, or a longer CTF respawn, are the knobs if playtests want it evened out.
+  - Map features must be reachable by the largest hull (Juggernaut r 22), not just by 4-neighbour tiles: `placeObjectiveFeatures` ends with a hull-clearance flood (2×2 open blocks) and carves ≈ 3-tile lanes to any sealed feature — one per base for a feature inside the central ring, so every team gets an equal lane. In practice only 8-team Core / hot site 0 need it (generateMap's 8-arc ring leaves ≈ 1-tile gaps). Bot nav (`ai/nav.ts`) likewise only routes over "wide" tiles.
+
+### 3c. Loot and profiles (lands in M2)
+- **Cosmetic only.** Nothing touches `computeStats`, `ShipStats`, hit sizes or ship record semantics. 7 slots (`hull`, `weapon`, `turret` per class/kit; `engine`, `death`, `title`, `killicon` shared), 5 rarities, 4 sets: Salvage Line (`common`, every mode) plus one exclusive set per game type (Rift / Gladiator / Swarm), 13 items each, plus 13 starters. Catalog ids are forever (`data/cosmetics.ts`, append-only, `retired: true` to stop drops).
+- **Two sources:** in-world caches (`World.loot`, rolled by `sim/loot.ts` from `DROP_RULES` × `SimConfig.lootMult`) and debrief crates at results (pity: epic at 12, legendary at 60). A cache is only `{rarity, set, source}`; the item is rolled server-side at grant time, against the profile. **M2 amendment to proposal §6.6 step 5:** the server rolls with `Rng(hash32(fnv1a(grantKey + '|' + profileKey), r1, r2))`, where `r1, r2` are fresh CSPRNG words per roll (`ProfileService` `saltedGrantRng`). Every other input is known to the client, so the unsalted `grantRng` let a modded client predict its crates and steer them by choosing how many caches to secure. No roll needs to be reproducible: a queued retry re-applies the grant it already rolled, and a replayed grantKey returns the recorded grant. `rolls.grantRng` stays as the reproducible stream for tests. `SimConfig.lootSeed` is server-only crypto randomness and **never sent**; `world.rng` is never consumed by loot, and `lootRng` feeds only chance, rarity and set (a cache's pop / scatter direction comes from public data, `hash32(id, tick)`, so snapshots never expose `lootRng` outputs).
+- **Carry / spill / secure:** humans (never bots or turrets) pick up caches and carry them unsecured (`Ship.carried`, cap 8, 24 in a rift). Death, leaving and team swaps spill them (a non-ally killer gets 2 s priority). Caches are secured at dungeon extraction or at match end (dungeon: only on `cleared`), and **granted exactly once** at results or on leave, keyed `${matchId}#${profileKey}#${seq}`.
+- **Profiles** (`protocol.ts` `Profile`, `PROFILE_VERSION 1`): server-authoritative per account in `accounts.profile_json` via the synchronous `ProfileStore` interface (`profile/store.ts`); one `commitGrants` transaction per match against the `loot_ledger` table (idempotent by grant key). Offline and online guests keep a device-local profile that is never uploaded (`persisted: false`). A profile with `v > PROFILE_VERSION` is read-only for the session.
+- **Single-process assumption:** one Node server process owns the SQLite file. The profile rev check (`ProfileConflict`) and the ledger primary key guard against double writes, but multi-process deployment is not supported. If a write from outside the process does land (a second process, a sqlite hand edit), `grantBatch` falls back from the one-transaction batch to one `commitGrants` per grant, so only the conflicting account is affected; that grant is rebased onto a fresh store read and committed again (the retry queue, too, rebuilds on a fresh read after a conflict). The device store (`LocalProfileStore`) applies the same stale-write rule between browser tabs.
+- **Grant flow details (M2, ROOM + LOOT):** `matchId = ${bootId}:${n}` (a random boot id per Zone, so a restart never reuses ledger keys). Crates **and** base shards sit behind the 120 s played / 180 s match gates (a host can't farm shards with back-to-back `/end`s); a grant that would be completely empty is skipped (no ledger row, no `lootGrant`). `lootMult` is 0 while no human is flying. A mid-match leave grants only a non-empty secured bank; caches still carried count as lost, and the `lootSpill` that `removePlayer` emits for them is not counted again (even on a same-tick rejoin). Failed commits are retried every `PROFILE_RETRY_SEC` (5 s) for `GRANT_RETRY_PASSES` (3) passes, then the pilot is told. A duplicate outcome (the key was already recorded) is never sent or announced again. `LootGrant.cachesLost` counts every token that spilled out of the hold, including ones picked back up (the Debrief says "spilled"); `stats.matches` counts grants, so a leave grant plus a rejoin's results grant count as two. Ledger rows live 30 days (the idempotency window).
+- **Tuning since the proposal:** `DROP_RULES.elite.chance.warzone` 0.03 → 0.05 (an M2 soak of Warzone Classic, 4 humans + 12 bots, gave 1.75 caches per human per 10 min at 0.03 and 2.25 at 0.05, against §6.7's 2–3). A Spiked Prow ram kill of an elite is a ship kill and rolls `'elite'` like any other (the "kamikaze deaths never drop" rule is the swarmer's own contact pop, `vanish()`).
+- Each player's look travels once in `PlayerInfo.cosmetics` (roomState), never per snapshot. Online guests get no server profile: their device applies `lootGrant` itself, and the client marks items the device already owns as duplicates (the server rolled them against an empty profile) and shows no pity countdown for them. Readability rule: team colour stays the outline, projectile main colour and nameplate; every accent has CIE76 ΔE ≥ 20 from all team/enemy colours or HSV saturation ≤ 0.30.
+
+### Classes, paths & talents (v0.2 — data/ships.ts is canon)
+Three Diablo-style classes replace the v0.1 ships. Each class has four skills (LMB primary, RMB secondary, Space mobility, E utility), a **turret kit**, and **three build paths**:
+- **Juggernaut (Brute):** Autocannon · Rocket Salvo · Ram Charge · Iron Hide — paths **Ram**, **Barrage**, **Bulwark**.
+- **Arcanist (Tech):** Plasma Bolt · Arc Lightning · Blink · Singularity — paths **Storm**, **Void**, **Lance**.
+- **Artificer (Engineer):** Rivet Gun · Deploy Sentry · Repair Pulse · Shield Wall — paths **Summoner**, **Medic**, **Architect**.
+
+**Level-up schedule** (still pick-1-of-3, live, never pauses):
+- Level `PATH_LEVEL` (3): a **path offer** — the class's 3 paths (category `'path'`, id `path:<PathId>`). Taking one sets `ship.path` and `ship.upgrades['path:<id>'] = 1`.
+- Levels in `TALENT_LEVELS` (6/9/12/15): a **talent offer** — up to 3 untaken talents of your path (category `'talent'`, id = talent id). No path yet → path offer instead.
+- Every other level: **general cards** (primary tweaks, passives, auto-weapons), weighted toward your path's style.
+- Each talent/path declares `impl`: `'stats'` → PVE's `computeStats`; `'sim'` → SIM skill behavior; `'both'` → split.
+
+**Energy = health = ammo.** Firing costs energy. Damage drains it. It recharges continuously. A ship dies when energy drops below 0. Healing (Engineer) restores energy.
+
+**Deployables** (`world.deployables`, `Deployable`/`DeployableView`): sentry, wall, well, drone, fire, nanite. They are owned by a ship, carry a team, expire, and can be destroyed (hp). Walls block hostile projectiles and enemies. Hostile projectiles damage sentries, walls and drones.
+
+**Class swap (v0.3):** while alive in a running Arena/Warzone match it happens in place (position, velocity and energy fraction kept, no invulnerability, turrets detached, flag dropped; a bigger hull is pushed out of an adjacent wall once). A team swap drops a carried flag and spills carried caches while the ship is still on its old team. Dungeon class swaps are queued to the next floor. The in-place swap emits `shipSpawn` at the ship's current position (for the spawn-ring FX), with the ship already alive, so **`shipSpawn` is not a respawn signal**: renderers, HUD cues and counters that mean "respawned" must use alive transitions instead.
+
+### Controls (world-relative, twin-stick)
+| Action | Mouse + keyboard | Gamepad (standard mapping) |
+|---|---|---|
+| Move (thrust direction) | WASD | Left stick |
+| Aim | Mouse | Right stick (idle → face move dir) |
+| Primary skill (`input.primary`) — as turret: **offense** | LMB | RT |
+| Secondary skill (`input.secondary`) — as turret: **defense** (hold) | RMB | RB |
+| Utility skill (`input.utility`) | E | LB |
+| Afterburner | Shift | LT |
+| Mobility skill (`input.mobility`) | Space | A |
+| Attach / detach turret | F (targets teammate under cursor, else nearest) | Y |
+| Shake off turrets | X | B |
+| Upgrade pick 1/2/3 | 1 / 2 / 3 | D-pad ← ↑ → |
+| Scoreboard | Tab (hold) | View/Back (hold) |
+| Big map | M | D-pad ↓ |
+| Chat / team chat | Enter / T (or prefix `//`) | — |
+| Menu | Esc | Start |
+
+### Turrets (the SubSpace stack) + turret kits
+- In teams mode, press attach to **warp onto a teammate** from anywhere. You need `ATTACH_MIN_ENERGY_FRAC` energy, a class with `canTurret`, and a host that has a free `maxTurrets` slot (`objMaxTurrets` in objective modes) and is not itself a turret.
+- A turret is locked at `host + turretOffset(host.angle, slot, count, host.radius)`. It aims freely, recharges at `TURRET_RECHARGE_MULT`, and deals `turretDamageMult` damage. Every turret slows its host by `HOST_SPEED_PENALTY_PER_TURRET`. The host can shake them off; a turret can detach itself; host death pushes them off.
+- **While attached, your class skills are replaced by your class's turret kit** (`ShipClassDef.turret`, knobs in `ShipStats.skill`, see `TURRET_KNOBS`):
+  - **LMB offense draws the HOST's energy**, not yours. It stops when the host is below `TURRET_HOST_FLOOR_FRAC`. Flak Cannon (brute), Laser Lance (tech), Seeker Volley (engineer).
+  - **RMB defense (hold) spends your own energy:** Brace (host damage −50%), Deflector (point-defense vs projectiles near host), Hull Weld (transfer your energy into the host).
+  - **Laser resonance:** each firing Laser Lance on a host deals × `LASER_RESONANCE^(n−1)` (n = lasers firing on that host this tick) and draws host energy × the same factor. Beams are hitscan, drawn from `ShipView.beamLen/beamKind/resonance`.
+- Bulwark / Architect paths add turret slots and turret damage — the dedicated "battle station" builds.
+- FFA has no attaching.
+
+### PvE layer
+- A wave director spawns Geometry-Wars-style swarms (`EnemyKind`) near players, but out of view: 1000–1500 px away, never on `TILE_BASE`. The count scales with players × `pveIntensity` × match time. `MAX_ENEMIES` caps it, and a **Hive** boss appears every 5th wave. In Warzone Control Zones the director also anchors on active zones (`objectiveAnchors`). In a rift the wave director is off and the rift director runs encounters per room instead.
+- Enemies target the **nearest ship of any team**. That is the PvPvE squeeze: everyone farms the swarm while fighting each other.
+- Kills drop **XP gems**. Ships magnetize and collect them within `magnetRadius`. Every level-up queues a **pick-1-of-3 offer** (path fork / talents / general cards — see Classes above). General cards include **auto-weapons** (Orbit Blades, Seeker Swarm, Pulse Nova, Arc Lightning, Mine Trail).
+- **Death:** you keep your upgrades but drop 40% of your current-level XP progress as gems. Your killer gets your **bounty** (`10 + 2·level + 5·killStreak`) as score.
+
+### Modes (allegiance)
+- **FFA:** everyone for themselves. `team = NO_TEAM`, with a per-player color.
+- **Teams:** 2–8 teams (dungeon: 1 party) with auto-balanced bots. In deathmatch, team score is the sum of member scores; objective sub-modes score objective points instead.
+- A timed match lasts `matchMinutes` or until the deathmatch `scoreLimit` / objective target is reached. Up to 32 active players (humans + bots) plus `SPECTATOR_SLOTS` watchers. Bots fill to `botFill` counting **active** humans only, so spectators never evict bots.
+
+### Scoring
+Player kill = 10 + victim bounty. Enemy kill = `enemy.scoreValue`. Bounty grows with level and kill streak. Objective and rift actions add personal score (captures, returns, room clears, extraction); see the proposal §4–§5.
+
+## 3b. Accounts (v0.2)
+- The Node server hosts an HTTP JSON auth API on the game port (see `protocol.ts` → Accounts): register (username + email + password), login (username, or email typed in the same field), logout, me, forgot, reset.
+- **Passwords:** scrypt with **N=2^15, r=8, p=3** (64-byte key, per-user 16-byte salt), stored as `scrypt$N$r$p$salt$hash`. The params live in each hash, so older hashes (v0.1 N=2^14 p=1, and N=2^15 p=1) still verify and are **rehashed with the current params on the next successful login** (compare-and-swap, so it can't undo a concurrent reset). A failed verify always costs at least one current-params verify, so timing never reveals whether an account exists. At most 2 scrypt jobs run at once.
+- **Tokens:** session tokens (30 days, sliding refresh, ≤ 20 per account) and reset tokens (30 min, single use) are stored **hashed** (sha256). A reset revokes every session, and the server kicks live ws connections of revoked sessions.
+- **Rate limits** are keyed per client address, where an address is an IPv4 address or an **IPv6 /64** (one subscriber usually owns a whole /64). Login also has a **per-account failure lock** across all addresses (10 failures / 15 min; unknown logins are locked identically, so a lock reveals nothing; a password reset lifts it). Failure slots are check-and-reserve, so a parallel burst can't slip past. See `src/server/auth/README.md` for every limit.
+- Storage: `node:sqlite` at `data/voidswarm.db`, gitignored. The account id is also the key the loot profile hangs off (`accounts.profile_json`, `loot_ledger`; `MIGRATIONS[1]` in v0.3 M2).
+- Password-reset emails go out via SMTP configured by env (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `PUBLIC_URL`). With no SMTP configured, the server logs the reset link to its console (dev mode).
+- WebSocket `hello` carries `token`. The server verifies it before the Zone sees the hello, so logged-in pilots use their account username. Guests can play but cannot use a registered name, and their loot stays on their device.
+- Offline mode never touches accounts.
+- **Security note:** over the internet this must run behind HTTPS/WSS (reverse proxy or tunnel). Plain ws/http is only acceptable on a LAN.
+
+## 4. Flow & chat
+```
+TITLE ─login/register/reset/guest/offline─▶ COMMAND
+COMMAND ─Quick Play <type>──▶ ROOM (auto-ready; 20 s auto-start; offline: countdown now) ─or─▶ GAME (live drop-in)
+COMMAND ─Join (row)─────────▶ ROOM, or GAME if live (dungeon: spectate, then join at the next floor)
+COMMAND ─Watch (row)────────▶ GAME as spectator
+COMMAND ─Create (card)──────▶ CreateGameModal ─▶ ROOM as host
+COMMAND ─Hangar─────────────▶ HangarModal ─▶ COMMAND
+ROOM ─match─▶ GAME ─matchEnd─▶ RESULTS + Debrief (12 s) ─▶ ROOM
+ROOM / GAME ─Back to Command / Leave─▶ COMMAND          any ─Log out / Disconnect / Quit to Title─▶ TITLE
+```
+1. **Title:** log in / create account / forgot password, or continue as guest, or play offline.
+2. **Command** (replaces the v0.2 zone lobby; still the chat interface): three game-type cards (Quick Play / Create, featured loot draws), a live games list filtered by type and sub-mode (Join / Watch, live timers and scorelines from `RoomSummary.live`), zone chat, and the Hangar. `roomList.online` shows pilots online.
+3. **Quick Play** (`quickPlay {gameType, subMode?}`): joins the best eligible room (countdown > pending auto-start > lobby > results > playing, weighted by humans; skips timed matches with < 90 s left) or creates an overflow room. Offline it starts the countdown immediately.
+4. **Watch** (`joinRoom {intent:'watch'}`): spectate a running match. Spectators never receive cloaked ships. Optionally (`ZoneOptions.blockSameNetworkWatch`, server env `WATCH_SAME_NETWORK_BLOCK=1`; **off by default**, since one NAT such as a classroom or household is one address), watching a room you are playing in from the same network address is refused (online only; offline never). "Playing" means flying the match (a ship, a pending rejoin, or a rift drop-in), not merely sitting in the room's lobby. The reverse order is closed too: when a pilot from a watcher's network drops into the match, that watcher's feed stops at once and they are sent back to Command with the refusal line (`RoomHost.returnToLobby`). With the rule enabled, one NAT (a classroom, or two tabs on one machine) is one address, so a two-tab check must Watch from a second network.
+5. **Hangar** (`HangarModal`, not a screen state): equip cosmetics per class, `equip` / `seenItems` messages handled by the Zone.
+6. **Room lobby:** team (or party) columns, ship picker, room chat, type-aware host settings (locked outside the lobby), Ready/Start, Back to Command. You can drop into a running match (dungeon: at the next floor).
+7. **In match:** HUD (one top-centre strip: rift OR objective OR classic timer+wave; the clock is hidden when untimed), in-game chat (Enter = all, T or `//` = team), kill feed, level-up cards, Tab scoreboard.
+8. **Results:** 12 s with the Debrief panel (loot reveals), then back to the room lobby.
+- **Offline:** the same Command UI with local house rooms (one per type that has a ready sub-mode); custom local rooms are capped at 3. Loot uses the device profile.
+- **Room guards:** a countdown/playing room with no humans for `BOTS_ONLY_ABORT_SEC` returns to its lobby (no results, no grants), and online at most `MAX_PLAYING_ROOMS` rooms run at once. Quick Play overflow rooms are user-created rooms of the caller under the same caps as Create (`MAX_ROOMS_PER_ADDRESS`, one empty room per connection is recycled, `MAX_ROOMS`). `botFill`, `matchMinutes`, `objectiveLimit` and `scoreLimit` changed during a match apply at the next match.
+- **Join order:** a joiner's first room message is its `roomState`, then `chatHistory`, then any tells and a live drop-in's `matchStart` (the client switches its chat/match context on a roomState for a new room).
+
+Chat commands (Room agent): zone `/help`, `/rooms`, `/join <n|name>`, `/play <type> [sub]`; room `/help`, `/name X`, `/team N|auto|spec`, `/ship <class>`, and host-only `/type`, `/sub`, `/floors 3|6`, `/target <n>`, `/mode ffa|teams N`, `/bots N`, `/skill easy|normal|hard`, `/pve 1-3`, `/start`, `/end` (in a dungeon: abandon the rift; unsecured loot is lost).
+
+## 5. Wire format (ROOM agent owns codec, CLIENT consumes)
+- JSON text frames carry `ClientMsg` / `ServerMsg` (`protocol.ts`). **`PROTOCOL_VERSION` = 4** (`version.ts`); the Zone refuses a hello with any other value. v0.3's single bump covers game types, `quickPlay`, join intents, `floorStart`, `profile` / `lootGrant`, `equip` / `seenItems`, `matchStart {gameType, subMode, floor}`, `roomList.online`, and the new snapshot layout. (The proposal §8.4 says 3, but v0.2.1 had already shipped 3, so v0.3 is 4.)
+- New client messages (`quickPlay`, `equip`, `seenItems`) are added to validate.ts `KNOWN` with shape checks and to `MSG_CLASSES`. Join intents are whitelisted to `lobby | play | watch`; the server-internal `'quick'` intent is never accepted from the wire.
+- Snapshots are binary frames. Positions are uint16 in 1/8 px (map < 8192), velocities int16 (px/s), angles uint8 (256 steps), and fractions uint8. `playerId` is u32 (ship and loot records). Events and other rare state go at the end as a small JSON tail.
+- **v0.3 snapshot layout** (proposal §8.9, ROOM implements in M1):
+  - header: `u8 version, u32 tick, u32 ackSeq, u16 nShips, u16 nEnemies, u16 nProjectiles, u16 nGems, u16 nDeployables, u16 nLoot` (21 bytes).
+  - ship (35 B), enemy, proj, gem, deploy and the binary `you.stats` section: unchanged. `ENEMY_KINDS` appends `'matriarch'` (unknown index → `'drone'`); the ship-class fallback is `'brute'`.
+  - loot: `u32 id, u16 x, u16 y (1/8 px), u8 rarity | setIdx<<3, u32 reservedFor, u8 lifeFrac` (14 B; `setIdx` = `LOOT_SETS` order). Count 0 until M2.
+  - tail: `u32 byteLength + UTF-8 JSON { you, match, events, carry?: number[] (flat shipId, n, best), xs?, xk? }`. `match` carries `timed`, `gameType`, `subMode`, and `dungeon` (RiftView) / `objective` (ObjectiveView) when present; its JSON is memoized per MatchView object (one shared view per `prepare()`). `you` gains `rift`, `carried`, `carryCap`.
+  - Codec `VERSION`: the proposal calls this layout "v4", but v0.2.1 already shipped codec VERSION 4 (the u32 playerId), so the layout above must bump the codec to **VERSION 5**.
+- Interest management: enemies, projectiles, gems, loot and positional events farther than `INTEREST_RADIUS` from the viewer's focus are dropped (epic+ caches are always sent). Ships are always sent, except cloaked opponents more than 180 px away, and **spectators never receive cloaked ships**. Every carrier the viewer receives appears in `carry` (the renderer beacons ≥ `LOOT_BEACON_COUNT` caches or an epic+ cache); a hidden cloaker's carry is never sent. `GLOBAL_EVENT_TYPES` lists the events every client receives (rift `spawnWarn` / `telegraph` and `lootDrop` stay positional); a `lootPickup` by a ship the viewer does not receive (a hidden cloaker) is dropped for that viewer, and the renderer draws no pickup FX for cloaked / faint non-allies.
+- `SHIPFLAG_CARRIER` (128) occupies the last free bit of the u8 ship flags byte.
+- `match.objective` (ObjectiveView JSON, shared by every viewer): ≈ 200–260 B for CTF (2 teams) and Hot Point, ≈ 320 B for 4-team CTF, ≈ 390 B for 3 Control Zones and ≈ 600 B for 5 (every zone entry repeats its default-valued fields). That is over the proposal's ≈ 200–250 B estimate; packing zones as tuples would need a codec change, so the measured sizes are the budget until then (Zones snapshots run ≈ +11% over Arena DM).
+
+## 6. Performance budget
+- Server tick for 32 ships + 350 enemies + 1500 projectiles: under 4 ms. Use the spatial hash in `world.ts`, rebuilt once per tick. The single-threaded server runs at most `MAX_PLAYING_ROOMS` (6) sims at once; idle house rooms have no Sim.
+- Rift floor generation < 15 ms. No per-tick storage I/O: profile writes happen once per match (one transaction), plus rate-limited equips.
+- Client: 60 fps with bloom on mid hardware. Pool Pixi objects (no per-frame allocation of display objects) and cap particles around 4000. Cosmetics add ≤ 0.3 ms per frame at 32 ships.
+
+## 7. Definition of done
+**v0.1 / v0.2 baseline (always):** `npm run typecheck` clean; `npm test` green; `npm run smoke` runs 60 s of 16 bots in teams mode without throwing; offline and online play work end-to-end.
+
+**v0.3 milestones** (`package.json` goes `0.3.0-m1` → `-m2` → `-m3` → `0.3.0`; each is shippable):
+- **M1: Contract + Command** — frozen contract and stubs (this file, `docs/v0.3-proposal.md` §8); PROTOCOL 4 + codec VERSION 5 layout (loot count 0); Command screen with type cards, live list, Quick Play / Join / Watch / Create; house rooms; Create Game modal; Arena Deathmatch + Warzone Classic playable; correctness fixes §1.3.B (bots cap on active humans, spectator cloak + same-address watch, `timed`, in-place class swap, bots-only abort, playing cap, …). Ready after: `deathmatch`. Manual check: offline Title → Command → Quick Play (one click) → match → results → Command; two online tabs see each other's rooms live, Join, Watch, chat; phone width has no horizontal scroll.
+- **M2: Loot core** (landed as `0.3.0-m2`) — in-world caches (drop / carry / spill / secure), debrief crates, pity, duplicates → shards, profile persistence (SQLite + ledger, `MIGRATIONS[1]`), device profile for offline and guests, Hangar, cosmetic renderer for the 7 slots. Tests: catalog invariants, 100k-roll weight check, idempotent grants, `commitGrants` + migration, readability test. Smoke: 60 s warzone with `lootMult` 1.
+- **M3: Objectives** (landed as `0.3.0-m3`; `ctf`, `zones`, `hotpoint` are `ready`) — Arena CTF, Control Zones, Hot Point; Warzone Control Zones; objective bots, HUD and render. Each sub-mode flips `ready` only when the smoke AI-parity run passes (16 bots, 5 sim-minutes: ≥ 1 capture / ≥ 2 zone captures / ≥ 1 hot capture + 2 moves). Gates: `npm run smoke -- --mode all` (and `--mode hotpoint --ffa`) on the Room path; `npm test -- src/shared/ai/objectiveParity.test.ts` on the real Sim (it also holds the Arena DM PvP-rate check: ≥ 15 kills a minute, mean of 8 seeds).
+- **M4: Dungeon Runner** (landed as `0.3.0`; `coop` is `ready`) — co-op rift (1–4 pilots, 3 or 6 floors), sealed rooms, lives, the Matriarch, extraction, floor swap, rift bots, HUD and render, plus the soundtrack wiring (Music volume / mute in Settings). `coop` flipped `ready` once "4 normal bots clear floor 1 of seed 1234 within 6 sim-minutes" passed on the real Sim: 98 s (seeds 1 / 2 / 3 / 777 / 99999: 84–103 s, no deaths). The gate lives in `src/shared/ai/riftParity.test.ts` (not `bots.test`, which mocks `sim/map`). Also: `npm run smoke -- --rift` (180 s on the Room path: floor reached, a drop-in, `/end` abandon; `--rift 700 --floors 3 --no-dropin` clears a run); the M3 gates and the lootMult-0 golden digest are unchanged.

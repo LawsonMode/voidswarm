@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "vite", "runtimeExecutable": "npx", "runtimeArgs": ["vite"], "port": 5173 },
+    { "name": "server", "runtimeExecutable": "npx", "runtimeArgs": ["tsx", "src/server/index.ts"], "port": 7777 },
+    {
+      "name": "server-playtest",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "src/server/index.ts"],
+      "port": 7777,
+      "env": { "DB_PATH": "data/playtest.db", "PUBLIC_URL": "http://localhost:5173" }
+    }
+  ]
+}

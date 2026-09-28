@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voidswarm Music Demo</title>
+  <style>
+    :root { --bg: #07041a; --panel: #120a2e; --line: #2b1a5c; --pink: #ff3fa4; --cyan: #33e6ff; --violet: #9d7bff; --text: #e8e2ff; --dim: #8f86b8; --warn: #ffb347; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, Segoe UI, sans-serif; }
+    body { background: linear-gradient(180deg, #07041a 0%, #150633 60%, #2a0a3e 100%) fixed; min-height: 100vh; }
+    main { max-width: 980px; margin: 0 auto; padding: 20px 16px 40px; }
+    h1 { margin: 0 0 2px; font-size: 26px; letter-spacing: 0.06em; background: linear-gradient(90deg, var(--pink), var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .sub { color: var(--dim); margin: 0 0 16px; }
+    .panel { background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+    .panel h2 { margin: 0 0 10px; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--violet); }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button { background: #1c1145; color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 8px 12px; font: inherit; cursor: pointer; }
+    button:hover { border-color: var(--violet); }
+    button.on { background: linear-gradient(90deg, #5a1a7a, #1a3f7a); border-color: var(--cyan); box-shadow: 0 0 10px #33e6ff55; }
+    button.big { font-size: 16px; padding: 12px 18px; border-color: var(--pink); }
+    label { color: var(--dim); }
+    input[type=range] { width: 220px; accent-color: var(--pink); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; }
+    .kv { font: 13px Consolas, monospace; }
+    .kv b { display: block; color: var(--dim); font-weight: normal; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+    .meter { position: relative; height: 16px; background: #0b0724; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin: 4px 0 10px; }
+    .meter > div { position: absolute; top: 0; bottom: 0; left: 0; }
+    .meter .fill { background: linear-gradient(90deg, var(--cyan), var(--violet) 70%, var(--pink)); }
+    .meter .hold { width: 2px; background: #fff; }
+    .mono { font: 12px Consolas, monospace; white-space: pre-wrap; color: var(--dim); }
+    .warn { color: var(--warn); }
+    select { background: #1c1145; color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 7px; font: inherit; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script type="module" src="./audio/music/demo.ts"></script>
+</body>
+</html>
