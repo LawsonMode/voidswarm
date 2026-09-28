@@ -39,7 +39,21 @@ export const ERR = {
   notFound: 'Not found',
   origin: 'Origin not allowed',
   server: 'Server error',
+  /** Login of a banned account / from a banned network (after the password was proven: reveals nothing to others). */
+  signInBlocked: "This account can't sign in right now.",
 } as const;
+
+/**
+ * Moderation seam (src/server/moderation): lets the game server refuse sign-ins of banned accounts / networks and
+ * account creation from banned networks (or with names the filter refuses). Both are optional; a throwing guard is
+ * logged and ignored (fail open: a broken moderation store must not lock every pilot out).
+ */
+export interface SignInGuard {
+  /** After the password is proven, before a session is minted. true = refuse (403 ERR.signInBlocked). */
+  login?(account: { accountId: string; username: string }, ip: string): boolean;
+  /** After the cheap checks and the rate limit, before any lookup. A refusal is answered as given. */
+  register?(username: string, ip: string): { status: number; message: string } | null;
+}
 
 export interface AuthLimits {
   loginPerIp: [max: number, windowMs: number];
@@ -71,6 +85,8 @@ export interface AuthDeps {
   /** Mail sender. Default: SMTP via nodemailer if SMTP_HOST is set, else the dev console logger. */
   mailer?: Mailer;
   limits?: Partial<AuthLimits>;
+  /** Moderation guard for login / register (see SignInGuard). Default: none. */
+  guard?: SignInGuard;
 }
 
 type Handler = (body: Record<string, unknown>, ip: string) => Promise<[status: number, body: unknown]>;
@@ -148,6 +164,26 @@ export function createAuthServiceWith(opts: AuthOptions, deps: AuthDeps = {}): A
     if (wait > 0) throw rateLimited(wait);
   };
 
+  const signInGuard = deps.guard;
+  /** SignInGuard.login: true = refuse. Fails open (logged). */
+  const loginRefused = (a: AccountRow, ip: string): boolean => {
+    if (!signInGuard?.login) return false;
+    try { return signInGuard.login({ accountId: a.id, username: a.username }, ip) === true; } catch (e) {
+      log(`[auth] sign-in guard failed: ${(e as Error)?.message ?? e}`);
+      return false;
+    }
+  };
+  /** SignInGuard.register: throws the refusal as an HttpError. Fails open (logged). */
+  const registerGuard = (username: string, ip: string): void => {
+    if (!signInGuard?.register) return;
+    let refusal: { status: number; message: string } | null = null;
+    try { refusal = signInGuard.register(username, ip); } catch (e) {
+      log(`[auth] register guard failed: ${(e as Error)?.message ?? e}`);
+      return;
+    }
+    if (refusal) throw new HttpError(refusal.status >= 400 && refusal.status < 500 ? refusal.status : 403, String(refusal.message || ERR.badRequest));
+  };
+
   type RevokeListener = (accountId: string, sessionTokenHash: string | null) => void;
   const revokeListeners: RevokeListener[] = [];
   /** Tell the server a session (hash) or all of an account's sessions (null) are gone. Call after commit. */
@@ -198,6 +234,7 @@ export function createAuthServiceWith(opts: AuthOptions, deps: AuthDeps = {}): A
     // Counted after cheap validation (typos don't burn the budget) but before any lookup, so
     // probing which names/emails exist is capped too.
     guard(registerIp, ip);
+    registerGuard(username, ip); // moderation: banned network / refused name
     const usernameLower = username.toLowerCase();
     const emailLower = email.toLowerCase();
     // One generic answer for both collisions: register must not say that an email has an account
@@ -284,6 +321,9 @@ export function createAuthServiceWith(opts: AuthOptions, deps: AuthDeps = {}): A
           throw new HttpError(401, ERR.badLogin);
         }
       }
+      // Moderation: a banned account / network gets one generic refusal, only once the password is proven (so it
+      // tells nobody but the owner that the account is restricted). The slots are released as for a success.
+      if (loginRefused(account, ip)) throw new HttpError(403, ERR.signInBlocked);
       store.setLastLogin(account.id, now());
       const token = newSession(account.id);
       const out: AuthResponse = { token, account: toInfo(account) };

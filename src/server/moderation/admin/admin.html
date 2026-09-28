@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Voidswarm Moderation</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+  <script type="module" src="/admin/admin.js"></script>
+</head>
+<body>
+  <noscript><p class="status error">The moderation dashboard needs JavaScript.</p></noscript>
+  <p class="boot-msg muted" id="boot-msg">Loading…</p>
+
+  <!-- ============ LOGIN ============ -->
+  <main id="login-view" class="login-wrap" hidden>
+    <div class="panel login-card">
+      <h1 class="logo">VOIDSWARM</h1>
+      <div class="logo-sub">Moderation</div>
+      <form id="login-form" autocomplete="on" novalidate>
+        <label class="lbl">Username or email
+          <input class="field" id="login-user" name="username" autocomplete="username" maxlength="254" required spellcheck="false" autocapitalize="off">
+        </label>
+        <label class="lbl">Password
+          <input class="field" id="login-pass" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+        </label>
+        <button class="btn btn-primary" id="login-submit" type="submit">Sign in</button>
+        <div class="status" id="login-status" role="status" aria-live="polite"></div>
+      </form>
+      <p class="login-note">Moderator accounts only. A moderator is promoted from the server console
+        (<code>npm run mod -- promote &lt;username&gt;</code>). You are signed out when this tab closes.</p>
+    </div>
+  </main>
+
+  <!-- ============ APP ============ -->
+  <div id="app-view" class="app" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo-mark">VOIDSWARM</span>
+        <span class="brand-sub">Moderation</span>
+      </div>
+      <div class="whoami">
+        <span>Signed in as <strong id="who-name"></strong></span>
+        <button class="btn btn-ghost btn-small" id="logout-btn" type="button">Log out</button>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Moderation sections">
+      <button class="tab" role="tab" id="tab-btn-live" data-tab="live" aria-controls="tab-live" aria-selected="true" type="button">Live</button>
+      <button class="tab" role="tab" id="tab-btn-chat" data-tab="chat" aria-controls="tab-chat" aria-selected="false" tabindex="-1" type="button">Chat log</button>
+      <button class="tab" role="tab" id="tab-btn-reports" data-tab="reports" aria-controls="tab-reports" aria-selected="false" tabindex="-1" type="button">Reports<span class="count" id="reports-count" hidden></span></button>
+      <button class="tab" role="tab" id="tab-btn-bans" data-tab="bans" aria-controls="tab-bans" aria-selected="false" tabindex="-1" type="button">Bans &amp; mutes</button>
+      <button class="tab" role="tab" id="tab-btn-actions" data-tab="actions" aria-controls="tab-actions" aria-selected="false" tabindex="-1" type="button">Actions</button>
+    </nav>
+
+    <!-- ---------- LIVE ---------- -->
+    <section id="tab-live" role="tabpanel" aria-labelledby="tab-btn-live">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Online players <span class="muted small" id="live-count"></span></h2>
+          <div class="btn-row">
+            <label class="check"><input type="checkbox" id="live-auto" checked> Auto-refresh</label>
+            <button class="btn btn-small" id="live-refresh" type="button">Refresh</button>
+          </div>
+        </div>
+        <div class="status" id="live-status" role="status" aria-live="polite"></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Player</th><th>Type</th><th>Room</th><th>Address</th><th>Strikes</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="live-body"></tbody>
+          </table>
+        </div>
+        <p class="hint">Strikes are blocked messages in the last 10 minutes. Everyone in one school or household usually shares one address.</p>
+      </div>
+
+      <div class="panel" id="whois-panel">
+        <div class="panel-head">
+          <h2>Player lookup</h2>
+          <form id="whois-form" class="btn-row" novalidate>
+            <label class="sr-only" for="whois-input">Callsign or username</label>
+            <input class="field" id="whois-input" maxlength="64" placeholder="Callsign or username" spellcheck="false" autocomplete="off">
+            <button class="btn btn-small btn-primary" type="submit">Look up</button>
+          </form>
+        </div>
+        <div class="status" id="whois-status" role="status" aria-live="polite"></div>
+        <div id="whois-view" hidden>
+          <dl class="detail-grid" id="whois-meta"></dl>
+          <div class="btn-row" id="whois-buttons"></div>
+          <h3 class="sub-head">Active bans &amp; mutes</h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Kind</th><th>Scope</th><th>Target</th><th>Reason</th><th>By</th><th>Expires</th><th></th></tr></thead>
+              <tbody id="whois-bans"></tbody>
+            </table>
+          </div>
+          <h3 class="sub-head">Recent moderation</h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Time</th><th>Moderator</th><th>Action</th><th>Duration</th><th>Reason</th></tr></thead>
+              <tbody id="whois-actions"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- CHAT LOG ---------- -->
+    <section id="tab-chat" role="tabpanel" aria-labelledby="tab-btn-chat" hidden>
+      <div class="panel">
+        <div class="panel-head"><h2>Chat log</h2></div>
+        <form id="chat-filters" class="filters" novalidate>
+          <label class="lbl">Player <input class="field" name="player" maxlength="64" spellcheck="false" autocomplete="off" placeholder="Callsign or username"></label>
+          <label class="lbl">Text <input class="field" name="grep" maxlength="100" autocomplete="off" placeholder="Contains…"></label>
+          <label class="lbl">Address <input class="field" name="address" maxlength="64" spellcheck="false" autocomplete="off"></label>
+          <label class="lbl">Room
+            <select class="field" name="roomId" id="chat-room"><option value="">Any room</option></select>
+          </label>
+          <label class="lbl">Filter action
+            <select class="field" name="action">
+              <option value="">Any</option>
+              <option value="flagged">Flagged (not passed)</option>
+              <option value="block">Blocked</option>
+              <option value="mask">Masked</option>
+              <option value="spam">Spam</option>
+              <option value="muted">Sent while muted</option>
+              <option value="pass">Passed</option>
+            </select>
+          </label>
+          <label class="lbl">Time
+            <select class="field" name="range" id="chat-range">
+              <option value="">Any time</option>
+              <option value="1h">Last hour</option>
+              <option value="1d">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </label>
+          <label class="lbl" data-custom-range hidden>From <input class="field" name="from" type="datetime-local"></label>
+          <label class="lbl" data-custom-range hidden>To <input class="field" name="to" type="datetime-local"></label>
+          <div class="btn-row">
+            <button class="btn btn-ghost btn-small" id="chat-clear" type="button">Clear</button>
+            <button class="btn btn-primary btn-small" type="submit">Search</button>
+          </div>
+        </form>
+        <div class="status" id="chat-status" role="status" aria-live="polite"></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Time</th><th>Room</th><th>Player</th><th>Original</th><th>Shown</th><th>Filter</th><th>Actions</th></tr></thead>
+            <tbody id="chat-body"></tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <span id="chat-page-info"></span>
+          <div class="btn-row">
+            <button class="btn btn-small btn-ghost" id="chat-first" type="button" disabled>Newest</button>
+            <button class="btn btn-small btn-ghost" id="chat-prev" type="button" disabled>Newer</button>
+            <button class="btn btn-small btn-ghost" id="chat-next" type="button" disabled>Older</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- REPORTS ---------- -->
+    <section id="tab-reports" role="tabpanel" aria-labelledby="tab-btn-reports" hidden>
+      <div class="split">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Reports</h2>
+            <div class="btn-row">
+              <label class="sr-only" for="reports-status">Show</label>
+              <select class="field" id="reports-status">
+                <option value="open">Open</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="dismissed">Dismissed</option>
+                <option value="all">All</option>
+              </select>
+              <button class="btn btn-small" id="reports-refresh" type="button">Refresh</button>
+            </div>
+          </div>
+          <div class="status" id="reports-list-status" role="status" aria-live="polite"></div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Time</th><th>Reported</th><th>By</th><th>Reason</th><th>Status</th></tr></thead>
+              <tbody id="reports-body"></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span id="reports-page-info"></span>
+            <div class="btn-row">
+              <button class="btn btn-small btn-ghost" id="reports-prev" type="button" disabled>Newer</button>
+              <button class="btn btn-small btn-ghost" id="reports-next" type="button" disabled>Older</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel" id="report-detail">
+          <div class="panel-head"><h2>Report detail</h2></div>
+          <p class="muted" id="report-empty">Select a report to review it.</p>
+          <div id="report-view" hidden>
+            <dl class="detail-grid" id="report-meta"></dl>
+            <h3 class="sub-head">Their recent chat (when reported)</h3>
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>Time</th><th>Room</th><th>Original</th><th>Shown</th><th>Filter</th></tr></thead>
+                <tbody id="report-chat-body"></tbody>
+              </table>
+            </div>
+            <div class="btn-row report-actions">
+              <button class="btn btn-danger" id="report-ban" type="button">Ban</button>
+              <button class="btn btn-warn" id="report-mute" type="button">Mute</button>
+              <button class="btn btn-accent" id="report-warn" type="button">Warn</button>
+              <button class="btn btn-ghost" id="report-dismiss" type="button">Dismiss</button>
+              <button class="btn btn-ghost" id="report-reopen" type="button" hidden>Reopen</button>
+              <button class="btn btn-ghost" id="report-log" type="button">Full chat log</button>
+            </div>
+            <div class="status" id="report-status" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- BANS & MUTES ---------- -->
+    <section id="tab-bans" role="tabpanel" aria-labelledby="tab-btn-bans" hidden>
+      <div class="panel">
+        <div class="panel-head"><h2>New ban or mute</h2></div>
+        <form id="ban-form" novalidate>
+          <div class="form-grid">
+            <label class="lbl">Type
+              <select class="field" name="kind" id="ban-kind">
+                <option value="ban">Ban</option>
+                <option value="mute">Mute</option>
+              </select>
+            </label>
+            <label class="lbl">Who
+              <select class="field" name="scope" id="ban-scope">
+                <option value="target">A player or account (by name)</option>
+                <option value="guest">Every guest on a network address</option>
+                <option value="address">Everyone on a network address</option>
+              </select>
+            </label>
+            <label class="lbl"><span id="ban-target-label">Callsign or username</span>
+              <input class="field" name="target" id="ban-target" maxlength="64" spellcheck="false" autocomplete="off" required>
+            </label>
+            <p class="hint warn-hint wide" id="ban-scope-hint" hidden></p>
+            <div class="lbl wide">Duration
+              <div class="presets" id="ban-presets" role="group" aria-label="Duration"></div>
+            </div>
+            <label class="lbl wide">Reason (shown to the player)
+              <input class="field" name="reason" id="ban-reason" maxlength="200" autocomplete="off" required>
+            </label>
+            <div class="btn-row wide">
+              <button class="btn btn-danger" type="submit" id="ban-submit">Ban</button>
+              <span class="status" id="ban-status" role="status" aria-live="polite"></span>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Bans &amp; mutes</h2>
+          <div class="btn-row">
+            <label class="sr-only" for="bans-kind">Kind</label>
+            <select class="field" id="bans-kind">
+              <option value="all">Bans and mutes</option>
+              <option value="ban">Bans only</option>
+              <option value="mute">Mutes only</option>
+            </select>
+            <label class="check"><input type="checkbox" id="bans-inactive"> Show ended</label>
+            <button class="btn btn-small" id="bans-refresh" type="button">Refresh</button>
+          </div>
+        </div>
+        <div class="status" id="bans-status" role="status" aria-live="polite"></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Kind</th><th>Scope</th><th>Target</th><th>Reason</th><th>By</th><th>Created</th><th>Expires</th><th></th></tr></thead>
+            <tbody id="bans-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- ACTIONS (audit trail) ---------- -->
+    <section id="tab-actions" role="tabpanel" aria-labelledby="tab-btn-actions" hidden>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Moderation actions</h2>
+          <form id="actions-form" class="btn-row" novalidate>
+            <label class="sr-only" for="actions-target">Target</label>
+            <input class="field" id="actions-target" maxlength="64" placeholder="Filter by target" spellcheck="false" autocomplete="off">
+            <label class="check"><input type="checkbox" id="actions-reads"> Show dashboard reads</label>
+            <button class="btn btn-small" type="submit">Refresh</button>
+          </form>
+        </div>
+        <div class="status" id="actions-status" role="status" aria-live="polite"></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Time</th><th>Moderator</th><th>Action</th><th>Target</th><th>Duration</th><th>Reason</th></tr></thead>
+            <tbody id="actions-body"></tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <span id="actions-page-info"></span>
+          <div class="btn-row">
+            <button class="btn btn-small btn-ghost" id="actions-prev" type="button" disabled>Newer</button>
+            <button class="btn btn-small btn-ghost" id="actions-next" type="button" disabled>Older</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ DIALOG (confirm / ban / mute / warn) — fields are built by admin.js ============ -->
+  <dialog id="dlg" class="modal" aria-labelledby="dlg-title">
+    <form method="dialog" id="dlg-form" novalidate>
+      <div class="modal-body">
+        <h2 id="dlg-title"></h2>
+        <p id="dlg-text"></p>
+        <p class="modal-target" id="dlg-target"></p>
+        <div id="dlg-fields" class="modal-fields"></div>
+        <div class="modal-error" id="dlg-error" role="alert"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="dlg-cancel" type="button">Cancel</button>
+        <button class="btn btn-danger" value="ok" id="dlg-ok" type="submit">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-host" id="toasts" aria-live="polite"></div>
+</body>
+</html>

@@ -12,10 +12,17 @@ import { ProfileService, type ProfileMsg } from '../profile/service';
 import type { ProfileStore } from '../profile/store';
 import type { GameType, PlayerId, Snapshot, SubMode } from '../types';
 import { GAME_VERSION, PROTOCOL_VERSION } from '../version';
+import { checkName, filterChat, isSpam, tameText, type FilterResult, type Strictness } from '../moderation/filter';
+import {
+  MOD_COMMANDS, MSG_BLOCKED, MSG_CARE, MSG_NAME_REFUSED, MSG_REPORT_OFFLINE, MSG_REPORT_USAGE, MSG_ROOM_NAME_REFUSED, MSG_SPAM,
+  REPORT_COMMAND, SPAM_RECENT_MAX, SPAM_RECENT_MS, blockCategories, hitLabel, mutedMessage,
+  type ChatAction, type ChatLogEntry, type LogChannel, type ModerationHook, type ModUser, type MuteInfo, type OnlinePilot,
+  type ReplyLines, type StrikeReason,
+} from './moderation';
 import { Room, subModeShort } from './Room';
 import {
-  ConnectionRate, allowChat, takeToken, type LootGrantEntry, type LootGrantOutcome, type RoomHost, type TokenBucket,
-  type ZoneUser,
+  ConnectionRate, allowChat, takeToken, type ChatWhere, type LootGrantEntry, type LootGrantOutcome, type RoomHost,
+  type TokenBucket, type ZoneUser,
 } from './user';
 import {
   ROOM_NAME_MAX_LEN, clampSettings, dedupeName, nameKey, parseGameType, parseSubMode, quickPlayScore, sanitizeBotName,
@@ -85,7 +92,22 @@ export interface ZoneOptions {
    * it: everything goes through the Zone's ProfileService (attach on hello, equip / seenItems, grantLoot).
    */
   profiles?: ProfileStore;
+  /**
+   * Moderation hook (optional; room/moderation.ts). The word filter always runs (online and offline); this adds the
+   * host's chat log, mutes, strikes / auto-mute, moderator commands and /report. The Node server injects its
+   * SQLite-backed implementation (src/server/moderation/service.ts); offline there is none.
+   */
+  moderation?: ModerationHook;
+  /**
+   * Word-filter strictness for chat and human-chosen names (moderation/filter.ts). Default 'strict' (classroom:
+   * profanity AND mild words are starred); 'standard' lets the mild tier through. Slurs, hate, sexual content,
+   * threats and self-harm statements are blocked either way. The server sets it from env CHAT_FILTER.
+   */
+  chatFilter?: Strictness;
 }
+
+/** Zone-lobby chat lines are logged under this room name (roomId null). */
+export const ZONE_LOG_ROOM_NAME = 'Zone';
 
 /** User-created rooms with no humans close after this long (server mode only). */
 export const EMPTY_ROOM_CLOSE_SEC = 60;
@@ -110,9 +132,12 @@ export const PROFILE_RETRY_SEC = 5;
 const REGISTERABLE_KEY_RE = /^[a-z0-9_-]{3,16}$/;
 
 const ZONE_HELP = [
-  'Zone commands: /help  /name <callsign>  /rooms  /join <room # or name>  /play <type> [mode]',
+  'Zone commands: /help  /name <callsign>  /rooms  /join <room # or name>  /play <type> [mode]  /report <name> <reason>',
   'Types: dungeon, arena, warzone (e.g. /play arena dm, /play warzone). Or use Quick Play / Join / Watch / Create.',
 ];
+
+/** Fallback when a command handler of the moderation hook throws / rejects. */
+const MOD_FAILED_MSG = 'That command failed — see the server log.';
 
 /** 31-bit random seed, from the platform CSPRNG when there is one (browsers, Node 19+). */
 function cryptoSeed(): number {
@@ -154,9 +179,15 @@ export class Zone {
   private readonly bootId = makeBootId();
   /** v0.3 M2: the only door to profile storage (Room never touches it). */
   private readonly profiles: ProfileService;
+  /** Moderation hook (null offline / in tests without one): filter only. */
+  private readonly mod: ModerationHook | null;
+  /** Word-filter strictness (ZoneOptions.chatFilter; 'strict' unless the host says 'standard'). */
+  private readonly filterOpts: { strictness: Strictness };
 
   constructor(opts: ZoneOptions) {
     this.opts = opts;
+    this.mod = opts.moderation ?? null;
+    this.filterOpts = { strictness: opts.chatFilter === 'standard' ? 'standard' : 'strict' };
     this.profiles = new ProfileService(opts.profiles ?? null, { log: (line) => this.log(line) });
     const self = this;
     this.hostApi = {
@@ -178,6 +209,8 @@ export class Zone {
         this.tell(u, reason);
       },
       grantLoot: (entries) => this.grantLoot(entries),
+      chatGate: (u, text, where) => this.chatGate(u, text, where),
+      roomNameAllowed: (u, name) => this.nameAllowed(u, name, 'room', u?.room ?? null),
     };
     const defs = opts.defaultRooms.length ? opts.defaultRooms : [{}];
     for (const d of defs) this.createRoomInternal(this.settingsFor(d), false);
@@ -277,6 +310,41 @@ export class Zone {
     this.tickCount++;
     for (const r of this.rooms.values()) r.tick();
     this.housekeeping();
+  }
+
+  // --- Moderation (called by the host's moderation service, never from a tick) ---
+
+  /** Every greeted connection, with its account, address and room (moderation: online list, lookups). */
+  onlinePilots(): OnlinePilot[] {
+    const out: OnlinePilot[] = [];
+    for (const u of this.users.values()) out.push(this.pilotOf(u));
+    return out;
+  }
+
+  /**
+   * Kick every greeted connection `select` picks (a ban took effect): each gets { type:'error', message: reason },
+   * leaves the zone and is closed by its transport. Returns how many were kicked.
+   */
+  kickPilots(select: (p: OnlinePilot) => boolean, reason: string): number {
+    let n = 0;
+    for (const u of [...this.users.values()]) {
+      if (u.kicked) continue;
+      let hit = false;
+      try { hit = select(this.pilotOf(u)); } catch { hit = false; }
+      if (!hit) continue;
+      this.kick(u, reason);
+      n++;
+    }
+    if (n) this.flush();
+    return n;
+  }
+
+  /** A private system line to one pilot (moderator warnings, report notices). False = not connected. */
+  tellPilot(playerId: PlayerId, text: string): boolean {
+    const u = this.users.get(playerId);
+    if (!u || u.kicked) return false;
+    this.tell(u, text);
+    return true;
   }
 
   // ------------------------------------------------------------------------------------------
@@ -413,13 +481,19 @@ export class Zone {
     return dedupeName(base, (n) => taken.has(nameKey(n)) || this.isReservedLookalike(n));
   }
 
-  private renameUser(user: ZoneUser, raw: string): string {
+  /** `via` 'msg' = a setName message (a refusal is an error), 'cmd' = the /name chat command (a system line). */
+  private renameUser(user: ZoneUser, raw: string, via: 'cmd' | 'msg' = 'cmd'): string {
     if (user.account) {
       this.tell(user, 'Your callsign is your account name.');
       return user.name;
     }
     const next = this.uniqueName(raw, user.playerId);
     if (next === user.name) return next;
+    if (!this.nameAllowed(user, next, 'name', user.room)) {
+      if (via === 'msg') user.sink.sendMsg({ type: 'error', message: MSG_NAME_REFUSED });
+      else this.tell(user, MSG_NAME_REFUSED);
+      return user.name;
+    }
     const old = user.name;
     user.name = next;
     const text = `${old} is now known as ${next}.`;
@@ -452,6 +526,16 @@ export class Zone {
     } else {
       name = this.uniqueName(typeof rawName === 'string' ? rawName : '', pid);
     }
+    // Moderation: a guest callsign the name filter refuses becomes a generated one (logged below; a strike only when
+    // the name is hateful / sexual / a slur, see nameRefused).
+    let refused: { name: string; reason: string; severe: boolean } | null = null;
+    if (!account) {
+      const chk = this.checkNameSafe(name);
+      if (!chk.ok) {
+        refused = { name, reason: chk.reason, severe: chk.severe };
+        name = this.uniqueName(`Pilot${1000 + Math.floor(Math.random() * 9000)}`, pid);
+      }
+    }
     const user: ZoneUser = {
       playerId: pid, name, sink, room: null, ping: 0, chatTimes: [], account, kicked: false, address, ownedRoomId: null,
       profile: null, profileKey: null, profileWritable: false, opTimes: [],
@@ -465,6 +549,10 @@ export class Zone {
     this.lobbyDirty = true; // everyone else's list: coalesced by housekeeping
     sink.sendMsg(this.lobbyStateMsg()); // roomState (zone lobby) before history
     sink.sendMsg({ type: 'chatHistory', lines: this.zoneChat.slice() });
+    if (refused) {
+      this.nameRefused(user, refused.name, refused.reason, refused.severe, 'name', null);
+      this.tell(user, `That callsign isn't allowed here — you're flying as ${user.name}. Pick another with /name.`);
+    }
     this.presenceLine(`${user.name} entered the zone.`);
     this.log(`+ ${user.name} (#${pid}${account ? ', account' : ', guest'}) — ${this.users.size} online`);
     return user;
@@ -583,6 +671,11 @@ export class Zone {
    */
   private createRoomFor(user: ZoneUser, patch: unknown): void {
     const settings = this.settingsFor(patch);
+    const named = !!patch && typeof patch === 'object' && (patch as Record<string, unknown>).name !== undefined;
+    if (named && !this.nameAllowed(user, settings.name, 'room', null)) {
+      user.sink.sendMsg({ type: 'error', message: MSG_ROOM_NAME_REFUSED });
+      return;
+    }
     if (!SUB_MODES[settings.subMode].ready) {
       // The Zone refuses a type (or sub-mode) that isn't implemented yet (section 3.2).
       user.sink.sendMsg({ type: 'error', message: `${GAME_TYPES[settings.gameType].name} isn't open yet.` });
@@ -765,10 +858,12 @@ export class Zone {
       // v0.3 Hangar messages belong to the ProfileService (§7.3.2); never forwarded to a room.
       case 'equip': case 'seenItems': this.profileOp(user, msg); return;
       case 'leaveRoom': this.leaveRoom(user); return;
-      case 'setName': this.renameUser(user, typeof msg.name === 'string' ? msg.name : ''); return;
+      case 'setName': this.renameUser(user, typeof msg.name === 'string' ? msg.name : '', 'msg'); return;
       case 'chat': {
         const text = sanitizeText(msg.text, CHAT_MAX_LEN);
         if (/^\/leave\b/i.test(text)) { if (user.room) this.leaveRoom(user); return; }
+        // /report and the moderator commands work the same in the zone lobby and in every room.
+        if (this.moderationCommand(user, text)) return;
         if (user.room) { user.room.handle(user, msg); return; }
         this.lobbyChat(user, text);
         return;
@@ -827,7 +922,221 @@ export class Zone {
     }
     if (text.startsWith('//')) text = text.slice(2).trim();
     if (!text) return;
-    this.pushZoneChat({ fromPlayerId: user.playerId, fromName: user.name, channel: 'all', team: NO_TEAM, text, time: Date.now() });
+    const shown = this.chatGate(user, text, { roomId: null, roomName: ZONE_LOG_ROOM_NAME, channel: 'all', team: NO_TEAM });
+    if (shown === null) return;
+    this.pushZoneChat({ fromPlayerId: user.playerId, fromName: user.name, channel: 'all', team: NO_TEAM, text: shown, time: Date.now() });
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // Moderation (room/moderation.ts)
+  // ------------------------------------------------------------------------------------------
+
+  private modUser(u: ZoneUser): ModUser {
+    return {
+      playerId: u.playerId, name: u.name, accountId: u.account?.accountId ?? null, username: u.account?.username ?? null,
+      address: u.address,
+    };
+  }
+
+  private pilotOf(u: ZoneUser): OnlinePilot {
+    return { ...this.modUser(u), roomId: u.room?.id ?? null, roomName: u.room ? u.room.settings.name : null };
+  }
+
+  /** Run a hook call; a throw is logged and yields `fallback`. */
+  private safeHook<T>(what: string, fn: (h: ModerationHook) => T, fallback: T): T {
+    const h = this.mod;
+    if (!h) return fallback;
+    try {
+      return fn(h);
+    } catch (e) {
+      this.log(`moderation ${what} failed: ${(e as Error)?.message ?? e}`);
+      return fallback;
+    }
+  }
+
+  private logChat(entry: ChatLogEntry): void {
+    this.safeHook('logChat', (h) => h.logChat(entry), undefined);
+  }
+
+  /** Record a strike; the hook may answer with a private notice (e.g. an automatic mute). */
+  private strike(user: ZoneUser, reason: StrikeReason): void {
+    const notice = this.safeHook<string | null | void>('onStrike', (h) => h.onStrike(this.modUser(user), reason), null);
+    if (typeof notice === 'string' && notice) this.tell(user, notice);
+  }
+
+  /**
+   * RoomHost.chatGate (and the zone lobby): mute → repeat flood → word filter, then the chat log. Returns the text
+   * to broadcast ('mask' = starred), or null when the line is not shown (the sender got a private notice).
+   */
+  private chatGate(user: ZoneUser, text: string, where: ChatWhere): string | null {
+    const now = Date.now();
+    const log = (action: ChatAction, shown: string, hits: string[]): void => this.logChat({
+      time: now, roomId: where.roomId, roomName: where.roomName, channel: where.channel, team: where.team,
+      playerId: user.playerId, name: user.name, accountId: user.account?.accountId ?? null, address: user.address,
+      original: text, shown, action, hits,
+    });
+    /** The filter's verdict; null when it threw (fail closed: the line is not shown). */
+    const verdict = (): FilterResult | null => {
+      try {
+        return filterChat(text, this.filterOpts);
+      } catch (e) {
+        this.log(`moderation filterChat failed: ${(e as Error)?.message ?? e}`);
+        return null;
+      }
+    };
+    const labels = (r: FilterResult | null): string[] =>
+      (r ? (Array.isArray(r.hits) ? r.hits.slice(0, 20).map(hitLabel) : []) : ['filter-error']);
+    /**
+     * A line that is withheld anyway (muted / repeat flood) is still read by the filter: its hits go to the log, and
+     * a self-harm statement or a threat still reaches the moderators (a pilot who was just muted is exactly the one
+     * who might write one). No strike: the line was never going to be shown.
+     */
+    const withheld = (action: 'muted' | 'spam'): null => {
+      const r = verdict();
+      log(action, '', labels(r));
+      const cats = r ? blockCategories(r.hits) : [];
+      if (cats.includes('selfharm')) { this.tell(user, MSG_CARE); this.alert(user, 'selfharm'); }
+      else if (cats.includes('threat')) this.alert(user, 'threat');
+      return null;
+    };
+    const mute = this.safeHook<MuteInfo | null>('isMuted', (h) => h.isMuted(this.modUser(user)), null);
+    if (mute) {
+      this.tell(user, mutedMessage(mute));
+      return withheld('muted');
+    }
+    const recent = user.recentChat ?? (user.recentChat = []);
+    while (recent.length && (now - recent[0].time > SPAM_RECENT_MS || recent.length > SPAM_RECENT_MAX)) recent.shift();
+    let spam = false;
+    try { spam = isSpam(recent, text, now) === true; } catch (e) { this.log(`moderation isSpam failed: ${(e as Error)?.message ?? e}`); }
+    if (spam) {
+      this.tell(user, MSG_SPAM);
+      return withheld('spam');
+    }
+    recent.push({ text, time: now });
+    // Fail closed: a filter error (r === null) never lets an unchecked line through.
+    const r = verdict();
+    let action: ChatAction = 'block';
+    let shown = '';
+    const hits = labels(r);
+    const blockCats = r ? blockCategories(r.hits) : [];
+    if (r && r.action === 'pass') { action = 'pass'; shown = text; }
+    else if (r && r.action === 'mask' && typeof r.text === 'string' && r.text) { action = 'mask'; shown = r.text; }
+    if (action === 'block') {
+      log('block', '', hits);
+      // A line blocked only as a self-harm statement is not punished: a kind private note, and the host alerts a
+      // moderator. A threat is a strike that moderators hear about at once.
+      if (blockCats.length && blockCats.every((c) => c === 'selfharm')) {
+        this.tell(user, MSG_CARE);
+        this.strike(user, 'selfharm');
+      } else {
+        this.tell(user, MSG_BLOCKED);
+        this.strike(user, blockCats.includes('threat') ? 'threat' : 'language');
+        // a self-harm statement mixed with other blocked language still reaches the moderators
+        if (blockCats.includes('selfharm')) this.alert(user, 'selfharm');
+      }
+      return null;
+    }
+    // Display taming (shouting lowercased, character floods cut back): what everyone sees, and what is logged.
+    try { const tamed = tameText(shown); if (typeof tamed === 'string' && tamed.trim()) shown = tamed; } catch { /* untamed */ }
+    log(action, shown, hits);
+    return shown;
+  }
+
+  /** A self-harm statement / threat in a withheld line: tell the moderators (ModerationHook.alert; no strike). */
+  private alert(user: ZoneUser, kind: 'selfharm' | 'threat'): void {
+    this.safeHook('alert', (h) => h.alert?.(this.modUser(user), kind), undefined);
+  }
+
+  /**
+   * checkName that never throws (a failing filter refuses the name). `reason` = log label(s) of the refusal;
+   * `severe` = a block-tier hit (slur, hate, sexual, threat), the only kind of refused name that is a strike.
+   */
+  private checkNameSafe(name: string): { ok: true } | { ok: false; reason: string; severe: boolean } {
+    try {
+      const r = checkName(name, this.filterOpts);
+      if (r && r.ok) return { ok: true };
+      const list: unknown[] = Array.isArray(r?.hits) ? r.hits : [];
+      const hits = list.slice(0, 5).map(hitLabel).join(', ');
+      const severe = list.some((h) => !!h && typeof h === 'object' && (h as { tier?: unknown }).tier === 'block');
+      return { ok: false, reason: hits || (r && typeof r.reason === 'string' && r.reason ? r.reason : 'name'), severe };
+    } catch (e) {
+      this.log(`moderation checkName failed: ${(e as Error)?.message ?? e}`);
+      return { ok: false, reason: 'filter-error', severe: false };
+    }
+  }
+
+  /**
+   * A refused name attempt: always logged (channel 'name' / 'room'). A strike only when `severe` (a slur, hate,
+   * sexual term or threat): profanity inside a name is refused but not punished, because real names collide with
+   * the list and a student retrying their own name must not end up auto-muted.
+   */
+  private nameRefused(user: ZoneUser, attempted: string, reason: string, severe: boolean,
+    channel: Extract<LogChannel, 'name' | 'room'>, room: Room | null): void {
+    this.logChat({
+      time: Date.now(), roomId: room?.id ?? null, roomName: room ? room.settings.name : ZONE_LOG_ROOM_NAME, channel,
+      team: NO_TEAM, playerId: user.playerId, name: user.name, accountId: user.account?.accountId ?? null,
+      address: user.address, original: attempted, shown: '', action: 'block', hits: [reason],
+    });
+    if (severe) this.strike(user, 'name');
+  }
+
+  /** Is a human-chosen name (callsign or room name) allowed? A refusal is logged (and a strike when severe). */
+  private nameAllowed(user: ZoneUser | null, name: string, channel: 'name' | 'room', room: Room | null): boolean {
+    const chk = this.checkNameSafe(name);
+    if (chk.ok) return true;
+    if (user) this.nameRefused(user, name, chk.reason, chk.severe, channel, room);
+    return false;
+  }
+
+  /**
+   * `/report` (everyone) and the moderator commands (MOD_COMMANDS), in the zone lobby and in rooms. True = handled.
+   * A pilot the hook doesn't call a moderator gets exactly the ordinary unknown-command line, so the commands'
+   * existence never shows (same chat budget, same text as any other unknown command).
+   */
+  private moderationCommand(user: ZoneUser, text: string): boolean {
+    if (!text.startsWith('/') || text.startsWith('//')) return false;
+    const parts = text.slice(1).trim().split(/\s+/);
+    const cmd = (parts[0] || '').toLowerCase();
+    if (cmd !== REPORT_COMMAND && !MOD_COMMANDS.has(cmd)) return false;
+    const args = parts.slice(1);
+    const mu = this.modUser(user);
+    // A moderator's own commands skip the chat budget (a teacher muting / kicking several pilots in a row must not
+    // be told to slow down; the per-connection message limits still apply). Everyone else pays it like any command.
+    const moderator = cmd !== REPORT_COMMAND && this.safeHook('isAdmin', (h) => h.isAdmin(mu) === true, false);
+    if (!moderator && !allowChat(user, Date.now())) { this.tell(user, 'Slow down — chat is rate limited.'); return true; }
+    if (cmd === REPORT_COMMAND) {
+      if (!this.mod) { this.tell(user, MSG_REPORT_OFFLINE); return true; }
+      const target = args[0] ?? '';
+      const reason = args.slice(1).join(' ').trim();
+      if (!target || !reason) { this.tell(user, MSG_REPORT_USAGE); return true; }
+      const room = user.room;
+      this.replyTo(user, 'report', (h) => h.report(mu, target, reason, { roomId: room?.id ?? null, roomName: room ? room.settings.name : ZONE_LOG_ROOM_NAME }));
+      return true;
+    }
+    if (!moderator) {
+      this.tell(user, `Unknown command /${cmd} — try /help`);
+      return true;
+    }
+    this.replyTo(user, cmd, (h) => h.adminCommand(mu, cmd, args));
+    return true;
+  }
+
+  /** Deliver a hook's reply lines (sync or async) to `user` as private system lines. */
+  private replyTo(user: ZoneUser, what: string, fn: (h: ModerationHook) => ReplyLines): void {
+    const h = this.mod;
+    if (!h) return;
+    const fail = (e: unknown): void => {
+      this.log(`moderation /${what} failed: ${(e as Error)?.stack ?? e}`);
+      this.tell(user, MOD_FAILED_MSG);
+    };
+    const send = (lines: unknown): void => {
+      if (!Array.isArray(lines)) return;
+      for (const l of lines) if (typeof l === 'string' && l) this.tell(user, l.slice(0, 500));
+    };
+    let out: ReplyLines;
+    try { out = fn(h); } catch (e) { fail(e); return; }
+    if (out && typeof (out as Promise<string[]>).then === 'function') (out as Promise<string[]>).then(send, fail);
+    else send(out);
   }
 }
 

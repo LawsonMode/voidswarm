@@ -1,6 +1,6 @@
 {
   "name": "voidswarm",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Voidswarm — SubSpace-inspired 32-player neon PvPvE arena shooter (browser client + Node server).",
   "type": "module",
@@ -8,10 +8,13 @@
     "dev": "vite",
     "server": "tsx watch src/server/index.ts",
     "build": "vite build",
+    "build:pages": "vite build --mode pages",
+    "preview:pages": "vite preview --mode pages",
     "start": "tsx src/server/index.ts --serve dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "smoke": "tsx src/shared/smoke.ts"
+    "smoke": "tsx src/shared/smoke.ts",
+    "mod": "tsx src/server/moderation/cli.ts"
   },
   "dependencies": {
     "nodemailer": "^10.0.11",

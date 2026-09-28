@@ -33,7 +33,12 @@ export interface ZoneUser {
   profileWritable: boolean;
   /** epoch ms of recent equip / seenItems ops (ProfileService rate limit). */
   opTimes: number[];
+  /** Moderation: this pilot's recent chat lines (repeat-flood check; see room/moderation.ts SPAM_RECENT_*). */
+  recentChat?: { text: string; time: number }[];
 }
+
+/** Where a chat line was said (moderation gate / chat log). `roomId` null = the zone lobby. */
+export interface ChatWhere { roomId: string | null; roomName: string; channel: 'all' | 'team'; team: number }
 
 /** One human's grant for RoomHost.grantLoot (profileKey = accountId | 'local' | `guest:${playerId}`). */
 export interface LootGrantEntry { user: ZoneUser | null; profileKey: string; input: GrantInput }
@@ -79,6 +84,15 @@ export interface RoomHost {
    * (fix #18); outcomes line up with `entries` by index, and a missing outcome means "not granted" (logged).
    */
   grantLoot(entries: LootGrantEntry[]): LootGrantOutcome[];
+  // --- moderation (room/moderation.ts) ---
+  /**
+   * The moderation gate for one human chat line (after rate limiting and command handling): mute check, repeat
+   * flood, word filter, chat log, strikes. Returns the text to broadcast (possibly masked), or null when nothing is
+   * shown (the sender already got a private notice).
+   */
+  chatGate(user: ZoneUser, text: string, where: ChatWhere): string | null;
+  /** A host renames the room to `name` (already sanitized): false = refused by the name filter (logged + strike). */
+  roomNameAllowed(user: ZoneUser | null, name: string): boolean;
 }
 
 /** Chat rate limit: at most CHAT_BURST messages per CHAT_WINDOW_MS. */

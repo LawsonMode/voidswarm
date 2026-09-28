@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voidswarm — title scene demo</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" />
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #07040f; color: #e8ecff; font: 13px/1.4 system-ui, sans-serif; }
+    #host { position: fixed; inset: 0; }
+    #host canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .mock { position: fixed; border: 1px dashed rgba(255, 255, 255, 0.35); pointer-events: none; }
+    #hud { position: fixed; left: 8px; bottom: 8px; padding: 6px 8px; background: rgba(0, 0, 0, 0.6); border-radius: 4px; white-space: pre; font-family: ui-monospace, monospace; }
+    /* the harness only loads title/* + TitleScreen: build errors elsewhere in the app shouldn't cover it */
+    vite-error-overlay { display: none !important; }
+  </style>
+</head>
+<body>
+  <!-- Dev-only harness: the Title attract scene alone, with mock logo / panel rects. ?q=0|1|2 pins quality, ?reduced=1 shows the poster. -->
+  <div id="host"></div>
+  <div id="hud"></div>
+  <script type="module" src="./demo.ts"></script>
+</body>
+</html>

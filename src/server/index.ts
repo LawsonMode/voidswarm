@@ -8,12 +8,19 @@
 //        TRUST_PROXY=1 (+ optional TRUSTED_PROXIES) — X-Forwarded-For is only believed from a proxy on
 //          loopback / the local network (or listed), so direct clients cannot forge their address,
 //        MAX_CONNECTIONS (default 512), MAX_CONN_PER_IP (default 64; new connections per address are
-//          also rate limited: burst 64, then 1/s).
+//          also rate limited: burst 64, then 1/s),
+//        CHAT_FILTER=strict|standard (word filter; default strict = classroom: mild words starred too; the filter runs
+//          with or without accounts),
+//        moderation (src/server/moderation, needs accounts): CHAT_LOG_RETENTION_DAYS (default 90),
+//          MOD_STRIKE_LIMIT / MOD_STRIKE_WINDOW_MIN / MOD_AUTOMUTE_MIN (default 3 blocked lines in 10 min → 10 min mute).
+//        Moderators: `npm run mod -- promote <username>`; dashboard at /admin; API in moderation/adminApi.md;
+//          guide: docs/MODERATION.md.
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { hostname, networkInterfaces } from 'node:os';
 import { WebSocketServer, WebSocket } from 'ws';
 import { DEFAULT_PORT, SNAPSHOT_EVERY_ONLINE } from '../shared/constants';
+import { parseStrictness } from '../shared/moderation/filter';
 import { WS_CLOSE_KICKED } from '../shared/net/closeCodes';
 import { encodeSnapshot } from '../shared/net/codec';
 import { validateClientMsg } from '../shared/net/validate';
@@ -22,7 +29,10 @@ import type { ClientMsg, ServerMsg } from '../shared/protocol';
 import { houseRooms } from '../shared/room/houseRooms';
 import { Zone, type ClientSink } from '../shared/room/Zone';
 import { GAME_VERSION, PROTOCOL_VERSION } from '../shared/version';
-import { createAuthService, type AuthService } from './auth/index';
+import type { AuthService } from './auth/index';
+import { createAuthServiceWith } from './auth/service';
+import { createAdminHttp, serveAdminPage } from './moderation/http';
+import { ModerationService } from './moderation/service';
 import { createSqliteProfileStore } from './profile/sqliteProfiles';
 import {
   ConnectionGate, EventCarry, SESSION_ENDED_MSG, SessionRegistry, clientAddressKey, createFrameCache,
@@ -69,16 +79,34 @@ const corsOrigins = resolveCorsOrigins(process.env.CORS_ORIGINS, () => defaultCo
 // Accounts are optional infrastructure: if the auth service can't start, everyone plays as a guest.
 const dbPath = process.env.DB_PATH || 'data/voidswarm.db';
 let auth: AuthService | null = null;
+/** Moderation (chat log, bans, mutes, reports, moderators): on the auth DB, so only when accounts are up. */
+let mod: ModerationService | null = null;
 try {
-  auth = createAuthService({
+  auth = createAuthServiceWith({
     dbPath,
     publicUrl,
     corsOrigins,
     log, // auth lines already carry an "[auth]" prefix
+  }, {
+    // Banned accounts / networks can't sign in; banned networks (and filtered names) can't register.
+    guard: {
+      login: (account, ip) => mod ? mod.loginRefused(account, ip) : false,
+      register: (username, ip) => mod ? mod.registerRefusal(username, ip) : null,
+    },
   });
 } catch (e) {
   auth = null;
   log(`WARNING: accounts disabled (auth service failed to start: ${(e as Error)?.message ?? e}). Everyone plays as a guest.`);
+}
+if (auth) {
+  try {
+    mod = new ModerationService({ dbPath, log });
+  } catch (e) {
+    mod = null;
+    log(`WARNING: moderation disabled (${(e as Error)?.message ?? e}) — chat is still filtered but NOT logged, and bans are not enforced.`);
+  }
+} else {
+  log('WARNING: moderation needs the accounts database — chat is still filtered but NOT logged, and bans are not enforced.');
 }
 
 // v0.3 loot profiles (docs/v0.3-proposal.md §7.2): a second connection on the auth DB, opened AFTER the AuthService
@@ -99,10 +127,19 @@ if (auth) {
     : `accounts API: cross-origin allowed for ${corsOrigins.length} origin(s) (+ same-origin); set CORS_ORIGINS to change`);
 }
 
+// Word filter strictness (docs/MODERATION.md): 'strict' unless CHAT_FILTER=standard; a typo stays strict.
+const chatFilter = parseStrictness(process.env.CHAT_FILTER);
+if (process.env.CHAT_FILTER && process.env.CHAT_FILTER.trim().toLowerCase() !== chatFilter) {
+  log(`WARNING: CHAT_FILTER=${JSON.stringify(process.env.CHAT_FILTER).slice(0, 40)} is not strict or standard — using strict.`);
+}
+log(`chat filter: ${chatFilter}${chatFilter === 'strict' ? ' (classroom default)' : ''}`);
+
 const zone = new Zone({
   snapshotEvery: SNAPSHOT_EVERY_ONLINE,
   local: false,
-  motd: `Welcome to Voidswarm v${GAME_VERSION}. Pick a game type and hit Quick Play, or type /help for commands.`,
+  // Say so when chat is logged (docs/MODERATION.md, privacy): players should know a moderator can read it later.
+  motd: `Welcome to Voidswarm v${GAME_VERSION}. Pick a game type and hit Quick Play, or type /help for commands.`
+    + (mod ? ' Chat on this server is filtered and logged for moderators; /report <name> <reason> flags a problem.' : ''),
   // v0.3 house rooms, each only while its sub-mode is `ready` (The Descent, Flag Run, Hot Points, Duel Pit, Warzone
   // Classic — docs/v0.3-proposal.md section 3.3; houseRooms() skips the rest, so The Descent opens once `coop` is ready)
   defaultRooms: houseRooms(false),
@@ -113,6 +150,17 @@ const zone = new Zone({
   // Off by default (classrooms / households share one address); set 1 for public internet hosting.
   blockSameNetworkWatch: process.env.WATCH_SAME_NETWORK_BLOCK === '1',
   profiles,
+  moderation: mod ? mod.hook() : undefined,
+  chatFilter,
+});
+mod?.attachZone(zone);
+
+const adminHttp = createAdminHttp({
+  service: mod,
+  verifyToken: auth ? (t) => auth!.verifyToken(t) : null,
+  corsOrigins,
+  trustProxy: proxyTrust.enabled,
+  log,
 });
 
 /** Live ws connections authenticated with a session, so a logout / password reset can end them. */
@@ -146,6 +194,9 @@ const http = createServer((req, res) => {
   if (proxyTrust.enabled && !isTrustedProxyPeer(req.socket.remoteAddress, proxyTrust)) delete req.headers['x-forwarded-for'];
   void (async () => {
     try {
+      // Moderation first: the admin API (/api/admin/*) and its dashboard (/admin).
+      if (await adminHttp.handle(req, res)) return;
+      if (serveAdminPage(req, res)) return;
       if (auth && (await auth.handleHttp(req, res))) return;
     } catch (e) {
       log(`auth http error: ${(e as Error)?.stack ?? e}`);
@@ -225,12 +276,14 @@ wss.on('connection', (ws: WebSocket, req) => {
   let pending: ClientMsg[] | null = null;
   const onHello = async (hello: Extract<ClientMsg, { type: 'hello' }>): Promise<void> => {
     let invalid = false;
+    let accountId: string | null = null;
     if (auth && typeof hello.token === 'string' && hello.token) {
       const token = hello.token;
       try {
         const acc = await auth.verifyToken(token);
         conn.setAccount(acc);
         invalid = !acc;
+        accountId = acc ? acc.accountId : null;
         if (acc && !closed) {
           forgetSession = sessions.add(acc.accountId, sha256Hex(token), { kick: (r) => conn.kick(r) });
         }
@@ -243,6 +296,14 @@ wss.on('connection', (ws: WebSocket, req) => {
       conn.setAccount(null);
     }
     if (closed) return;
+    // Moderation: a banned account / network (or a guest from a network banned for guests) is refused here.
+    const ban = mod ? mod.banFor({ accountId, address: key, name: typeof hello.name === 'string' ? hello.name : null }) : null;
+    if (ban) {
+      log(`ws refused ${addr} (${key}): banned (#${ban.id})`);
+      pending = null;
+      conn.kick(mod!.banMessage(ban));
+      return;
+    }
     if (invalid) sink.sendMsg({ type: 'error', message: 'Session expired — please log in again' });
     deliver(hello);
     const queued = pending ?? [];
@@ -322,6 +383,7 @@ function shutdown(): void {
   wss.close();
   // Every Zone connection is gone (no more grants): close the profile connection first, then the AuthService's.
   try { profiles?.close?.(); } catch (e) { log(`profile store close error: ${(e as Error)?.message ?? e}`); }
+  try { mod?.close(); } catch (e) { log(`moderation close error: ${(e as Error)?.message ?? e}`); } // flushes the chat log
   try { auth?.close(); } catch (e) { log(`auth close error: ${(e as Error)?.message ?? e}`); }
   http.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 1000).unref();

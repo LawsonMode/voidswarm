@@ -64,6 +64,98 @@ export const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX loot_ledger_time ON loot_ledger(created_at);
   `,
+  // Moderation (src/server/moderation/store.ts reads and writes these over its own connection; the CLI too).
+  // chat_log: every human chat line and refused name attempt (filter action + hits); mod_actions: the audit trail;
+  // bans: bans and mutes (scope account | address | guest; expires_at NULL = permanent); reports: /report;
+  // admins: moderator accounts; mod_meta.rev: bumped on every bans / admins change so a running server notices
+  // changes made by the CLI (or another connection) within seconds.
+  `
+  CREATE TABLE chat_log (
+    id          INTEGER PRIMARY KEY,
+    ts          INTEGER NOT NULL,
+    room_id     TEXT,
+    room_name   TEXT NOT NULL DEFAULT '',
+    channel     TEXT NOT NULL,
+    team        INTEGER NOT NULL DEFAULT -1,
+    player_id   INTEGER NOT NULL DEFAULT 0,
+    name        TEXT NOT NULL,
+    name_key    TEXT NOT NULL,
+    account_id  TEXT,
+    address     TEXT,
+    original    TEXT NOT NULL,
+    shown       TEXT NOT NULL,
+    action      TEXT NOT NULL,
+    hits        TEXT NOT NULL DEFAULT '[]'
+  );
+  CREATE INDEX chat_log_ts ON chat_log(ts);
+  CREATE INDEX chat_log_account ON chat_log(account_id, ts);
+  CREATE INDEX chat_log_address ON chat_log(address, ts);
+  CREATE INDEX chat_log_name ON chat_log(name_key, ts);
+  CREATE TABLE mod_actions (
+    id                INTEGER PRIMARY KEY,
+    ts                INTEGER NOT NULL,
+    actor_account_id  TEXT NOT NULL,
+    actor_name        TEXT NOT NULL DEFAULT '',
+    action            TEXT NOT NULL,
+    target_account_id TEXT,
+    target_name       TEXT,
+    target_address    TEXT,
+    duration_sec      INTEGER,
+    expires_at        INTEGER,
+    reason            TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX mod_actions_ts ON mod_actions(ts);
+  CREATE INDEX mod_actions_target ON mod_actions(target_account_id, ts);
+  CREATE INDEX mod_actions_address ON mod_actions(target_address, ts);
+  CREATE TABLE bans (
+    id             INTEGER PRIMARY KEY,
+    kind           TEXT NOT NULL CHECK (kind IN ('ban', 'mute')),
+    scope          TEXT NOT NULL CHECK (scope IN ('account', 'address', 'guest')),
+    account_id     TEXT,
+    username       TEXT,
+    address_prefix TEXT,
+    created_at     INTEGER NOT NULL,
+    expires_at     INTEGER,
+    reason         TEXT NOT NULL DEFAULT '',
+    by             TEXT NOT NULL DEFAULT '',
+    revoked_at     INTEGER
+  );
+  CREATE INDEX bans_account ON bans(account_id);
+  CREATE INDEX bans_address ON bans(address_prefix);
+  CREATE INDEX bans_live ON bans(revoked_at, expires_at);
+  CREATE TABLE reports (
+    id                  INTEGER PRIMARY KEY,
+    ts                  INTEGER NOT NULL,
+    reporter_player_id  INTEGER,
+    reporter_name       TEXT NOT NULL,
+    reporter_account_id TEXT,
+    reporter_address    TEXT,
+    target_player_id    INTEGER,
+    target_name         TEXT NOT NULL,
+    target_account_id   TEXT,
+    target_address      TEXT,
+    reason              TEXT NOT NULL,
+    room                TEXT NOT NULL DEFAULT '',
+    recent_chat_json    TEXT NOT NULL DEFAULT '[]',
+    status              TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'reviewed', 'dismissed')),
+    reviewed_by         TEXT,
+    reviewed_at         INTEGER,
+    note                TEXT
+  );
+  CREATE INDEX reports_ts ON reports(ts);
+  CREATE INDEX reports_status ON reports(status, ts);
+  CREATE INDEX reports_target ON reports(target_account_id);
+  CREATE TABLE admins (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    added_at   INTEGER NOT NULL,
+    added_by   TEXT NOT NULL DEFAULT ''
+  );
+  CREATE TABLE mod_meta (
+    k TEXT PRIMARY KEY,
+    v INTEGER NOT NULL
+  );
+  INSERT INTO mod_meta (k, v) VALUES ('rev', 0);
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

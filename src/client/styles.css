@@ -119,22 +119,191 @@ input[type='checkbox'] { accent-color: var(--magenta); width: 1.1rem; height: 1.
 .table tr.me td { background: rgba(255, 59, 212, 0.1); }
 .empty { padding: 1rem 0.2rem; }
 
-/* ---------- title ---------- */
-.screen-title { align-items: center; justify-content: center; }
-.title-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; width: min(34rem, 92vw); }
-.logo { font-family: var(--font-display); font-weight: 900; font-size: clamp(2.6rem, 9vmin, 7rem); letter-spacing: 0.12em; margin: 0; line-height: 1;
-  background: linear-gradient(180deg, #fff 0%, var(--cyan) 38%, var(--magenta) 62%, var(--violet) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 0 0.4rem rgba(59, 242, 255, 0.6)) drop-shadow(0 0 1.6rem rgba(255, 59, 212, 0.45)); padding-left: 0.12em; }
-/* White + Orbitron Black for legibility (was thin magenta); a faint magenta halo keeps the neon look. */
-.tagline { font-family: var(--font-display); font-weight: 900; font-size: 0.85rem; letter-spacing: 0.2em; text-transform: uppercase; color: #ffffff; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.85), 0 0 8px rgba(255, 59, 212, 0.45); text-align: center; }
-.title-panel { width: 100%; display: flex; flex-direction: column; gap: 0.8rem; padding: 1.3rem; background: var(--glass-strong); }
+/* ---------- title (v0.3.1: animated attract scene, chrome logo, neon panel) ---------- */
+/* Centred with auto margins, so a tall form on a short screen scrolls from its top instead of being clipped. */
+.screen-title { align-items: center; justify-content: flex-start; overflow-y: auto; overflow-x: hidden; padding: 1.2rem 16px; }
+.title-wrap { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 0.9rem; width: min(34rem, 100%); margin: auto 0; flex-shrink: 0; }
+/* title/TitleScene.ts draws on a canvas in here; it replaces the static menu backdrop while it runs. */
+.title-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.title-bg .title-scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* cinematic vignette: a static layer over the canvas (cheaper than a full-screen pass in the canvas each frame) */
+.title-bg::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 75% 70% at 50% 46%, rgba(3, 1, 10, 0) 55%, rgba(3, 1, 10, 0.6) 100%); }
+body:has(.screen-title.active.scene-live) #bg { display: none; }
+
+/* Logo: chrome wordmark (sky-chrome top, a dark horizon band, neon bottom) over a pre-blurred glow layer. */
+.logo-wrap { position: relative; display: grid; place-items: center; isolation: isolate; max-width: none; }
+.logo-wrap > * { grid-area: 1 / 1; }
+/* The wordmark is wider than the column: max-width none lets the flex column centre it (overflowing evenly
+   both sides) instead of pinning its left edge. It still fits every viewport (the font size is 9vmin). */
+/* a soft dark plate: without it the wordmark's pink lower half melts into the sun and the magenta ridge */
+.logo-wrap::before { content: ""; position: absolute; inset: -24% -6% -18%; z-index: -1; pointer-events: none; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(7, 2, 20, 0.6), rgba(7, 2, 20, 0.36) 58%, rgba(7, 2, 20, 0)); }
+/* held hidden until the intro can play cleanly (title/logoFx.ts: font loaded, page settled) */
+.logo-wrap.intro-wait { opacity: 0; }
+.logo, .logo-glow, .logo-rgb { font-family: var(--font-display); font-weight: 900; font-size: clamp(2.4rem, 9vmin, 7rem); letter-spacing: 0.12em; line-height: 1; padding-left: 0.12em; white-space: nowrap; }
+.logo { position: relative; z-index: 1; margin: 0;
+  background: linear-gradient(180deg, #ffffff 0%, #dffcff 17%, #86f6ff 34%, #2ad4ff 46%, #1c0738 49%, #3b0b60 51.5%, #ff3bd4 60%, #ff9ee9 80%, #fff0fb 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 1px rgba(255, 255, 255, 0.3);
+  filter: drop-shadow(0 2px 0 rgba(18, 4, 38, 0.95)) drop-shadow(0 0 0.3rem rgba(59, 242, 255, 0.55)); }
+/* specular shine sweep every few seconds (only the first ~1.4 s of each cycle moves) */
+.logo::after { content: attr(data-text); position: absolute; inset: 0; padding-left: 0.12em; pointer-events: none; -webkit-text-stroke: 0;
+  background: linear-gradient(105deg, transparent 0 41%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0) 55%, transparent 100%) no-repeat;
+  background-size: 250% 100%; background-position: 160% 0; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: logo-shine 6.5s ease-in-out 2.4s infinite; }
+@keyframes logo-shine { 0% { background-position: 160% 0; } 22%, 100% { background-position: -60% 0; } }
+.logo-glow { z-index: 0; color: #ff3bd4; opacity: 0.55; filter: blur(7px); pointer-events: none; user-select: none; will-change: opacity;
+  text-shadow: 0 0 0.12em #ff3bd4, 0 0 0.35em #9b5bff, 0 0 0.7em rgba(59, 242, 255, 0.6); }
+/* one-time glitch / scanline intro (the .intro class is set for ~1.6 s by title/logoFx.ts) */
+.logo-rgb { z-index: 2; opacity: 0; pointer-events: none; user-select: none; mix-blend-mode: screen; }
+.logo-rgb.c { color: #3bf2ff; }
+.logo-rgb.m { color: #ff3bd4; }
+.logo-scan { position: absolute; inset: -14% -3%; z-index: 3; opacity: 0; pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0) 0 2px, rgba(4, 1, 12, 0.6) 2px 3px),
+    linear-gradient(180deg, transparent 0 44%, rgba(170, 250, 255, 0.4) 50%, transparent 56%);
+  background-size: 100% 100%, 100% 320%; }
+.logo-wrap.intro .logo { animation: logo-glitch 1.1s steps(1, end) both; }
+.logo-wrap.intro .logo-rgb.c { animation: logo-rgb-c 1.1s steps(1, end) both; }
+.logo-wrap.intro .logo-rgb.m { animation: logo-rgb-m 1.1s steps(1, end) both; }
+.logo-wrap.intro .logo-scan { animation: logo-scan 1.5s ease-out both; }
+.logo-wrap.intro .logo-glow { animation: logo-glow-in 1.5s ease-out both; }
+@keyframes logo-glitch {
+  0% { opacity: 0; }
+  8% { opacity: 1; clip-path: inset(0 0 62% 0); transform: translateX(-0.06em); }
+  16% { clip-path: inset(40% 0 22% 0); transform: translateX(0.05em); }
+  24% { clip-path: inset(8% 0 55% 0); transform: translateX(-0.02em); }
+  32% { opacity: 0.55; clip-path: inset(0); transform: none; }
+  40% { opacity: 1; clip-path: inset(68% 0 0 0); transform: translateX(0.04em); }
+  48%, 100% { opacity: 1; clip-path: inset(0); transform: none; }
+}
+@keyframes logo-rgb-c {
+  0% { opacity: 0; }
+  8% { opacity: 0.9; transform: translate(-0.07em, 0.02em); clip-path: inset(18% 0 42% 0); }
+  20% { transform: translate(0.05em, 0); clip-path: inset(56% 0 4% 0); }
+  36% { transform: translate(-0.03em, -0.02em); clip-path: inset(4% 0 70% 0); }
+  52% { opacity: 0.45; transform: translate(0.015em, 0); clip-path: inset(0); }
+  64%, 100% { opacity: 0; transform: none; clip-path: inset(0); }
+}
+@keyframes logo-rgb-m {
+  0% { opacity: 0; }
+  8% { opacity: 0.9; transform: translate(0.07em, -0.02em); clip-path: inset(46% 0 14% 0); }
+  20% { transform: translate(-0.05em, 0.01em); clip-path: inset(2% 0 64% 0); }
+  36% { transform: translate(0.03em, 0.02em); clip-path: inset(60% 0 8% 0); }
+  52% { opacity: 0.45; transform: translate(-0.015em, 0); clip-path: inset(0); }
+  64%, 100% { opacity: 0; transform: none; clip-path: inset(0); }
+}
+@keyframes logo-scan { 0% { opacity: 1; background-position: 0 0, 0 100%; } 70% { opacity: 0.75; } 100% { opacity: 0; background-position: 0 0, 0 0; } }
+@keyframes logo-glow-in { 0%, 30% { opacity: 0; } 60% { opacity: 0.85; } 100% { opacity: 0.55; } }
+
+/* White + Orbitron Black for legibility (was thin magenta); a dark edge keeps it readable over the sun and haze. */
+.tagline { font-family: var(--font-display); font-weight: 900; font-size: 0.85rem; letter-spacing: 0.2em; text-transform: uppercase; color: #ffffff; text-align: center;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.9), 0 0 6px rgba(4, 1, 12, 0.9), 0 0 10px rgba(255, 59, 212, 0.5); }
+/* Rotating feature line: 4 lines + the first repeated, so the loop is seamless. Pauses on hover. */
+.title-ticker { --tk: 1.4em; height: var(--tk); overflow: hidden; margin-top: -0.4rem; max-width: 100%;
+  font-family: var(--font-display); font-weight: 900; font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: #ffffff; text-align: center;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.9), 0 0 6px rgba(4, 1, 12, 0.9), 0 0 10px rgba(59, 242, 255, 0.55);
+  -webkit-mask: linear-gradient(180deg, transparent, #000 24%, #000 76%, transparent); mask: linear-gradient(180deg, transparent, #000 24%, #000 76%, transparent); }
+.ticker-track { animation: title-ticker 14s cubic-bezier(0.7, 0, 0.3, 1) infinite; will-change: transform; }
+.ticker-line { height: var(--tk); line-height: var(--tk); white-space: nowrap; }
+.ticker-line::before, .ticker-line::after { content: "\25C6"; color: var(--cyan); font-size: 0.6em; vertical-align: 0.25em; margin: 0 0.9em; text-shadow: 0 0 0.4rem var(--cyan); }
+.title-ticker:hover .ticker-track { animation-play-state: paused; }
+@keyframes title-ticker {
+  0%, 21% { transform: translateY(0); }
+  25%, 46% { transform: translateY(calc(var(--tk) * -1)); }
+  50%, 71% { transform: translateY(calc(var(--tk) * -2)); }
+  75%, 96% { transform: translateY(calc(var(--tk) * -3)); }
+  100% { transform: translateY(calc(var(--tk) * -4)); }
+}
+.title-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* Panel: glass over the scene, with a neon conic border that sweeps around it. */
+@property --tp-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.title-panel { --tp-gap: 0.8rem; position: relative; width: 100%; display: flex; flex-direction: column; gap: var(--tp-gap); padding: 1.3rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0) 30%), rgba(12, 7, 28, 0.8);
+  border-color: rgba(120, 220, 255, 0.16);
+  backdrop-filter: blur(14px) saturate(1.35); -webkit-backdrop-filter: blur(14px) saturate(1.35);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 0.8rem 2.6rem rgba(0, 0, 0, 0.55), 0 0 2.4rem rgba(155, 91, 255, 0.2); }
+.title-panel::before { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px; pointer-events: none;
+  background: conic-gradient(from var(--tp-angle), rgba(59, 242, 255, 0) 0deg, rgba(59, 242, 255, 0.95) 55deg, rgba(59, 242, 255, 0) 125deg,
+    rgba(255, 59, 212, 0) 180deg, rgba(255, 59, 212, 0.95) 235deg, rgba(155, 91, 255, 0) 305deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: title-border 7s linear infinite; transition: opacity 0.4s; }
+@keyframes title-border { to { --tp-angle: 360deg; } }
+/* typing in the panel (TitleScreen adds .typing for a moment after each keystroke): the border and the
+   ticker hold still next to the fields. (Not :focus-within: the username field is focused on load.) */
+.screen-title.typing .title-panel::before { animation-play-state: paused; opacity: 0.55; }
+.screen-title.typing .ticker-track { animation-play-state: paused; }
+/* slow device (the scene's quality governor stepped down): shed the page's own GPU cost too */
+.screen-title.title-lite .title-panel { background: rgba(12, 7, 28, 0.93); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.screen-title.title-lite .title-panel::before, .screen-title.title-lite .logo::after { animation: none; }
+/* micro-interactions */
+.screen-title .btn { transition: background 0.15s, box-shadow 0.15s, transform 0.12s, border-color 0.15s, color 0.15s; }
+.screen-title .btn:hover:not(:disabled), .screen-title .btn:focus-visible { transform: translateY(-1px); }
+.screen-title .btn:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
+.screen-title .btn-primary { position: relative; overflow: hidden; }
+.screen-title .btn-primary::after { content: ""; position: absolute; inset: 0; pointer-events: none; transform: translateX(-120%); transition: transform 0.6s ease;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.32) 50%, transparent 70%); }
+.screen-title .btn-primary:hover:not(:disabled)::after, .screen-title .btn-primary:focus-visible::after { transform: translateX(120%); }
+.screen-title .btn-primary:hover:not(:disabled), .screen-title .btn-primary:focus-visible {
+  box-shadow: 0 0 0.6rem rgba(59, 242, 255, 0.7), 0 0 1.8rem rgba(59, 242, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.3) inset; }
+.screen-title .field { transition: border-color 0.15s, box-shadow 0.15s, background 0.15s; }
+.screen-title .field:focus { background: rgba(10, 4, 28, 0.88); }
+.screen-title .field-label { font-weight: 700; transition: color 0.15s, text-shadow 0.15s; }
+.screen-title .field-label .field { font-weight: 400; }
+.screen-title .field-label:focus-within { color: var(--cyan); text-shadow: 0 0 0.4rem rgba(59, 242, 255, 0.45); }
+.screen-title .link { transition: color 0.15s, text-shadow 0.15s, text-decoration-color 0.15s; }
+/* static host (GitHub Pages): offline play leads, the login is secondary */
+.offline-hero { display: flex; flex-direction: column; gap: 0.55rem; }
+.btn-hero { width: 100%; padding: 0.95rem 1.4rem; font-size: 1rem; letter-spacing: 0.14em; border-color: var(--magenta); color: #fff;
+  background: linear-gradient(180deg, rgba(255, 59, 212, 0.4), rgba(155, 91, 255, 0.16)); box-shadow: 0 0 0.9rem rgba(255, 59, 212, 0.45), 0 0 2rem rgba(155, 91, 255, 0.25); }
+.screen-title .btn-hero:hover:not(:disabled), .screen-title .btn-hero:focus-visible {
+  background: linear-gradient(180deg, rgba(255, 59, 212, 0.52), rgba(155, 91, 255, 0.24)); box-shadow: 0 0 1rem rgba(255, 59, 212, 0.75), 0 0 2.4rem rgba(155, 91, 255, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.3) inset; }
+.static-note { color: #dfe2f7; font-size: 0.92rem; text-align: center; line-height: 1.3; }
+.static-note .link { padding: 0; font-size: inherit; }
+.auth-form > .btn-login, .login-more > .btn-login { width: 100%; }
+.login-more { display: flex; flex-direction: column; gap: 0.6rem; }
+/* "or log in to a server" as the fold's toggle: a divider you can press */
+.divider-btn { width: 100%; background: none; border: 0; padding: 0.45rem 0; cursor: pointer; color: #b8c2ea; }
+.divider-btn:hover, .divider-btn:focus-visible { color: var(--cyan); text-shadow: 0 0 0.4rem rgba(59, 242, 255, 0.45); }
+.divider-btn .divider-caret { margin-left: -0.3rem; letter-spacing: 0; font-size: 1.3em; line-height: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .logo::after { display: none; }
+  .title-panel::before, .ticker-track, .logo-wrap.intro > * { animation: none !important; }
+  .screen-title .btn-primary::after { display: none; }
+}
+@media (max-width: 480px) {
+  .screen-title { padding: 0.8rem 16px; }
+  .title-wrap { gap: 0.7rem; }
+  .title-panel { padding: 1rem; }
+  /* phones: nothing under 11 px; 16 px inputs (iOS Safari zooms into anything smaller on focus);
+     links and buttons big enough to hit */
+  .tagline { font-size: 11px; letter-spacing: 0.1em; line-height: 1.35; text-wrap: balance; }
+  .title-ticker { font-size: 11px; letter-spacing: 0.05em; }
+  .ticker-line::before, .ticker-line::after { margin: 0 0.4em; }
+  .screen-title .field-label { font-size: 11px; }
+  .screen-title .field, .screen-title .field-label .field { font-size: 16px; }
+  .screen-title .link, .screen-title .link.subtle { font-size: 14px; padding: 0.4rem 0.35rem; }
+  /* the link rows wrap here: spacing instead of dots, so no line ends on a stray separator */
+  .screen-title .title-links, .screen-title .title-foot { gap: 0 0.9rem; }
+  .screen-title .title-links .foot-sep, .screen-title .title-foot .foot-sep { display: none; }
+  .screen-title .static-note .link { font-size: inherit; padding: 6px 4px; margin: -6px -4px; }
+  .screen-title .btn { font-size: 13px; }
+  .screen-title .btn-hero { font-size: 14px; }
+  .screen-title .divider { font-size: 11px; letter-spacing: 0.2em; }
+  .static-note { font-size: 13px; }
+  .screen-title .api-host, .screen-title .muted.small { font-size: 12px; }
+  .title-foot .version { font-size: 11px; }
+}
 .title-buttons { display: flex; gap: 0.7rem; }
 .title-buttons > * { flex: 1; }
 .title-buttons.small .btn { font-size: 0.7rem; }
 .title-status { min-height: 1.3em; color: var(--cyan); text-align: center; }
+/* empty: no line and no extra gap (stays in the accessibility tree, so the live region still announces) */
+.title-panel > .title-status:empty { min-height: 0; margin-bottom: calc(-1 * var(--tp-gap)); }
 .title-status.error { color: var(--red); }
 .title-hint { color: var(--muted); font-size: 0.9rem; text-align: center; line-height: 1.8; }
 .version { font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.2em; color: var(--muted); }
+.title-foot .version { font-size: 0.66rem; letter-spacing: 0.14em; }
 
 /* ---------- top bar ---------- */
 .topbar { display: flex; align-items: center; gap: 1rem; min-height: 2.6rem; }

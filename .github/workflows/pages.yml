@@ -1,0 +1,59 @@
+# Builds the static client (offline vs bots + "Server…" for online play) and deploys it to GitHub Pages:
+#   https://lawsonmode.github.io/voidswarm/
+# The Node game server is NOT deployed here: Pages only serves static files (see README "Host online multiplayer").
+#
+# One-time setup by the repo owner: Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# Until then the build job still runs (typecheck + tests + build) but the deploy job fails; re-run it afterwards.
+name: Deploy client to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; let an in-progress deploy finish instead of cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # The accounts/scrypt suite (src/server/auth) is slow and server-only, so it is skipped here;
+      # run the full suite locally with `npm test`.
+      - name: Tests (without the server auth suite)
+        run: npx vitest run --exclude "src/server/auth/**"
+
+      - name: Build for Pages (base /voidswarm/)
+        run: npm run build:pages
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

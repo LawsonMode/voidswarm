@@ -560,8 +560,8 @@ describe('storage', () => {
     return { dbPath, token };
   }
 
-  it('migrates an existing v1 (v0.2) DB to v2: loot tables added, accounts + sessions intact, profile_json NULL', async () => {
-    expect(SCHEMA_VERSION).toBe(2);
+  it('migrates an existing v1 (v0.2) DB to the current schema: loot tables added, accounts + sessions intact, profile_json NULL', async () => {
+    expect(SCHEMA_VERSION).toBe(3); // v2 = loot tables (v0.3 M2), v3 = moderation tables
     const dir = mkdtempSync(join(tmpdir(), 'voidswarm-auth-'));
     const { dbPath, token } = await v1Db(dir);
     const h = await start({ dir });
@@ -575,7 +575,7 @@ describe('storage', () => {
 
     const db = new DatabaseSync(dbPath);
     try {
-      expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(2);
+      expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(SCHEMA_VERSION);
       const accts = db.prepare('SELECT username, profile_json, profile_rev FROM accounts ORDER BY username').all();
       expect(accts).toEqual([
         { username: 'Rookie', profile_json: null, profile_rev: 0 },

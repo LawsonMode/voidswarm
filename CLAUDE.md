@@ -20,8 +20,10 @@ Milestones: M1 contract + Command + Deathmatch, M2 loot, M3 objectives, M4 Dunge
 
 The stack is TypeScript + Vite + PixiJS v8 on the client and an authoritative Node `ws` server. The same shared sim runs in the browser for offline play against bots. The build is contract-first: **`ARCHITECTURE.md` is canon** (frozen contract, module ownership, game design), and `src/shared/data/ships.ts` is canon for classes, skills and talents. Standalone, not 5bot.
 
+**v0.4 (0.4.0) adds chat moderation** (guide: `docs/MODERATION.md`; seams: ARCHITECTURE.md "Moderation"): a shared word filter (`src/shared/moderation/`, strict by default, `CHAT_FILTER=standard` relaxes the mild tier) on every chat line and human-chosen name, online and offline; and, on the server (needs accounts), a SQLite chat log, strikes → auto-mute, bans / mutes (account, guest callsign, network), `/report`, moderator chat commands, the `/admin` dashboard and `npm run mod -- <cmd>` (promote, ban, log, export-log, purge-log, ...). The word lists are ROT13 / ROT5 data in `lists.ts`: never paste the decoded terms into docs, chat or commits.
+
 ## Version location
-The root `package.json` `version` (currently 0.3.0). `src/shared/version.ts` reads it, and it also holds `PROTOCOL_VERSION` (currently 4, bump it on wire changes). Don't hardcode versions anywhere else.
+The root `package.json` `version` (currently 0.4.0). `src/shared/version.ts` reads it, and it also holds `PROTOCOL_VERSION` (currently 4, bump it on wire changes; moderation added none). Don't hardcode versions anywhere else.
 
 ## How to run
 ```
@@ -42,6 +44,8 @@ npm test -- src/shared/ai/riftParity.test.ts        # the rift AI ready gate: 4 
 Accounts use `node:sqlite` at `DB_PATH` (default `data/voidswarm.db`; `data/` is gitignored). Password-reset mail goes through SMTP env vars (see `src/server/auth/README.md`). Without SMTP, the reset link is printed to the server console.
 
 `.claude/launch.json` has a `server-playtest` entry that uses `data/playtest.db`. Its test credentials are in the gitignored `data/playtest-credentials.txt`.
+
+Moderation: `npm run mod -- promote <username>` makes an account a moderator (it must exist first); the dashboard is `http://localhost:7777/admin` (Node server only, not the Vite / Pages build). Chat-log retention is `CHAT_LOG_RETENTION_DAYS` (default 90); `npm run mod -- purge-log --before 30d` deletes older lines at once.
 
 ## Gotchas / constraints
 - The sim must be deterministic given the seed: use `Rng`, never `Math.random`, anywhere in `src/shared/sim`. The client regenerates the map from `mapSeed` through `buildMatchMap` (`sim/mapgen.ts`), which is also how rift floors are rebuilt.

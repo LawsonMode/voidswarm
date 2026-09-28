@@ -4,6 +4,11 @@
 // a "Server…" link. Logging in (or registering / resetting) connects straight to Command.
 // Passwords only ever go into the request body; password fields are cleared after every submit and
 // nothing password-related is logged. Email is only asked for in Create account and Forgot password.
+// v0.3.1: an animated attract scene (title/TitleScene.ts) runs behind the panel while this screen is
+// active and is destroyed when it leaves; the logo gets a chrome shine, a one-time glitch intro and a beat
+// glow (title/logoFx.ts); a feature ticker sits under the tagline. On a static host (GitHub Pages, or
+// window.VOIDSWARM_STATIC) with the page's default server, "Play offline vs bots" leads and the login form
+// folds away behind "or log in to a server" until it is opened or a server address is entered.
 import { NAME_MAX_LEN } from '../../shared/constants';
 import { PASSWORD_MIN, type AccountInfo, type AuthResponse } from '../../shared/protocol';
 import { GAME_VERSION } from '../../shared/version';
@@ -11,7 +16,10 @@ import {
   AccountsApi, apiBaseFromServerUrl, ApiError, clearSession, isInsecureRemote, loadSession, saveSession,
   validateNewPassword, validateRegistration, type StoredSession,
 } from '../net/accounts';
-import { isPrivateHost, normalizeServerUrl, serverHost, type ResolvedServer } from '../net/serverUrl';
+import { isPrivateHost, isStaticHost, normalizeServerUrl, serverHost, type ResolvedServer } from '../net/serverUrl';
+import { featureLines } from '../title/features';
+import { LogoFx } from '../title/logoFx';
+import { TitleScene } from '../title/TitleScene';
 import { h } from './dom';
 
 export interface TitleCallbacks {
@@ -35,7 +43,15 @@ export interface TitleOptions {
   resetServerUrl: string;
   /** location.hostname of this page (account servers on other hosts are flagged). */
   pageHost: string;
+  /** Static host with no game server of its own (default: net/serverUrl isStaticHost for pageHost). */
+  staticHost?: boolean;
 }
+
+/** Copy under the offline button on a static host (followed by a "Server…" link, which ends the sentence). */
+export const STATIC_NOTE = 'Online play needs a Voidswarm server — enter its address under';
+
+/** Keystrokes in the panel mark the screen as "typing" this long: the border and the ticker hold still. */
+const TYPING_MS = 2500;
 
 /** v0.3 guest copy (§1.3 / §2.1). */
 export const GUEST_COPY = 'Items you find stay on this device and only you see them. Create an account to keep them everywhere and show them off.';
@@ -63,6 +79,28 @@ export class TitleScreen {
   private sessionOnlyUrl: string | null;
   /** "Account server: <host>" line, moved into whichever auth form is showing. */
   private apiHost: HTMLElement;
+  /** Static host + the page's own (non-existent) server: offline play leads, online is secondary. */
+  readonly offlineFirst: boolean;
+  // --- attract scene + logo FX (alive only while this screen is active)
+  private readonly bg: HTMLElement;
+  private readonly wrap: HTMLElement;
+  private readonly logoWrap: HTMLElement;
+  private readonly logo: HTMLElement;
+  private readonly logoGlow: HTMLElement;
+  private readonly tagline: HTMLElement;
+  private readonly panel: HTMLElement;
+  private scene: TitleScene | null = null;
+  private logoFx: LogoFx | null = null;
+  private shown = false;
+  private measureQueued = 0;
+  private readonly reducedMq: MediaQueryList | null;
+  private typingTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Offline-first layout: the login fields were opened ("or log in to a server"). */
+  private loginOpen = false;
+  /** Offline-first login form parts, toggled without a re-render (so typed values survive). */
+  private loginFold: { more: HTMLElement; expand: HTMLElement; divider: HTMLElement } | null = null;
+  /** Window / visual-viewport resize: the column moves without changing size (ResizeObserver misses that). */
+  private readonly onViewport = (): void => this.queueMeasure();
 
   constructor(private cb: TitleCallbacks, opts: TitleOptions) {
     const { name, server, resetToken } = opts;
@@ -78,9 +116,14 @@ export class TitleScreen {
     this.urlInput = h('input', {
       type: 'url', class: 'field', value: url, spellcheck: 'false', 'data-nav': 'url', 'aria-label': 'Server URL', autocomplete: 'url',
     });
+    // net/serverUrl.ts isStaticHost: *.github.io, the Pages build (vite --mode pages), or window.VOIDSWARM_STATIC.
+    const isStatic = opts.staticHost ?? isStaticHost({ protocol: '', hostname: opts.pageHost, host: opts.pageHost, port: '', search: '' });
     this.serverBox = h('div', { class: 'server-box hidden' },
       h('label', { class: 'field-label' }, 'Server', this.urlInput),
-      h('div', { class: 'muted small' }, 'Default: this page\'s host on port 7777. Use wss:// for servers on the internet.'));
+      h('div', { class: 'muted small' }, isStatic
+        // a static host (GitHub Pages) runs no game server, so there is no "this page's host" default
+        ? 'The address of a Voidswarm game server, e.g. wss://play.example.com. Use wss:// for servers on the internet.'
+        : 'Default: this page\'s host on port 7777. Use wss:// for servers on the internet.'));
     this.serverLink = h('button', {
       class: 'link subtle', type: 'button', 'data-nav': 'server-link', 'aria-expanded': 'false',
       onclick: () => this.toggleServer(),
@@ -92,6 +135,10 @@ export class TitleScreen {
     });
     this.status = h('div', { class: 'title-status', role: 'status', 'aria-live': 'polite' });
     this.accountBox = h('div', { class: 'account-box' });
+    // Only while the page's own server is in use: a saved / linked server means online play is set up.
+    this.offlineFirst = isStatic && !resetToken && !server.pending
+      && normalizeServerUrl(url) === normalizeServerUrl(opts.resetServerUrl);
+    this.reducedMq = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 
     let urlTimer: ReturnType<typeof setTimeout> | null = null;
     this.urlInput.addEventListener('input', () => {
@@ -103,26 +150,131 @@ export class TitleScreen {
       urlTimer = setTimeout(() => void this.checkSession(), 600);
     });
 
-    this.root = h('section', { class: 'screen screen-title' },
-      h('div', { class: 'title-wrap' },
-        h('h1', { class: 'logo', 'data-text': 'VOIDSWARM' }, 'VOIDSWARM'),
-        h('div', { class: 'tagline' }, 'Neon arena · 32 pilots · the swarm is hungry'),
-        h('div', { class: 'panel title-panel' },
-          this.accountBox,
-          this.insecure,
-          this.status,
-          this.serverBox,
-          h('div', { class: 'title-foot' },
-            this.serverLink,
-            h('span', { class: 'foot-sep' }, '·'),
-            h('button', { class: 'link subtle', type: 'button', 'data-nav': 'settings', onclick: () => cb.onSettings() }, 'Settings'),
-            h('span', { class: 'foot-sep' }, '·'),
-            h('button', { class: 'link subtle', type: 'button', 'data-nav': 'controls', onclick: () => cb.onControls() }, 'Controls'))),
-        h('div', { class: 'version' }, `v${GAME_VERSION}`)));
+    // Logo: chrome wordmark + a pre-blurred glow layer (beat pulse) + RGB-split copies and scanlines (intro).
+    this.logoGlow = h('div', { class: 'logo-glow', 'aria-hidden': 'true' }, 'VOIDSWARM');
+    this.logo = h('h1', { class: 'logo', 'data-text': 'VOIDSWARM' }, 'VOIDSWARM');
+    this.logoWrap = h('div', { class: 'logo-wrap' },
+      this.logoGlow, this.logo,
+      h('div', { class: 'logo-rgb c', 'aria-hidden': 'true' }, 'VOIDSWARM'),
+      h('div', { class: 'logo-rgb m', 'aria-hidden': 'true' }, 'VOIDSWARM'),
+      h('div', { class: 'logo-scan', 'aria-hidden': 'true' }));
+    const features = featureLines();
+    this.bg = h('div', { class: 'title-bg', 'aria-hidden': 'true' });
+    // no-break spaces before each dot: when it wraps (phones) a line ends on a dot, never starts with one
+    this.tagline = h('div', { class: 'tagline' }, 'Neon arena\u00a0· 32 pilots\u00a0· the swarm is hungry');
+    this.panel = h('div', { class: 'panel title-panel' + (this.offlineFirst ? ' offline-first' : '') },
+      this.accountBox,
+      this.insecure,
+      this.status,
+      this.serverBox,
+      h('div', { class: 'title-foot' },
+        this.serverLink,
+        h('span', { class: 'foot-sep' }, '·'),
+        h('button', { class: 'link subtle', type: 'button', 'data-nav': 'settings', onclick: () => cb.onSettings() }, 'Settings'),
+        h('span', { class: 'foot-sep' }, '·'),
+        h('button', { class: 'link subtle', type: 'button', 'data-nav': 'controls', onclick: () => cb.onControls() }, 'Controls'),
+        // in the panel (not on the scrolling grid, where a bright row could pass behind it)
+        h('span', { class: 'foot-sep' }, '·'),
+        h('span', { class: 'version' }, `v${GAME_VERSION}`)));
+    this.wrap = h('div', { class: 'title-wrap' },
+        this.logoWrap,
+        this.tagline,
+        // Rotating feature line (decorative: screen readers get the same facts once, from the line after it).
+        h('div', { class: 'title-ticker', 'aria-hidden': 'true' },
+          h('div', { class: 'ticker-track' }, [...features, features[0]].map((f) => h('div', { class: 'ticker-line' }, f)))),
+        h('p', { class: 'title-sr' }, `${features.join('. ')}.`),
+        this.panel);
+    this.root = h('section', { class: 'screen screen-title' }, this.bg, this.wrap);
+    // Typing in the panel: the neon border and the ticker hold still next to the fields.
+    this.panel.addEventListener('input', () => {
+      this.root.classList.add('typing');
+      if (this.typingTimer) clearTimeout(this.typingTimer);
+      this.typingTimer = setTimeout(() => { this.typingTimer = null; this.root.classList.remove('typing'); }, TYPING_MS);
+    });
 
     this.updateServerUi();
     this.render();
     void this.checkSession();
+
+    // main.ts shows / hides screens by toggling `.active`: follow it, so the scene only lives while shown.
+    new MutationObserver(() => this.syncShown()).observe(this.root, { attributes: true, attributeFilter: ['class'] });
+    if (typeof ResizeObserver === 'function') {
+      // the logo's own box too: it changes width when the display font finishes loading
+      const ro = new ResizeObserver(() => this.queueMeasure());
+      ro.observe(this.wrap);
+      ro.observe(this.logo);
+    }
+    void document.fonts?.ready.then(() => this.queueMeasure());
+    this.root.addEventListener('scroll', () => this.queueMeasure(), { passive: true });
+    this.reducedMq?.addEventListener?.('change', () => {
+      this.root.classList.toggle('reduced-motion', this.reducedMotion());
+      this.scene?.setReducedMotion(this.reducedMotion());
+    });
+    this.root.classList.toggle('reduced-motion', this.reducedMotion());
+  }
+
+  // ------------------------------------------------------------------ attract scene lifecycle
+  private reducedMotion(): boolean { return !!this.reducedMq?.matches; }
+
+  private syncShown(): void {
+    const active = this.root.classList.contains('active');
+    if (active === this.shown) return;
+    this.shown = active;
+    if (active) {
+      try {
+        this.scene = new TitleScene(this.bg, {
+          reducedMotion: this.reducedMotion(),
+          onFrame: (now, dt) => this.logoFx?.frame(now, dt),
+          // A slow device (the governor stepped down): shed the page's own GPU cost too — an opaque panel with
+          // no backdrop blur, a still border. Kept until the screen closes, so it doesn't flap.
+          onQuality: (q) => { if (q <= 1) this.root.classList.add('title-lite'); },
+        });
+        this.root.classList.add('scene-live');
+      } catch (e) {
+        console.warn('[voidswarm] title scene unavailable; keeping the static backdrop', e);
+        this.scene = null;
+      }
+      this.logoFx = new LogoFx(this.logoWrap, this.logoGlow, () => this.reducedMotion());
+      this.logoFx.playIntro();
+      window.addEventListener('resize', this.onViewport);
+      window.visualViewport?.addEventListener('resize', this.onViewport);
+      window.visualViewport?.addEventListener('scroll', this.onViewport);
+      this.measureNow();
+      this.scene?.start();
+    } else {
+      // Leaving the Title screen: tear everything down (no rAF, no canvas, no listeners left behind).
+      this.scene?.destroy();
+      this.scene = null;
+      this.logoFx?.destroy();
+      this.logoFx = null;
+      window.removeEventListener('resize', this.onViewport);
+      window.visualViewport?.removeEventListener('resize', this.onViewport);
+      window.visualViewport?.removeEventListener('scroll', this.onViewport);
+      this.root.classList.remove('scene-live', 'title-lite', 'typing');
+      if (this.typingTimer) { clearTimeout(this.typingTimer); this.typingTimer = null; }
+      if (this.measureQueued) { cancelAnimationFrame(this.measureQueued); this.measureQueued = 0; }
+    }
+  }
+
+  private queueMeasure(): void {
+    if (!this.scene || this.measureQueued) return;
+    this.measureQueued = requestAnimationFrame(() => { this.measureQueued = 0; this.measureNow(); });
+  }
+
+  /**
+   * Tell the scene where things are: the sun frames the logo and the horizon runs under it (above the tagline),
+   * the action avoids the column, and only faint far flybys cross behind the panel.
+   */
+  private measureNow(): void {
+    if (!this.scene) return;
+    const logo = this.logo.getBoundingClientRect();
+    const col = this.wrap.getBoundingClientRect();
+    const tag = this.tagline.getBoundingClientRect();
+    const panel = this.panel.getBoundingClientRect();
+    this.scene.setAnchors({
+      logo: logo.width > 0 ? logo : null, focus: col.width > 0 ? col : null,
+      tagline: tag.height > 0 ? tag : null, panel: panel.width > 0 ? panel : null,
+    });
   }
 
   // ------------------------------------------------------------------ public API (main.ts)
@@ -213,17 +365,31 @@ export class TitleScreen {
     const url = this.accountServerUrl();
     this.insecure.classList.toggle('hidden', !isInsecureRemote(url));
     const label = serverHost(this.serverUrl) || this.serverUrl;
-    this.serverLink.textContent = `Server: ${label || 'default'}…`;
+    // A blank address only happens on a static host (no default server there): say so, not "default".
+    this.serverLink.textContent = `Server: ${label || (this.offlineFirst ? 'not set' : 'default')}…`;
     // Where passwords go, spelled out on every auth form.
     const host = serverHost(url);
     let hostname = '';
     try { hostname = new URL(url).hostname.toLowerCase().replace(/^\[|\]$/g, ''); } catch { /* invalid */ }
     const foreign = !!hostname && hostname !== this.pageHost && !isPrivateHost(hostname);
     this.apiHost.classList.toggle('foreign', foreign);
+    // No address at all (static host, nothing entered yet): nothing to point at, so no line.
+    this.apiHost.classList.toggle('hidden', !url.trim());
     this.apiHost.replaceChildren(
       h('span', { class: 'muted' }, 'Account server: '),
       h('span', { class: 'strong' }, host || 'invalid address'),
       foreign ? h('span', null, ' — not this site') : '');
+    this.syncLoginFold();
+  }
+
+  /** Offline-first: the login fields show once opened, or as soon as a server address is set. */
+  private syncLoginFold(): void {
+    const f = this.loginFold;
+    if (!f) return;
+    const open = this.loginOpen || !!this.serverUrl;
+    f.more.classList.toggle('hidden', !open);
+    f.divider.classList.toggle('hidden', !open);
+    f.expand.classList.toggle('hidden', open);
   }
 
   /** Server whose accounts API the visible form talks to (the reset form always uses the issuing server). */
@@ -307,6 +473,7 @@ export class TitleScreen {
   }
 
   private render(): void {
+    this.loginFold = null;
     let body: HTMLElement;
     if (this.pendingServer && this.view !== 'reset') body = this.confirmServerView(this.pendingServer);
     else if (this.session && this.view !== 'reset') body = this.loggedInView(this.session);
@@ -322,6 +489,7 @@ export class TitleScreen {
     this.accountBox.replaceChildren(body);
     this.updateServerUi();
     this.applyBusy();
+    this.queueMeasure();
   }
 
   /** A ?server= link pointed at someone else's host: ask before anything (login, token, socket) goes there. */
@@ -397,22 +565,55 @@ export class TitleScreen {
     return h('input', { class: 'field', spellcheck: 'false', autocapitalize: 'off', ...attrs });
   }
 
+  /** Static host: the big offline button, with the "bring a server" note under it. */
+  private offlineHero(): HTMLElement {
+    return h('div', { class: 'offline-hero' },
+      h('button', {
+        class: 'btn btn-primary btn-big btn-hero', type: 'button', 'data-nav': 'offline', 'data-play': true, 'data-autofocus': true,
+        onclick: () => this.cb.onOffline(this.offlineName()),
+      }, 'Play offline vs bots'),
+      h('div', { class: 'static-note', role: 'note' }, `${STATIC_NOTE} `,
+        h('button', { class: 'link', type: 'button', 'data-nav': 'static-server', onclick: () => this.toggleServer(true) }, 'Server…')));
+  }
+
   private loginForm(): HTMLElement {
+    const lead = this.offlineFirst;
     // Labelled "Username"; the server also accepts the account email here.
-    const login = this.input({ type: 'text', name: 'username', autocomplete: 'username', 'data-nav': 'login-user', 'data-autofocus': true, required: true, maxlength: 254 });
+    const login = this.input({ type: 'text', name: 'username', autocomplete: 'username', 'data-nav': 'login-user', 'data-autofocus': !lead, required: true, maxlength: 254 });
     const pw = this.input({ type: 'password', name: 'password', autocomplete: 'current-password', 'data-nav': 'login-pw', required: true });
-    const form = h('form', { class: 'auth-form', novalidate: true, autocomplete: 'on' },
+    const links = h('div', { class: 'title-links' },
+      h('button', { class: 'link', type: 'button', 'data-nav': 'to-register', onclick: () => this.setView('register') }, 'Create account'),
+      h('span', { class: 'foot-sep' }, '·'),
+      h('button', { class: 'link', type: 'button', 'data-nav': 'forgot', onclick: () => this.setView('forgot') }, 'Forgot password?'),
+      h('span', { class: 'foot-sep' }, '·'),
+      h('button', { class: 'link', type: 'button', 'data-nav': 'to-guest', onclick: () => this.setView('guest') }, 'Continue as guest'));
+    const fields = [
       this.apiHost,
       this.field('Username', login),
       this.field('Password', pw),
-      h('button', { class: 'btn btn-primary btn-big', type: 'submit', 'data-nav': 'login-submit', 'data-play': true }, 'Log in'),
-      h('div', { class: 'title-links' },
-        h('button', { class: 'link', type: 'button', 'data-nav': 'to-register', onclick: () => this.setView('register') }, 'Create account'),
-        h('span', { class: 'foot-sep' }, '·'),
-        h('button', { class: 'link', type: 'button', 'data-nav': 'forgot', onclick: () => this.setView('forgot') }, 'Forgot password?'),
-        h('span', { class: 'foot-sep' }, '·'),
-        h('button', { class: 'link', type: 'button', 'data-nav': 'to-guest', onclick: () => this.setView('guest') }, 'Continue as guest')),
-      h('div', { class: 'title-links' }, this.offlineLink()));
+      h('button', { class: lead ? 'btn btn-login' : 'btn btn-primary btn-big', type: 'submit', 'data-nav': 'login-submit', 'data-play': true }, 'Log in'),
+      links,
+    ];
+    let body: (HTMLElement | null)[];
+    if (lead) {
+      // Static host: the fields do nothing until a server is set, so they fold away behind the divider.
+      const more = h('div', { class: 'login-more', id: 'title-login-more' }, ...fields);
+      const expand = h('button', {
+        class: 'divider divider-btn', type: 'button', 'data-nav': 'login-expand', 'aria-expanded': 'false', 'aria-controls': 'title-login-more',
+        onclick: () => {
+          this.loginOpen = true;
+          this.syncLoginFold();
+          // no server yet: that comes first (the Server box opens and takes focus), else straight to the username
+          if (!this.serverUrl) this.toggleServer(true); else login.focus();
+        },
+      }, 'or log in to a server', h('span', { class: 'divider-caret', 'aria-hidden': 'true' }, '▾'));
+      const divider = h('div', { class: 'divider' }, 'or log in to a server');
+      this.loginFold = { more, expand, divider };
+      body = [this.offlineHero(), expand, divider, more];
+    } else {
+      body = [...fields, h('div', { class: 'title-links' }, this.offlineLink())];
+    }
+    const form = h('form', { class: 'auth-form', novalidate: true, autocomplete: 'on' }, ...body);
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const user = login.value.trim(), pass = pw.value;

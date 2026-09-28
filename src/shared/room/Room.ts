@@ -37,9 +37,10 @@ import {
 import { SnapshotBuilder } from './snapshot';
 import { allowChat, type LootGrantEntry, type LootGrantOutcome, type RoomHost, type ZoneUser } from './user';
 import {
-  BOT_CALLSIGNS, clampSettings, dedupeName, isShipClass, leastUsedClass, nameKey, parseGameType, parseSubMode,
-  sanitizeInput, sanitizeText,
+  BOT_CALLSIGNS, ROOM_NAME_MAX_LEN, clampSettings, dedupeName, isShipClass, leastUsedClass, nameKey, parseGameType,
+  parseSubMode, sanitizeInput, sanitizeName, sanitizeText,
 } from './util';
+import { MSG_ROOM_NAME_REFUSED } from './moderation';
 
 /** Server-only: a room with >=1 ready human auto-starts after this long in the lobby. */
 export const AUTO_START_SEC = 20;
@@ -160,7 +161,7 @@ interface PendingBotChat { at: number; pid: PlayerId; text: string; channel: 'al
 
 const CLASS_LIST = SHIP_CLASS_IDS.map((id) => `${id} (${SHIP_CLASSES[id].name})`).join(', ');
 const HELP_LINES = [
-  'Commands: /help  /name <callsign>  /team <1-8|auto|spec>  /class <class>  /ready  /leave',
+  'Commands: /help  /name <callsign>  /team <1-8|auto|spec>  /class <class>  /ready  /leave  /report <name> <reason>',
   'Host: /type dungeon|arena|warzone  /sub <mode>  /mode ffa | /mode teams <n>  /floors 3|6  /target <n>',
   'Host: /bots <n>  /skill easy|normal|hard  /pve 1-3  /start  /end (in a Dungeon Run: abandon it)',
   `Classes: ${CLASS_LIST}.  Prefix a message with // for team chat.`,
@@ -787,7 +788,7 @@ export class Room {
         break;
       case 'updateSettings':
         if (p.playerId !== this.hostPid) { this.tell(p, 'Only the host can change settings.'); break; }
-        this.applySettings(msg.settings, p);
+        this.applySettings(this.screenRoomName(p, msg.settings), p);
         break;
       case 'startMatch': this.requestStart(p); break;
       case 'joinMatch': this.joinMatch(p); break;
@@ -831,7 +832,23 @@ export class Room {
     let ch: 'all' | 'team' = channel === 'team' ? 'team' : 'all';
     if (text.startsWith('//')) { ch = 'team'; text = text.slice(2).trim(); if (!text) return; }
     else if (text.startsWith('/')) { this.command(p, text); return; }
-    this.pushChat({ fromPlayerId: p.playerId, fromName: p.name, channel: ch, team: p.team, text, time: Date.now() });
+    // Moderation: mute / repeat flood / word filter / chat log (null = not shown; the sender was told why).
+    const shown = this.host.chatGate(p.user, text, { roomId: this.id, roomName: this.settings.name, channel: ch, team: p.team });
+    if (shown === null) return;
+    this.pushChat({ fromPlayerId: p.playerId, fromName: p.name, channel: ch, team: p.team, text: shown, time: Date.now() });
+  }
+
+  /**
+   * Moderation: a settings patch that renames the room is checked with the name filter first. A refused name is
+   * dropped from the patch (the host is told; the rest of the patch still applies).
+   */
+  private screenRoomName(p: RoomPlayer, patch: unknown): unknown {
+    if (!patch || typeof patch !== 'object' || (patch as Record<string, unknown>).name === undefined) return patch;
+    const name = sanitizeName((patch as Record<string, unknown>).name, this.settings.name, ROOM_NAME_MAX_LEN);
+    if (name === this.settings.name || this.host.roomNameAllowed(p.user, name)) return patch;
+    this.tell(p, MSG_ROOM_NAME_REFUSED);
+    const { name: _refused, ...rest } = patch as Record<string, unknown>;
+    return rest;
   }
 
   private command(p: RoomPlayer, text: string): void {

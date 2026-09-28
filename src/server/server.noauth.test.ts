@@ -7,6 +7,8 @@ import { PROTOCOL_VERSION } from '../shared/version';
 vi.mock('../shared/sim/Sim', () => ({ Sim: class { constructor() { throw new Error('no sim'); } } }));
 vi.mock('../shared/ai/bots', () => ({ createBotBrain: () => ({ think: () => ({}), chooseUpgrade: () => 0 }) }));
 vi.mock('./auth/index', () => ({ createAuthService: () => { throw new Error('createAuthService: not implemented'); } }));
+// server/index.ts builds the service with createAuthServiceWith (to pass the moderation sign-in guard).
+vi.mock('./auth/service', () => ({ createAuthServiceWith: () => { throw new Error('createAuthServiceWith: not implemented'); } }));
 
 const port = 17000 + Math.floor(Math.random() * 20000);
 const logs: string[] = [];
