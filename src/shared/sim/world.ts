@@ -2,7 +2,10 @@
 // Owned by the architect. Module owners may ADD helpers at the bottom (marked with their module),
 // but must not change existing signatures.
 
-import { ENEMY_TEAM, MAX_GEMS, MAX_PROJECTILES, NO_TEAM, TICK_RATE } from '../constants';
+import {
+  CAPITAL_SCALE_BASE, CAPITAL_SCALE_PER_TURRET, ENEMY_TEAM, HARDPOINT_SEAT, MAX_GEMS, MAX_HARDPOINTS, MAX_PROJECTILES,
+  NO_TEAM, TICK_RATE,
+} from '../constants';
 import { Rng } from '../util/rng';
 import { segPointDist2 } from '../util/math';
 import type {
@@ -147,11 +150,46 @@ export function dropGems(world: World, x: number, y: number, total: number, life
 // Turrets (shared by sim and client so attached ships render exactly where the server puts them)
 // ---------------------------------------------------------------------------------------------
 
-/** World-space offset of turret `slot` (0-based) of `count` turrets on a host facing hostAngle. */
+/**
+ * v0.5 hardpoint layout by turret count (index = count, 1..MAX_HARDPOINTS). Each entry is
+ * [along, side] in hull radii: along +1 = bow, −1 = stern; side +1 = starboard (right of the heading),
+ * −1 = port. Slot i of `count` turrets sits at HARDPOINT_LAYOUT[count][i], so mounts re-flow as turrets
+ * join or leave:
+ *   1: bow · 2: fore port, fore starboard · 3: fore port, fore starboard, center aft ·
+ *   4: fore port, fore starboard, aft port, aft starboard · 5: bow + fore P/S + aft P/S.
+ */
+export const HARDPOINT_LAYOUT: readonly (readonly (readonly [number, number])[])[] = [
+  [],
+  [[0.95, 0]],
+  [[0.4, -0.72], [0.4, 0.72]],
+  [[0.4, -0.72], [0.4, 0.72], [-0.85, 0]],
+  [[0.4, -0.72], [0.4, 0.72], [-0.6, -0.68], [-0.6, 0.68]],
+  [[0.95, 0], [0.4, -0.72], [0.4, 0.72], [-0.6, -0.68], [-0.6, 0.68]],
+];
+
+/**
+ * v0.5 capital-ship scale: a host with ≥ 1 docked turret becomes its class's capital variant, and its hull
+ * AND hitbox scale by this factor (1 when hosting nobody). Sim applies it to ship.stats.radius; clients use it
+ * to draw the capital hull and to place bubble turrets.
+ */
+export function capitalScale(turretCount: number): number {
+  const n = Math.max(0, Math.min(MAX_HARDPOINTS, Math.floor(turretCount)));
+  return n > 0 ? CAPITAL_SCALE_BASE + CAPITAL_SCALE_PER_TURRET * n : 1;
+}
+
+/**
+ * World-space offset of the hardpoint for turret `slot` (0-based) of `count` turrets on a host facing
+ * hostAngle. `hostRadius` is the host's EFFECTIVE (capital-scaled) radius. Domes sit on the hull at
+ * HARDPOINT_SEAT of the radius. Signature unchanged since v0.1; the layout is new in v0.5.
+ */
 export function turretOffset(hostAngle: number, slot: number, count: number, hostRadius: number): { dx: number; dy: number } {
-  const a = hostAngle + Math.PI + (slot - (count - 1) / 2) * 0.8;
-  const r = hostRadius + 12;
-  return { dx: Math.cos(a) * r, dy: Math.sin(a) * r };
+  const n = Math.max(1, Math.min(MAX_HARDPOINTS, Math.floor(count)));
+  const layout = HARDPOINT_LAYOUT[n];
+  const [along, side] = layout[Math.max(0, Math.min(layout.length - 1, Math.floor(slot)))];
+  const r = hostRadius * HARDPOINT_SEAT;
+  const c = Math.cos(hostAngle), s = Math.sin(hostAngle);
+  // heading = (c, s); starboard (right of heading, y-down screen) = (−s, c)
+  return { dx: c * along * r - s * side * r, dy: s * along * r + c * side * r };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -182,7 +220,7 @@ function cellIndex(g: SpatialHash, x: number, y: number): number {
 /** Visit alive ships whose centers are within r (+ their radius if padByRadius) of (x,y). Grid reflects start-of-tick positions. */
 export function forEachShipNear(world: World, x: number, y: number, r: number, fn: (s: Ship) => void): void {
   const g = world.grid;
-  const reach = r + 32;
+  const reach = r + 48; // largest hull headroom: a 5-turret Titan Dreadnought is ~39 px (v0.5)
   const x0 = Math.max(0, Math.floor((x - reach) / g.cell)), x1 = Math.min(g.cols - 1, Math.floor((x + reach) / g.cell));
   const y0 = Math.max(0, Math.floor((y - reach) / g.cell)), y1 = Math.min(g.rows - 1, Math.floor((y + reach) / g.cell));
   for (let cy = y0; cy <= y1; cy++) {

@@ -30,13 +30,20 @@ export function pickAttachCandidate(
   return best;
 }
 
-/** turretOffset() puts turrets at hostRadius + this (derived, so it follows world.ts). */
-const TURRET_RING_PAD = (() => { const o = turretOffset(0, 0, 1, 0); return Math.sqrt(o.dx * o.dx + o.dy * o.dy); })();
+/** |turretOffset| for a host of radius `r`: the hardpoint's distance from the host centre (angle-invariant). */
+function mountDist(slot: number, count: number, r: number): number {
+  const o = turretOffset(0, slot, count, r);
+  return Math.sqrt(o.dx * o.dx + o.dy * o.dy);
+}
+
+/** Largest plausible effective host radius, in class hulls: capitalScale(5) (1.55) × Bulwark's Titan (1.15), + slack. */
+const MAX_HOST_RADIUS_HULLS = 2.2;
 
 /**
  * Effective radius of every host that has a turret, read off the server's own turret placement
- * (turret = host + turretOffset(angle, slot, n, host.stats.radius), so |turret − host| − pad = radius).
- * This picks up radius talents (e.g. Bulwark's Titan) that ShipView doesn't carry. Use RAW snapshot
+ * (turret = host + turretOffset(angle, slot, n, host.stats.radius), and |turretOffset| is affine in the radius for a
+ * given hardpoint: pad + per·radius; v0.5 hardpoints are pad 0, per = HARDPOINT_SEAT × |mount|). This picks up radius
+ * talents (e.g. Bulwark's Titan) and the v0.5 capital scale, neither of which ShipView carries. Use RAW snapshot
  * ships (both positions from the same tick), not interpolated ones.
  */
 export function hostRadii(ships: readonly ShipView[]): Map<EntityId, number> {
@@ -47,9 +54,13 @@ export function hostRadii(ships: readonly ShipView[]): Map<EntityId, number> {
     if (!t.attachedTo || !t.alive || out.has(t.attachedTo)) continue;
     const host = byId.get(t.attachedTo);
     if (!host) continue;
+    const slot = Math.max(0, t.turretSlot), count = Math.max(1, t.turretCount);
+    const pad = mountDist(slot, count, 0);
+    const per = mountDist(slot, count, 1) - pad;
+    if (!(per > 1e-6)) continue;
     const base = SHIP_CLASSES[host.shipClass]?.base.radius ?? 16;
-    const r = Math.hypot(t.x - host.x, t.y - host.y) - TURRET_RING_PAD;
-    if (r >= base * 0.7 && r <= base * 2) out.set(host.id, r); // otherwise a knock moved one of them: ignore
+    const r = (Math.hypot(t.x - host.x, t.y - host.y) - pad) / per;
+    if (r >= base * 0.7 && r <= base * MAX_HOST_RADIUS_HULLS) out.set(host.id, r); // otherwise a knock moved one: ignore
   }
   return out;
 }

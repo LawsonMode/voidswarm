@@ -6,6 +6,8 @@
 // v0.3 M4: in a rift the RiftHud strip is the top-centre strip (boss bar below it, rift banners in the same queue), a
 // party roster replaces the team-score strip, and the out-of-lives overlay / extract ring / portal arrows / floor flash
 // join the HUD (RiftHud.ts; wording in riftInfo.ts).
+// v0.5: a host flies its capital variant — the Space slot shows the capital skill (its own cooldown), a
+// "CAPITAL: Dreadnought" badge counts the hardpoints used, and a turret's line names its mount (capitalInfo.ts).
 import type { RenderFrame } from '../contracts';
 import { setHudInsets } from '../hudInsets';
 import { LASER_RESONANCE, LOOT_PICKUP_PAD, NO_TEAM, PATH_LEVEL, TURRET_HOST_FLOOR_FRAC } from '../../shared/constants';
@@ -19,6 +21,9 @@ import { hostEnergyState, hostLaserDraw, laserResonance } from '../net/attach';
 import type { GameClient } from '../net/GameClient';
 import { loadStr, saveStr } from '../storage';
 import { BannerQueue } from './bannerQueue';
+import {
+  CapitalCooldown, capitalBadgeModel, capitalCooldownSec, capitalCost, isHosting, skillBarModel, turretSeatText,
+} from './capitalInfo';
 import { ChatView } from './ChatView';
 import { accentCss, SLOT_KEYS, SLOT_ORDER, slotCost } from './classInfo';
 import { fmtClock, h, replaceChildren, setStyle, setText, teamCss, toggleClass } from './dom';
@@ -96,6 +101,14 @@ export class Hud {
   private tipAt = 0;
   private respawn = h('div', { class: 'respawn hidden' });
   private turret = h('div', { class: 'turret-status hidden' });
+  // v0.5 capital badge (hosts): name, one pip per hardpoint, HARDPOINTS n/5, host-energy draw.
+  private capBadge = h('div', { class: 'capital-badge hidden' });
+  private capName = h('span', { class: 'cap-name' });
+  private capPips = h('span', { class: 'cap-pips' });
+  private capCount = h('span', { class: 'cap-count' });
+  private capDraw = h('span', { class: 'cap-draw' });
+  private capKey = '';
+  private capCd = new CapitalCooldown();
   private spectate = h('div', { class: 'spectate hidden' });
   private panel: HTMLElement;
   private energyWrap = h('div', { class: 'energy' });
@@ -159,9 +172,11 @@ export class Hud {
         h('div', { class: 'hud-side' }, this.resonanceEl, this.deployEl)),
       this.talentsEl);
     this.tray.append(h('span', { class: 'lt-label' }, 'UNSECURED'), this.trayPips, this.trayCount, this.trayHint);
+    this.capBadge.append(this.capName, this.capPips, this.capCount, this.capDraw);
     this.top = h('div', { class: 'hud-top' }, this.scoresStrip, this.rift.roster,
       h('div', { class: 'hud-top-mid' }, this.timer, this.wave, this.obj.strip, this.rift.strip, this.rift.boss), this.stats);
-    this.bottom = h('div', { class: 'hud-bottom' }, this.cards.root, this.turret, h('div', { class: 'loot-tray-wrap' }, this.holdToast, this.tray), this.panel);
+    this.bottom = h('div', { class: 'hud-bottom' }, this.cards.root, this.turret, this.capBadge,
+      h('div', { class: 'loot-tray-wrap' }, this.holdToast, this.tray), this.panel);
     this.root = h('div', { class: 'screen hud' },
       this.rift.flash,
       this.rift.arrows,
@@ -189,6 +204,9 @@ export class Hud {
     this.upgradesKey = this.scoresKey = this.pathKey = this.talentsKey = this.deployKey = '';
     this.cards.render(null, 0);
     this.turretReload.reset();
+    this.capCd.reset();
+    this.capKey = '';
+    this.capBadge.classList.add('hidden');
     this.banners.clear();
     this.bannerSeq = -1;
     this.banner.classList.add('hidden');
@@ -258,6 +276,9 @@ export class Hud {
           text: ev.level === PATH_LEVEL ? `LEVEL ${ev.level} — CHOOSE YOUR PATH` : `LEVEL ${ev.level}`,
           kind: 'level', priority: 2, ms: 1600,
         }, now);
+      } else if (ev.t === 'ability') {
+        // v0.5: an own capital skill use (Broadside / Overcharge / Repair Bay) lights and times the Space slot.
+        if (ev.shipId && ev.shipId === this.client.localShipId) this.capCd.onAbility(ev.skill, now, ev.talent);
       } else if (ev.t === 'lootPickup' || ev.t === 'lootSpill' || ev.t === 'lootSecured' || ev.t === 'lootDrop') {
         const b = lootBannerFor(ev, me);
         if (b) this.banners.push({ text: b.text, kind: 'loot', rarity: b.rarity, priority: b.priority, ms: b.ms }, now);
@@ -355,6 +376,7 @@ export class Hud {
     if (!you) {
       toggleClass(this.respawn, 'hidden', true);
       toggleClass(this.turret, 'hidden', true);
+      toggleClass(this.capBadge, 'hidden', true);
       toggleClass(this.tray, 'hidden', true);
       this.wasFull = false;
       this.cards.render(null, 0);
@@ -381,7 +403,7 @@ export class Hud {
 
     // Skill bar (class skills, or turret kit while attached).
     if (host) this.updateTurretMode(you, cls.id, host, f.ships, now, secondaryHeld);
-    else { this.updateSkillMode(you, cls.id, own); this.turretReload.reset(); }
+    else { this.updateSkillMode(you, cls.id, own, now); this.turretReload.reset(); }
     toggleClass(this.attachPip, 'hidden', c.mode === 'ffa' || !cls.canTurret);
     // CTF: a flag carrier can't attach as a turret (§5.3).
     toggleClass(this.attachPip, 'blocked', this.obj.carryingFlag);
@@ -401,16 +423,13 @@ export class Hud {
         : `Respawning in ${Math.max(0, you.respawnIn).toFixed(1)}s`);
     }
 
-    // Turret status line (both sides of the stack).
-    let turretText = '';
-    if (host) {
-      turretText = `TURRET on ${this.name(host.playerId)} — ${cls.turret.name}`;
-    } else if (you.turrets.length) {
-      const draw = hostLaserDraw(f.ships, you.shipId);
-      turretText = `Turrets: ${you.turrets.length}${draw > 0 ? ` — drawing ~${Math.round(draw)}/s` : ''}`;
-    }
+    // Turret status line (the turret side of the stack: which hardpoint you man), capital badge (the host side).
+    const turretText = host
+      ? turretSeatText(this.name(host.playerId), own?.turretSlot ?? 0, own?.turretCount ?? host.turretCount, cls.turret.name)
+      : '';
     toggleClass(this.turret, 'hidden', !turretText);
     setText(this.turret, turretText);
+    this.updateCapitalBadge(you, cls.id, f.ships);
 
     this.updateTray(f, you, now);
     if (this.tipUntil && you.alive && now - this.tipAt > TIP_MIN_MS) { this.tip.classList.add('hidden'); this.tipUntil = 0; }
@@ -450,13 +469,39 @@ export class Hud {
     this.wasFull = tm.full;
   }
 
-  private updateSkillMode(you: YouState, clsId: keyof typeof SHIP_CLASSES, own: ShipView | undefined): void {
-    const def = SHIP_CLASSES[clsId];
-    this.skills.setSlots(`skills:${clsId}`, SLOT_ORDER.map((slot) => ({
-      icon: def.skills[slot].icon, name: def.skills[slot].name, keys: SLOT_KEYS[slot],
-    })));
+  /** v0.5: while you host turrets, the capital badge (name, hardpoint pips, n/5, laser draw on your energy). */
+  private updateCapitalBadge(you: YouState, clsId: keyof typeof SHIP_CLASSES, ships: ShipView[]): void {
+    const m = isHosting(you) ? capitalBadgeModel(clsId, you.turrets.length, you.stats.maxTurrets) : null;
+    toggleClass(this.capBadge, 'hidden', !m);
+    if (!m) return;
+    const key = `${m.label}|${m.pips.join('')}|${m.cap}`;
+    if (key !== this.capKey) {
+      this.capKey = key;
+      // m.label = "CAPITAL: <name>"; the prefix folds away at phone width (styles.css), the name stays.
+      replaceChildren(this.capName, h('span', { class: 'cap-icon' }, '⚓'), ' ', h('span', { class: 'cap-prefix' }, 'CAPITAL: '), m.name);
+      replaceChildren(this.capPips, m.pips.map((p) => h('span', { class: `cap-pip ${p}` })));
+      // "HARDPOINTS n/cap" (usable mounts; locked pips show the rest of the 5; the word folds away at phone width)
+      replaceChildren(this.capCount, h('span', { class: 'cap-count-label' }, 'HARDPOINTS '), `${m.used}/${m.cap}`);
+      this.capBadge.title = m.title;
+    }
+    const draw = hostLaserDraw(ships, you.shipId);
+    setText(this.capDraw, draw > 0 ? `drawing ~${Math.round(draw)}/s` : '');
+  }
+
+  private updateSkillMode(you: YouState, clsId: keyof typeof SHIP_CLASSES, own: ShipView | undefined, now: number): void {
+    // v0.5: hosting ≥ 1 turret puts the capital skill in the Space slot (its own cooldown, cost and glow).
+    const bar = skillBarModel(clsId, isHosting(you));
+    this.skills.setSlots(bar.key, bar.specs);
     const flags = own?.flags ?? 0;
     SLOT_ORDER.forEach((slot, i) => {
+      if (i === bar.capitalIndex) {
+        const cd = this.capCd.state(you.cd.mobility, you.cdSec.mobility, capitalCooldownSec(you.stats), now);
+        this.skills.update(i, {
+          cd: cd.cd, cdSec: cd.cdSec, dim: you.alive && you.energy < capitalCost(you.stats),
+          active: this.capCd.active(you.stats, now, you.skillActive),
+        });
+        return;
+      }
       const sec = slot === 'primary' ? null : you.cdSec[slot];
       const active = (slot === 'mobility' && (flags & SHIPFLAG_CHARGING) !== 0)
         || (slot === 'utility' && clsId === 'brute' && (flags & SHIPFLAG_SHIELD) !== 0);

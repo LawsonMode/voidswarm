@@ -39,12 +39,16 @@ import { SHIP_CLASSES } from '../data/ships';
 import { createWorld, rebuildGrid } from '../sim/world';
 import { isSolidAt, lineOfSight } from '../sim/map';
 import {
-  SHIPFLAG_AFTERBURNER,
+  SHIPFLAG_AFTERBURNER, SHIPFLAG_CLOAKED,
   emptyInput, type Enemy, type FlagObjective, type GameMap, type InputState, type MapFeature, type ObjectiveState,
   type ObjectiveSubMode, type PathId, type Ship, type ShipClassId, type SimConfig, type UpgradeChoice, type World,
   type ZoneObjective,
 } from '../types';
-import { createBotBrain } from './bots';
+import {
+  BROADSIDE_RANGE, OVERCHARGE_MIN_EF, broadsideScore, createBotBrain, formCapitals, lasersOnTarget, mobilitySkillOf,
+  overchargeAffordable, repairBayNeed,
+} from './bots';
+import { MAX_HARDPOINTS } from '../constants';
 import {
   ATTACK_DIVE_R, DEFEND_HOLD_R, HOT_CONVERGE_FFA, HOT_FFA_PAD_FIGHT_MULT, OBJ_SCORE, amongNearest, carriedFlagOf, hostSeats,
   objectiveGoal, objectiveRank,
@@ -198,6 +202,7 @@ function runEcon(
 }
 
 const angDiff = (a: number, b: number) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+const clampTurn = (d: number, max: number) => (d > max ? max : d < -max ? -max : d);
 const card = (id: string, category: UpgradeChoice['category']): UpgradeChoice =>
   ({ id, name: id, description: '', level: 1, maxLevel: 5, category, icon: '?' });
 
@@ -1285,5 +1290,357 @@ describe('v0.3 M3 objective bots (tuning: dives, pad holds, carrier escapes)', (
       expect(Math.abs(angDiff(b.aim, Math.PI))).toBeLessThan(0.35); // toward the home stand (−x)
       expect(b.dist).toBeCloseTo((me.stats.skill.blinkRange ?? 480) * CTF_CARRIER_BLINK_MULT, 0);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// v0.5 hardpoints + capital ships
+// ---------------------------------------------------------------------------------------------
+
+/** Dock `turret` on `host` (the fake world has no Sim: just the links, the turret parked on the hull). */
+function dock(host: Ship, turret: Ship): void {
+  turret.attachedTo = host.id; host.turrets.push(turret.id);
+  turret.x = host.x; turret.y = host.y + 10;
+}
+
+describe('v0.5 capital ships: hosts use the capital skill', () => {
+  /** A Juggernaut host (bot, team 0) facing +x with one flak turret docked. */
+  const dreadnought = (w: World, x = 2000, y = 2000) => {
+    const host = makeShip(w, 'brute', x, y, 0);
+    dock(host, makeShip(w, 'brute', x, y, 0, false));
+    return host;
+  };
+
+  it('mobilitySkillOf: the capital skill replaces Space only while hosting', () => {
+    const w = makeWorld(makeMap(), 'teams');
+    const expectSkill = { brute: ['ram', 'broadside'], tech: ['blink', 'overcharge'], engineer: ['repair', 'repairbay'] } as const;
+    for (const cls of ['brute', 'tech', 'engineer'] as const) {
+      const host = makeShip(w, cls, 1000, 1000, 0);
+      expect(mobilitySkillOf(host)).toBe(expectSkill[cls][0]);
+      const tr = makeShip(w, 'tech', 1000, 1000, 0);
+      dock(host, tr);
+      expect(mobilitySkillOf(host)).toBe(expectSkill[cls][1]);
+      expect(mobilitySkillOf(host)).toBe(SHIP_CLASSES[cls].capital.skill.id);
+      host.turrets.length = 0; tr.attachedTo = 0;
+      expect(mobilitySkillOf(host)).toBe(expectSkill[cls][0]);
+    }
+  });
+
+  it('broadsideScore: counts hostiles where the slugs meet them at the aim point, in range, with line of sight', () => {
+    const w = makeWorld(makeMap([[70, 57, 70, 58]]), 'teams'); // a wall at x 2240..2272, y 1824..1888
+    const host = dreadnought(w);
+    const foe = makeShip(w, 'brute', 2400, 2000, 1); // 400 px dead ahead
+    rebuildGrid(w);
+    expect(broadsideScore(w, host, 2400, 2000)).toBe(1);
+    expect(broadsideScore(w, host, 2400, 2200)).toBe(0); // aimed 200 px off it
+    host.angle = Math.PI / 2; // the hull's heading does not matter: the volley converges on the aim point
+    expect(broadsideScore(w, host, 2400, 2000)).toBe(1);
+    host.angle = 0;
+    foe.energy = foe.stats.maxEnergy * 0.2;
+    expect(broadsideScore(w, host, 2400, 2000)).toBeCloseTo(1.3); // weak: finish it
+    foe.energy = foe.stats.maxEnergy;
+    foe.x = 2000 + BROADSIDE_RANGE + 150; rebuildGrid(w);
+    expect(broadsideScore(w, host, foe.x, foe.y)).toBe(0); // out of range
+    foe.x = 2400; foe.flags = SHIPFLAG_CLOAKED; rebuildGrid(w);
+    expect(broadsideScore(w, host, 2400, 2000)).toBe(0); // unseen
+    foe.flags = 0; foe.team = 0;
+    expect(broadsideScore(w, host, 2400, 2000)).toBe(0); // an ally (no friendly fire)
+    w.config.friendlyFire = true;
+    expect(broadsideScore(w, host, 2400, 2000)).toBeLessThan(0); // friendly fire: an ally at the aim point is a cost
+    foe.team = 1;
+    const mate = makeShip(w, 'tech', 2200, 2010, 0); // in the slugs' path, between the hull and the foe
+    rebuildGrid(w);
+    expect(broadsideScore(w, host, 2400, 2000)).toBeLessThan(0);
+    w.config.friendlyFire = false;
+    expect(broadsideScore(w, host, 2400, 2000)).toBe(1);
+    mate.alive = false; w.ships.delete(mate.id);
+    // the lead: a target crossing the aim line is scored where the slugs meet it (~0.35 s out), not where it is now
+    foe.y = 2000 + 210; foe.vy = -600; rebuildGrid(w); // (from starboard: the wall is to port)
+    expect(broadsideScore(w, host, 2400, 2000)).toBe(1);
+    foe.vy = 0;
+    expect(broadsideScore(w, host, 2400, 2000)).toBe(0);
+    // enemies: a drone clump (0.3 each) and a big one (0.8)
+    foe.y = 5000; rebuildGrid(w);
+    for (const y of [1650, 1670, 1690]) makeEnemy(w, 2000, y); // 330 px to port
+    rebuildGrid(w);
+    expect(broadsideScore(w, host, 2000, 1670)).toBeCloseTo(0.9);
+    makeEnemy(w, 2030, 1670, 'brute');
+    rebuildGrid(w);
+    expect(broadsideScore(w, host, 2000, 1670)).toBeCloseTo(1.7);
+    // nothing through a wall: a brute behind the wall; it counts once the wall is gone
+    const hidden = makeEnemy(w, 2400, 1750, 'brute');
+    rebuildGrid(w);
+    expect(lineOfSight(w.map, host.x, host.y, hidden.x, hidden.y)).toBe(false);
+    const blocked = broadsideScore(w, host, 2400, 1750);
+    for (const r of [57, 58]) w.map.tiles[r * w.map.cols + 70] = 0;
+    expect(broadsideScore(w, host, 2400, 1750)).toBeCloseTo(blocked + 0.8);
+  });
+
+  it('Broadside is aimed like a shot: the press carries aim + aimDist to the led fight target (no hull swing)', () => {
+    const w = makeWorld(makeMap(), 'teams');
+    const host = dreadnought(w);
+    makeShip(w, 'brute', 2400, 2000, 1); // 400 px dead ahead
+    const presses: { aim: number; dist: number; primary: boolean }[] = [];
+    run(w, host, createBotBrain('hard', 103), 240, (inp) => {
+      if (inp.mobility) presses.push({ aim: inp.aim, dist: inp.aimDist, primary: inp.primary });
+    }, { pinned: true });
+    expect(presses.length).toBeGreaterThan(0);
+    for (const p of presses) {
+      expect(Math.abs(angDiff(p.aim, 0))).toBeLessThan(0.05);
+      expect(Math.abs(p.dist - 400)).toBeLessThan(30);
+      expect(p.primary).toBe(false); // the press owns input.aim for its tick
+    }
+
+    // a target crossing the bow: the press leads it (aim + aimDist at where the slugs meet it)
+    const w2 = makeWorld(makeMap(), 'teams');
+    const host2 = dreadnought(w2);
+    const foe2 = makeShip(w2, 'brute', 2400, 2000, 1);
+    foe2.vy = 300;
+    const led: { aim: number; dist: number; fy: number }[] = [];
+    run(w2, host2, createBotBrain('hard', 103), 240, (inp) => {
+      if (inp.mobility) led.push({ aim: inp.aim, dist: inp.aimDist, fy: foe2.y });
+    }, { pinned: true, before: () => { foe2.y = 2000; } });
+    expect(led.length).toBeGreaterThan(0);
+    const tf = 400 / (host2.stats.skill.broadsideSpeed ?? 1150);
+    for (const p of led) {
+      const ax = 2000 + Math.cos(p.aim) * p.dist, ay = 2000 + Math.sin(p.aim) * p.dist;
+      expect(Math.abs(ax - 2400)).toBeLessThan(15);
+      expect(Math.abs(ay - (2000 + 300 * tf))).toBeLessThan(15);
+    }
+
+    // control: the same fight without a turret flies the v0.2 kit (a full-energy ship at 400 px is no Ram target)
+    const w3 = makeWorld(makeMap(), 'teams');
+    const free = makeShip(w3, 'brute', 2000, 2000, 0);
+    makeShip(w3, 'brute', 2400, 2000, 1);
+    let mob = 0;
+    run(w3, free, createBotBrain('hard', 103), 240, (inp) => { if (inp.mobility) mob++; }, { pinned: true });
+    expect(mob).toBe(0);
+  });
+
+  it('Broadside: nothing beyond ~600 px, nothing through an ally (friendly fire), nothing at a lone drone', () => {
+    const count = (setup: (w: World) => void, ff = false) => {
+      const w = makeWorld(makeMap(), 'teams');
+      w.config.friendlyFire = ff;
+      const host = dreadnought(w);
+      setup(w);
+      let mob = 0;
+      run(w, host, createBotBrain('hard', 107), 240, (inp) => { if (inp.mobility) mob++; }, { pinned: true });
+      return mob;
+    };
+    expect(count((w) => { makeShip(w, 'brute', 2000 + BROADSIDE_RANGE + 250, 2000, 1); })).toBe(0);
+    expect(count((w) => { makeShip(w, 'brute', 2400, 2000, 1); makeShip(w, 'tech', 2200, 2000, 0); }, true)).toBe(0);
+    expect(count((w) => { makeShip(w, 'brute', 2400, 2000, 1); makeShip(w, 'tech', 2200, 2000, 0); })).toBeGreaterThan(0);
+    expect(count((w) => { makeEnemy(w, 2300, 2000); })).toBe(0);
+    // a swarm clump at the aim point is worth a volley
+    expect(count((w) => { for (const dy of [-30, -10, 10, 30]) makeEnemy(w, 2300, 2000 + dy); })).toBeGreaterThan(0);
+  });
+
+  it('Overcharge: pressed when >= 2 laser turrets have their beams on a target and the host can pay the draw', () => {
+    const setup = (lasers: number, onTarget: boolean, hostEf = 1, maxEnergy = 0) => {
+      const w = makeWorld(makeMap(), 'teams');
+      const host = makeShip(w, 'tech', 2000, 2000, 0);
+      if (maxEnergy) host.stats.maxEnergy = maxEnergy;
+      host.energy = host.stats.maxEnergy * hostEf;
+      const trs: Ship[] = [];
+      for (let i = 0; i < lasers; i++) { const tr = makeShip(w, 'tech', 2000, 2000, 0); dock(host, tr); trs.push(tr); }
+      dock(host, makeShip(w, 'brute', 2000, 2000, 0)); // a flak turret never counts
+      makeShip(w, 'engineer', 2450, 2000, 1);
+      let presses = 0;
+      run(w, host, createBotBrain('hard', 109), 180, (inp) => { if (inp.mobility) presses++; }, {
+        pinned: true,
+        before: (tick) => {
+          for (const tr of trs) {
+            tr.input = { ...emptyInput(), primary: true };
+            tr.skillState.laserAccTick = onTarget ? tick : tick - 30;
+          }
+        },
+      });
+      return { presses, w, host };
+    };
+    expect(setup(2, true).presses).toBeGreaterThan(0);
+    // three lasers already draw x2.25 each: a base Spire can't pay the overcharged x3.375, a big-tanked one can
+    expect(setup(3, true).presses).toBe(0);
+    expect(setup(3, true, 1, 2600).presses).toBeGreaterThan(0);
+    expect(setup(1, true).presses).toBe(0); // one beam: nothing to resonate
+    expect(setup(2, false).presses).toBe(0); // firing at nothing
+    expect(setup(2, true, OVERCHARGE_MIN_EF - 0.15).presses).toBe(0); // the extra draw would drain the host
+
+    // lasersOnTarget reads the trigger + a fresh bank, only for lasers docked on this host
+    const { w, host } = setup(2, true);
+    const [a, b] = host.turrets.map((id) => w.ships.get(id)!);
+    a.input = { ...emptyInput(), primary: true }; a.skillState.laserAccTick = w.tick;
+    b.input = { ...emptyInput(), primary: false }; b.skillState.laserAccTick = w.tick;
+    expect(lasersOnTarget(w, host)).toBe(1);
+    b.input = { ...emptyInput(), primary: true };
+    expect(lasersOnTarget(w, host)).toBe(2);
+    b.attachedTo = 0;
+    expect(lasersOnTarget(w, host)).toBe(1);
+
+    // affordability: capCost + 1.5 s of the net overcharged draw must leave the host above the turret floor
+    host.stats.maxEnergy = 1100; host.energy = 1100;
+    expect(overchargeAffordable(host, 2)).toBe(true); // 1100 − (200 + (405 − 290) × 1.5) ≥ 220
+    host.energy = 580;
+    expect(overchargeAffordable(host, 2)).toBe(false);
+    host.energy = 1100;
+    expect(overchargeAffordable(host, 3)).toBe(false); // 3 × 90 × 3.375 draw
+  });
+
+  it('Repair Bay: pressed when a turret or an ally in the bay is low (or two are worn); never when everyone is fine', () => {
+    const setup = (o: { turretEf?: number; allyEf?: number; allyD?: number; hostEf?: number; hostile?: boolean }) => {
+      const w = makeWorld(makeMap(), 'teams');
+      w.config.pveIntensity = 1; // not an Arena DM opening (no hunting across the map)
+      const host = makeShip(w, 'engineer', 2000, 2000, 0);
+      host.energy = host.stats.maxEnergy * (o.hostEf ?? 1);
+      const tr = makeShip(w, 'engineer', 2000, 2000, 0);
+      dock(host, tr);
+      tr.energy = tr.stats.maxEnergy * (o.turretEf ?? 1);
+      if (o.allyEf !== undefined) {
+        const ally = makeShip(w, 'brute', 2000 + (o.allyD ?? 300), 2000, 0);
+        ally.energy = ally.stats.maxEnergy * o.allyEf;
+      }
+      makeShip(w, 'brute', o.hostile ? 2550 : 6000, o.hostile ? 2000 : 6000, 1);
+      let presses = 0;
+      run(w, host, createBotBrain('hard', 113), 180, (inp) => { if (inp.mobility) presses++; }, { pinned: true });
+      rebuildGrid(w);
+      return { presses, need: repairBayNeed(w, host) };
+    };
+    const hurtTurret = setup({ turretEf: 0.3 });
+    expect(hurtTurret.need).toBe(1);
+    expect(hurtTurret.presses).toBeGreaterThan(0);
+    expect(setup({ allyEf: 0.4, allyD: 300 }).presses).toBeGreaterThan(0);
+    // two worn (< 0.75) covered ships add up to a need of 1; one alone does not
+    expect(setup({ turretEf: 0.7, allyEf: 0.7 }).need).toBe(1);
+    expect(setup({ turretEf: 0.7, allyEf: 0.7 }).presses).toBeGreaterThan(0);
+    expect(setup({ turretEf: 0.7 }).presses).toBe(0); // one worn, nobody fighting
+    expect(setup({ turretEf: 0.7, hostile: true }).presses).toBeGreaterThan(0); // one worn mid-fight: the bay is free
+    // the bay never covers the Foundry itself (sim/capital.ts), so a low host alone is no reason
+    const selfOnly = setup({ hostEf: 0.4 });
+    expect(selfOnly.need).toBe(0);
+    expect(selfOnly.presses).toBe(0);
+    const fine = setup({});
+    expect(fine.need).toBe(0);
+    expect(fine.presses).toBe(0);
+    const farAlly = setup({ allyEf: 0.4, allyD: 900 }); // outside bayRadius (420)
+    expect(farAlly.need).toBe(0);
+    expect(farAlly.presses).toBe(0);
+  });
+});
+
+describe('v0.5 capital ships: seat picks form capitals', () => {
+  const firstSeats = (w: World, bot: Ship, seed: number, ticks = 4800): number[] => {
+    const out: number[] = [];
+    run(w, bot, createBotBrain('normal', seed), ticks, (inp) => { if (inp.attach) out.push(inp.attachTarget); }, { pinned: true });
+    return out;
+  };
+
+  it('hostSeats never offers more than MAX_HARDPOINTS mounts', () => {
+    const w = makeWorld(makeMap(), 'teams');
+    const host = makeShip(w, 'brute', 1000, 1000, 0, false, 'bulwark');
+    host.stats.maxTurrets = 9;
+    expect(MAX_HARDPOINTS).toBe(5);
+    expect(hostSeats(w, host)).toBe(MAX_HARDPOINTS);
+    host.stats.maxTurrets = 3;
+    expect(hostSeats(w, host)).toBe(3);
+  });
+
+  it('a full 5-hardpoint capital is never picked, even with maxTurrets above 5', () => {
+    const w = makeWorld(makeMap(), 'teams');
+    w.config.pveIntensity = 1;
+    const bot = makeShip(w, 'brute', 1000, 1000, 0);
+    const full = makeShip(w, 'brute', 1300, 1000, 0, false, 'bulwark');
+    full.stats.maxTurrets = 8;
+    for (let i = 0; i < 5; i++) dock(full, makeShip(w, 'engineer', 1300, 1000, 0));
+    const other = makeShip(w, 'engineer', 4000, 4000, 0);
+    makeShip(w, 'brute', 6000, 1000, 1);
+    const seats = firstSeats(w, bot, 17, 9600); // (Deathmatch seat rolls are x0.3: a longer window)
+    expect(seats.length).toBeGreaterThan(0);
+    expect(seats.every((id) => id === other.id)).toBe(true);
+  });
+
+  it('outside Deathmatch, prefers the capital that is already forming over an equal free hull (DM: v0.4 picks)', () => {
+    const pick = (subMode: ObjectiveSubMode | 'deathmatch') => {
+      const w = makeWorld(makeMap(), 'teams');
+      w.config.pveIntensity = 1;
+      w.config.gameType = 'warzone';
+      w.config.subMode = subMode;
+      const bot = makeShip(w, 'brute', 3000, 3000, 0);
+      // (the bare hull comes first in iteration order, so it wins a tie)
+      const bare = makeShip(w, 'brute', 3000, 4500, 0); // 1500 px south
+      bare.stats.maxTurrets = 4;
+      const forming = makeShip(w, 'brute', 3000, 1500, 0); // 1500 px north
+      forming.stats.maxTurrets = 4;
+      dock(forming, makeShip(w, 'engineer', 3000, 1500, 0));
+      dock(forming, makeShip(w, 'engineer', 3000, 1500, 0));
+      makeShip(w, 'brute', 6000, 6000, 1);
+      expect(formCapitals(w)).toBe(subMode !== 'deathmatch');
+      const seats = firstSeats(w, bot, 19, subMode === 'deathmatch' ? 9600 : 4800);
+      expect(seats.length).toBeGreaterThan(0);
+      return { seats, bare: bare.id, forming: forming.id };
+    };
+    const zones = pick('zones');
+    expect(zones.seats.every((id) => id === zones.forming)).toBe(true);
+    // Deathmatch: free pilots make the kills, so no pull toward a forming capital (the tie goes to the first hull)
+    const dm = pick('deathmatch');
+    expect(dm.seats.every((id) => id === dm.bare)).toBe(true);
+  });
+
+  it('a laser prefers a Spire (tech host: Resonance Overcharge) over an equal Juggernaut', () => {
+    const w = makeWorld(makeMap(), 'teams');
+    w.config.pveIntensity = 1;
+    const bot = makeShip(w, 'tech', 3000, 3000, 0);
+    makeShip(w, 'brute', 4500, 3000, 0); // first in iteration order: it would win a tie
+    const spire = makeShip(w, 'tech', 1500, 3000, 0);
+    makeShip(w, 'brute', 6000, 6000, 1);
+    const seats = firstSeats(w, bot, 23);
+    expect(seats.length).toBeGreaterThan(0);
+    expect(seats.every((id) => id === spire.id)).toBe(true);
+  });
+
+  it('32 brains with 6 capitals (2–4 turrets each) stay within the 1.5 ms/tick budget', () => {
+    const map = makeMap([[40, 40, 45, 120], [100, 30, 140, 34], [120, 90, 125, 170], [60, 150, 110, 154]]);
+    const w = makeWorld(map, 'teams');
+    w.config.pveIntensity = 1;
+    const rng = new Rng(77);
+    const classes: ShipClassId[] = ['brute', 'tech', 'engineer'];
+    const place = () => {
+      for (;;) {
+        const x = rng.range(200, 6200), y = rng.range(200, 6200);
+        if (!isSolidAt(map, x, y)) return [x, y];
+      }
+    };
+    const bots: { s: Ship; b: ReturnType<typeof createBotBrain> }[] = [];
+    for (let i = 0; i < 32; i++) {
+      const [x, y] = place();
+      const s = makeShip(w, classes[i % 3], x, y, i % 2, true, null);
+      bots.push({ s, b: createBotBrain((['easy', 'normal', 'hard'] as const)[i % 3], 3000 + i) });
+    }
+    // hosts 0..5 each carry 2–4 of the later bots (same team)
+    let next = 6;
+    for (let h = 0; h < 6; h++) {
+      const host = bots[h].s;
+      host.stats.maxTurrets = 5;
+      for (let k = 0; k < 2 + (h % 3) && next < 32; next++) {
+        const tr = bots[next].s;
+        if (tr.team !== host.team || tr.attachedTo) continue;
+        dock(host, tr); k++;
+      }
+    }
+    for (let i = 0; i < 250; i++) { const [x, y] = place(); makeEnemy(w, x, y, i % 25 === 0 ? 'brute' : 'drone'); }
+    getNavGrid(map);
+    let capitalPresses = 0;
+    const t0 = performance.now();
+    for (let tick = 0; tick < 600; tick++) {
+      w.tick = tick;
+      rebuildGrid(w);
+      for (const { s, b } of bots) {
+        const inp = b.think(w, s);
+        if (inp.mobility && s.turrets.length > 0) capitalPresses++;
+        applyInput(w, s, inp);
+        if (s.attachedTo) { const host = w.ships.get(s.attachedTo)!; s.x = host.x; s.y = host.y + 10; }
+      }
+    }
+    const perTick = (performance.now() - t0) / 600;
+    console.log(`AI perf (capitals): ${perTick.toFixed(3)} ms/tick for 32 bots, ${capitalPresses} capital presses`);
+    expect(perTick).toBeLessThan(1.5);
   });
 });

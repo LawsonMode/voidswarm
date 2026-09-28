@@ -24,7 +24,9 @@ export type SkillSlot = 'primary' | 'secondary' | 'mobility' | 'utility';
 export type SkillId =
   | 'autocannon' | 'rockets' | 'ram' | 'ironhide' // brute
   | 'plasma' | 'arc' | 'blink' | 'singularity' // tech
-  | 'rivet' | 'sentry' | 'repair' | 'wall'; // engineer
+  | 'rivet' | 'sentry' | 'repair' | 'wall' // engineer
+  // v0.5 capital skills: replace the mobility (Space) skill while the ship hosts ≥ 1 turret
+  | 'broadside' | 'overcharge' | 'repairbay';
 /** Placed/summoned objects owned by a ship. */
 export type DeployableKind =
   | 'sentry' // engineer turret: fires seekers
@@ -208,6 +210,17 @@ export interface PathDef {
   talents: TalentDef[];
 }
 
+/**
+ * v0.5 capital variant. A host with ≥ 1 docked turret transforms: hull + hitbox scale by capitalScale(turrets)
+ * (sim/world.ts), armor + CAPITAL_ARMOR_PER_TURRET per turret, speed penalty as before, turrets render as bubble
+ * domes on HARDPOINT_LAYOUT mounts, and `skill` replaces the mobility (Space) skill until the last turret leaves.
+ */
+export interface CapitalDef {
+  name: string;
+  description: string;
+  skill: SkillDef;
+}
+
 export interface ShipClassDef {
   id: ShipClassId;
   name: string;
@@ -218,6 +231,8 @@ export interface ShipClassDef {
   skills: Record<SkillSlot, SkillDef>;
   /** Kit this class uses while attached as a turret. */
   turret: TurretKitDef;
+  /** v0.5: the capital variant this ship becomes while hosting ≥ 1 turret (bigger hull, hardpoints, new Space skill). */
+  capital: CapitalDef;
   paths: PathDef[];
   /** Can this class attach to a teammate as a turret? */
   canTurret: boolean;

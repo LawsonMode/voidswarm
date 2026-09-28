@@ -7,6 +7,7 @@ import { PATHS, hasUpgrade, pathKey } from '../../data/ships';
 import type { Deployable, Enemy, EnemyKind, EntityId, LootSource, Ship, World } from '../../types';
 import { damageEnemy, damageShip, splashDamage } from '../combat';
 import { rollLoot } from '../loot';
+import { reseatTurrets } from '../hull';
 import { collideCircle, lineOfSight } from '../map';
 import { allocId, dropGems, emit, projectileDefaults, secToTicks, spawnProjectile } from '../world';
 import {
@@ -464,6 +465,9 @@ function contact(world: World, e: Enemy, def: EnemyDef): boolean {
         // Rift floors are solid rock outside the rooms: never leave a pinned ship inside a wall (Arena / Warzone keep
         // the v0.2 behaviour, so their golden digest is unchanged; movement resolves the overlap there).
         if (world.dungeon) { const c = collideCircle(world.map, s.x, s.y, s.stats.radius); s.x = c.x; s.y = c.y; }
+        // v0.5: a capital host's domes ride its hardpoints (they were seated in Sim pass 2, before this push), so the
+        // snapshot and this tick's hit tests see them on the hull
+        if (s.turrets.length) reseatTurrets(world, s);
       }
     }
     if (ready) {

@@ -20,6 +20,7 @@ import { activateFocused, moveFocus } from './ui/FocusNav';
 import { HangarModal } from './ui/HangarModal';
 import { Hud } from './ui/Hud';
 import { grantSummary } from './ui/lootInfo';
+import { MobileSupport } from './ui/mobile';
 import { ControlsModal, CreateGameModal, MenuModal, SettingsModal, Toasts, type Modal } from './ui/Overlays';
 import { RoomLobby } from './ui/RoomLobby';
 import { ResultsScreen, Scoreboard } from './ui/Scoreboard';
@@ -195,6 +196,21 @@ async function boot(): Promise<void> {
   uiHost.append(title.root, command.root, room.root, hud.root);
   overlayHost.prepend(scoreboard.root, results.root);
   overlayHost.appendChild(toasts.root);
+  // v0.5 mobile (phones / tablets without a mouse only): controller card + "Play fullscreen" on Title and Command,
+  // "Rotate to landscape" over the room lobby and the match in portrait. Only covers the view: the sim never pauses.
+  // While it covers, #overlays (modals, debrief, scoreboard) and the room lobby are inert, so Tab / Enter can't reach
+  // them; the match HUD is left alone (the ship controls stay live, a focused chat keeps its state).
+  const mobile = new MobileSupport({
+    onUi: ui,
+    onCover: (covered, scr) => {
+      overlayHost.toggleAttribute('inert', covered);
+      uiHost.toggleAttribute('inert', covered && scr !== 'game');
+    },
+    onPromptDismissed: (scr) => { if (scr === 'title') title.focusDefault(); else command.focusDefault(); },
+  });
+  title.mountNotice(mobile.titleSlot);
+  command.mountNotice(mobile.commandSlot);
+  overlayHost.after(mobile.rotateOverlay); // beside #overlays (not in it), so it stays live while that is inert
 
   const screenRoots: Record<ScreenId, HTMLElement> = { title: title.root, command: command.root, room: room.root, game: hud.root };
 
@@ -216,6 +232,7 @@ async function boot(): Promise<void> {
     const prev = screen;
     screen = next;
     for (const [id, el] of Object.entries(screenRoots)) el.classList.toggle('active', id === next);
+    mobile.setScreen(next);
     document.body.classList.toggle('in-game', next === 'game');
     input.inMatch = next === 'game';
     if (next !== 'game') {
@@ -327,6 +344,8 @@ async function boot(): Promise<void> {
   }
 
   function activeLayer(): HTMLElement | null {
+    // "Rotate to landscape" is on top of everything: gamepad A / the D-pad land on its own button, never behind it
+    if (mobile.rotateVisible) return mobile.rotateOverlay;
     const m = topModal();
     if (m) return m.root;
     if (screen === 'game') return null;
@@ -334,7 +353,10 @@ async function boot(): Promise<void> {
   }
 
   // --- UI actions from keyboard / gamepad
+  // v0.5 mobile: nothing opens, closes or switches behind "Rotate to landscape" (the in-match controls stay live)
+  const COVERED_ACTIONS: ReadonlySet<UiAction> = new Set<UiAction>(['menu', 'controls', 'back', 'chat', 'teamChat', 'tabPrev', 'tabNext']);
   input.onAction = (a: UiAction) => {
+    if (mobile.rotateVisible && COVERED_ACTIONS.has(a)) return;
     const layer = activeLayer();
     switch (a) {
       case 'menu': {

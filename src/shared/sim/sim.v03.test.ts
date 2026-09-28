@@ -386,7 +386,8 @@ describe('fieldRevive', () => {
 
 // ---------------------------------------------------------------------------------------------
 describe('lootMult 0 leaves the world.rng stream identical to v0.2', () => {
-  function run(extra: Partial<SimConfig>): { sim: Sim; trace: string[] } {
+  /** `turrets` false = the same script without the attach / detach presses (nobody ever hosts or docks). */
+  function run(extra: Partial<SimConfig>, turrets = true): { sim: Sim; trace: string[] } {
     const sim = new Sim({ ...cfg({ mapSeed: 4242, pveIntensity: 3, teamCount: 2, matchSeconds: 120 }), ...extra });
     const cls: ShipClassId[] = ['brute', 'tech', 'engineer'];
     for (let i = 1; i <= 8; i++) add(sim, i, cls[i % 3], i % 2, true);
@@ -397,7 +398,7 @@ describe('lootMult 0 leaves the world.rng stream identical to v0.2', () => {
         sim.setInput(i, inp({
           seq: k, moveX: Math.cos(a), moveY: Math.sin(a), aim: a + Math.sin(k * 0.07), aimDist: 300,
           primary: true, secondary: k % 40 < 12, mobility: k % 180 === i, utility: k % 240 === i,
-          attach: k % 300 === i * 7, detach: k % 300 === i * 7 + 90,
+          attach: turrets && k % 300 === i * 7, detach: turrets && k % 300 === i * 7 + 90,
         }));
         if (k % 45 === 0) sim.chooseUpgrade(i, i % 3);
       }
@@ -437,25 +438,47 @@ describe('lootMult 0 leaves the world.rng stream identical to v0.2', () => {
     expect(a.trace.filter((l) => l.includes('"shipDeath"')).length).toBeGreaterThanOrEqual(3);
   });
 
+  const digest = (r: { sim: Sim; trace: string[] }): string => {
+    const w = r.sim.world;
+    const parts = r.trace.slice();
+    for (const s of w.ships.values()) parts.push(JSON.stringify([s.id, s.shipClass, s.team, s.alive, s.x, s.y, s.energy, s.score, s.xp, s.level, s.kills, s.deaths]));
+    parts.push(JSON.stringify([w.tick, w.nextId, w.enemies.size, w.gems.size, w.projectiles.size]));
+    parts.push(JSON.stringify(Array.from({ length: 8 }, () => w.rng.next())));
+    const all = parts.join('\n');
+    return `${parts.length}:${all.length}:${fnv1a(all).toString(16).padStart(8, '0')}`;
+  };
+  const V03_FIELDS: Partial<SimConfig> = { gameType: 'warzone', subMode: 'deathmatch', lootMult: 0, lootSeed: 0x7fedcba9, objectiveLimit: 0 };
+
   /**
-   * Golden digest of this exact run, captured from the pre-M1 v0.2.1 Sim (its backup, same scripted inputs,
-   * no AI). The test above compares the M1 Sim with itself, so a change shared by both runs would slip through;
-   * this one pins the v0.2 behaviour itself. Loot (M2), objectives (M3) and rifts (M4) must never move it
-   * for a Deathmatch config with lootMult 0. Re-pin ONLY for a deliberate v0.2 gameplay change (and say so).
+   * Golden digest of this exact run. The test above compares the Sim with itself, so a change shared by both runs
+   * would slip through; this one pins the behaviour itself. Loot (M2), objectives (M3) and rifts (M4) must never
+   * move it for a Deathmatch config with lootMult 0. Re-pin ONLY for a deliberate gameplay change (and say so).
+   * RE-PINNED in v0.5 (deliberate turret gameplay change): the script docks turrets (attach presses), and v0.5 moves
+   * them onto hardpoints ON the hull (world.ts turretOffset), turns the host into a capital (bigger hull + armor,
+   * Space = capital skill) and docked turrets into bubble domes. The v0.2.1 value was '1404:359866:f57ee6fa'
+   * (unchanged from v0.2.1 through v0.4.0). The no-turret goldens below pin that nothing else moved.
+   * Re-pinned once more in the v0.5 integration (was '1396:362967:f5afa51b'): the script presses Space while hosting,
+   * and Broadside's slugs now converge on the aim point (sim/capital.ts broadsideFocus) instead of leaving the flanks
+   * perpendicular. The dome re-seat after a PvE push and the friendly-fire crew rule did not move it.
    */
-  it('reproduces the v0.2.1 golden digest, with and without the v0.3 fields', () => {
-    const V021_GOLDEN = '1404:359866:f57ee6fa';
-    const digest = (r: { sim: Sim; trace: string[] }): string => {
-      const w = r.sim.world;
-      const parts = r.trace.slice();
-      for (const s of w.ships.values()) parts.push(JSON.stringify([s.id, s.shipClass, s.team, s.alive, s.x, s.y, s.energy, s.score, s.xp, s.level, s.kills, s.deaths]));
-      parts.push(JSON.stringify([w.tick, w.nextId, w.enemies.size, w.gems.size, w.projectiles.size]));
-      parts.push(JSON.stringify(Array.from({ length: 8 }, () => w.rng.next())));
-      const all = parts.join('\n');
-      return `${parts.length}:${all.length}:${fnv1a(all).toString(16).padStart(8, '0')}`;
-    };
-    expect(digest(run({}))).toBe(V021_GOLDEN);
-    expect(digest(run({ gameType: 'warzone', subMode: 'deathmatch', lootMult: 0, lootSeed: 0x7fedcba9, objectiveLimit: 0 }))).toBe(V021_GOLDEN);
+  it('reproduces the golden digest (v0.5 turret gameplay), with and without the v0.3 fields', () => {
+    const V05_GOLDEN = '1400:363001:f3aa77f8';
+    expect(digest(run({}))).toBe(V05_GOLDEN);
+    expect(digest(run(V03_FIELDS))).toBe(V05_GOLDEN);
+  });
+
+  /**
+   * v0.5 hardpoints must not touch a match where nobody hosts or docks: the same script without attach presses
+   * (teams) and in FFA (no turrets at all) reproduce the digests captured from the v0.4.0 Sim.
+   */
+  it('a Deathmatch with no turrets reproduces the v0.4.0 digests exactly (teams without attaches, and FFA)', () => {
+    const V04_TEAMS_NO_TURRETS = '1368:389957:5ea61116';
+    const V04_FFA = '1406:390888:194d5c97';
+    expect(digest(run({}, false))).toBe(V04_TEAMS_NO_TURRETS);
+    expect(digest(run(V03_FIELDS, false))).toBe(V04_TEAMS_NO_TURRETS);
+    expect(digest(run({ mode: 'ffa' }))).toBe(V04_FFA);
+    const r = run({}, false);
+    for (const s of r.sim.world.ships.values()) expect(s.stats).toEqual(computeStats(s.shipClass, s.upgrades));
   });
 });
 

@@ -5,7 +5,7 @@ APP_DIR=/opt/voidswarm
 BRANCH="${BRANCH:-main}"
 if [[ $EUID -ne 0 ]]; then echo "Run as root (sudo)." >&2; exit 1; fi
 
-/usr/local/bin/voidswarm-backup || echo "warning: backup failed, continuing" >&2
+/usr/local/bin/voidswarm-backup || echo "warning: the backup step reported a problem (see above), continuing" >&2
 cd "$APP_DIR"
 before=$(sudo -u voidswarm git rev-parse --short HEAD)
 sudo -u voidswarm git fetch --quiet origin "$BRANCH"

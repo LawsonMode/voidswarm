@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { CODEC_VERSION, decodeSnapshot, encodeSnapshot } from './codec';
+import { CODEC_VERSION, codecKnobKeys, decodeSnapshot, encodeSnapshot } from './codec';
 import { validateClientMsg } from './validate';
 import { SHIPFLAG_CARRIER, SHIPFLAG_CLOAKED, SHIPFLAG_INVULN, type MatchView, type ShipStats, type Snapshot } from '../types';
-import { SHIP_CLASSES } from '../data/ships';
+import { SHIP_CLASS_IDS, SHIP_CLASSES, SKILL_KNOBS, TURRET_KNOBS } from '../data/ships';
+import { fnv1a } from '../util/hash';
+import { PROTOCOL_VERSION } from '../version';
 import { CTF_CARRIER_SPEED_MULT, carrierSpeedMult } from '../sim/objectives/rules';
 
 function angDiff(a: number, b: number): number {
@@ -389,6 +391,82 @@ describe('snapshot codec v5 (v0.3 layout, docs/v0.3-proposal.md §8.9)', () => {
       JSON.stringify = stringify;
     }
     expect(matchCalls).toBe(1);
+  });
+});
+
+describe('snapshot codec: v0.5 capital knobs (PROTOCOL_VERSION 5, layout unchanged)', () => {
+  const CAPITAL_KNOBS = [
+    'capCooldown', 'capCost', 'broadsideSlugs', 'broadsideDamage', 'broadsideSpeed', 'overchargeTime', 'overchargeBonus',
+    'bayHealFrac', 'bayTime', 'bayRadius', 'bayShield',
+  ];
+  const tailText = (buf: ArrayBuffer) => new TextDecoder().decode(new Uint8Array(buf));
+
+  it('the knob table holds every SKILL_KNOBS + TURRET_KNOBS key once, sorted, within a u8 index', () => {
+    const keys = codecKnobKeys();
+    const want = [...new Set([...Object.values(SKILL_KNOBS), ...Object.values(TURRET_KNOBS)].flatMap((o) => Object.keys(o)))].sort();
+    expect(keys).toEqual(want);
+    expect(keys.length).toBeLessThanOrEqual(255);
+    for (const k of CAPITAL_KNOBS) expect(keys, k).toContain(k);
+    keys.push('mutated'); // a copy: callers can't corrupt the wire table
+    expect(codecKnobKeys()).not.toContain('mutated');
+  });
+
+  it('is pinned to PROTOCOL_VERSION: a knob-table change must bump the protocol (then re-pin here)', () => {
+    const keys = codecKnobKeys();
+    expect({ protocol: PROTOCOL_VERSION, knobs: keys.length, fingerprint: fnv1a(keys.join(',')) })
+      .toEqual({ protocol: 5, knobs: 58, fingerprint: 3285079414 });
+    // why 5: without the capital knobs (the v0.4 table) existing knobs sat at other indices, so a v0.4 peer would
+    // decode e.g. blinkRange / ramDamage under the wrong names.
+    const v04 = keys.filter((k) => !CAPITAL_KNOBS.includes(k));
+    expect(v04.indexOf('blinkRange')).not.toBe(keys.indexOf('blinkRange'));
+    expect(v04.indexOf('ramDamage')).not.toBe(keys.indexOf('ramDamage'));
+  });
+
+  it("every class's full base stats (capital knobs included) round-trip exactly in binary, with no JSON fallback", () => {
+    for (const id of SHIP_CLASS_IDS) {
+      const s = sample();
+      const base = SHIP_CLASSES[id].base;
+      s.you = { ...s.you!, stats: { ...base, skill: { ...base.skill } }, turrets: [70002] };
+      const buf = encodeSnapshot(s);
+      expect(tailText(buf), id).not.toContain('"xk"');
+      expect(tailText(buf), id).not.toContain('"xs"');
+      const d = decodeSnapshot(buf).you!.stats;
+      expect(d.skill, id).toEqual(base.skill);
+      const { skill: _a, ...top } = base;
+      const { skill: _b, ...dtop } = d;
+      expect(dtop, id).toEqual(top);
+    }
+    const eng = decodeSnapshot(encodeSnapshot(sample())).you!.stats.skill; // sample() = engineer
+    expect([eng.capCooldown, eng.capCost, eng.bayHealFrac, eng.bayTime, eng.bayRadius, eng.bayShield])
+      .toEqual([16, 0, 0.35, 4, 420, 0.3]);
+  });
+
+  it('odd capital knob values keep 7 significant digits; fields after the stats block still line up', () => {
+    const s = sample();
+    const sk = s.you!.stats.skill;
+    sk.capCooldown = 7.123456; sk.broadsideSpeed = 1149.875; sk.overchargeBonus = 2; sk.bayShield = 0.3333333;
+    const d = decodeSnapshot(encodeSnapshot(s));
+    expect(d.you!.stats.skill.capCooldown).toBe(7.123456);
+    expect(d.you!.stats.skill.broadsideSpeed).toBe(1149.875);
+    expect(d.you!.stats.skill.overchargeBonus).toBe(2);
+    expect(d.you!.stats.skill.bayShield).toBe(0.3333333);
+    expect(d.you!.offerId).toBe(17);
+    expect(d.you!.cdSec.mobility).toBe(4.25);
+    expect(d.events).toHaveLength(4);
+  });
+
+  it('capital state rides the existing ShipView fields: every hardpoint slot / count 1..5 round-trips', () => {
+    const s = sample();
+    const host = s.ships[0];
+    const turret = s.ships[1];
+    for (let n = 1; n <= 5; n++) {
+      for (let slot = 0; slot < n; slot++) {
+        host.turretCount = n; turret.turretSlot = slot; turret.turretCount = n;
+        const d = decodeSnapshot(encodeSnapshot(s));
+        expect(d.ships[0].turretCount).toBe(n);
+        expect(d.ships[1]).toMatchObject({ attachedTo: host.id, turretSlot: slot, turretCount: n });
+      }
+    }
   });
 });
 

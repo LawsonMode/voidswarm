@@ -1,10 +1,12 @@
 // RENDER v0.3 M2: loot SFX + UI blips run on a stub WebAudio graph (no browser needed).
 // v0.3 M3: objective SFX (every kind, ours / theirs variants, never silent) and the hot point armed pulse.
 // v0.3 M4: rift SFX (every rift event, global vs positional, slam vs klaxon, boss roar) and the portal hum loop.
+// v0.5: capital SFX (Broadside / Overcharge / Repair Bay), the mass-driver thump by fire style, the transform cues.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { GameEvent, ObjectiveEventKind, Rarity } from '../../shared/types';
-import { beamBus, publishPortal } from '../render/beamBus';
-import { AudioFx, LOOT_PITCH, OBJECTIVE_SFX, PORTAL_HEAR, RIFT_SFX } from './AudioFx';
+import { CUE_CAP_DOWN, CUE_CAP_UP, CUE_RING, beamBus, publishCue, publishPortal } from '../render/beamBus';
+import { FIRE_CODE } from '../render/capital';
+import { AudioFx, CUE_FRESH_MS, LOOT_PITCH, OBJECTIVE_SFX, PORTAL_HEAR, RIFT_SFX } from './AudioFx';
 
 /** Minimal WebAudio stub: every node method chains, every AudioParam accepts automation; counts oscillators + freqs. */
 const stats = { osc: 0, freqs: [] as number[] };
@@ -223,5 +225,70 @@ describe('rift audio', () => {
     publishPortal(100, 0, 1, 1); beamBus.stamp = performance.now() - 5000;
     hum();
     expect(a.portalHumOn).toBe(false); // the renderer went quiet (stale stamp)
+  });
+});
+
+// RENDER v0.5: capital ships — the three capital skills each have their own sound, a mass-driver turret swaps its
+// class primary for a thump (beamBus.turretFire), and the renderer's transform cues play once, fresh, and in range.
+describe('capital audio', () => {
+  beforeEach(() => { beamBus.turretFire.clear(); });
+  const ability = (skill: 'broadside' | 'overcharge' | 'repairbay', x = 0): GameEvent => ({ t: 'ability', shipId: 5, skill, x, y: 0 });
+
+  it('Broadside, Resonance Overcharge and Repair Bay each play (and differ); far away they are silent', () => {
+    const got = (['broadside', 'overcharge', 'repairbay'] as const).map((k) => oscFor((a) => a.playEvents([ability(k)], 0, 0, 0)));
+    for (const g of got) expect(g.osc).toBeGreaterThan(2);
+    expect(got[0].freqs).not.toEqual(got[1].freqs);
+    expect(got[1].freqs).not.toEqual(got[2].freqs);
+    expect(got[0].osc).toBeGreaterThanOrEqual(8); // a rolling volley: several thumps a side
+    expect(got[2].freqs.some((f) => f > 1200)).toBe(true); // the bay chime rings high
+    expect(oscFor((a) => a.playEvents([ability('broadside', 99_999)], 0, 0, 0)).osc).toBe(0);
+  });
+
+  it('a mass-driver turret thumps instead of its class primary; other styles keep the primary', () => {
+    const fire: GameEvent = { t: 'fire', shipId: 42, skill: 'autocannon', x: 0, y: 0 };
+    const plain = oscFor((a) => a.playEvents([fire], 0, 0, 0));
+    beamBus.turretFire.set(42, FIRE_CODE.tracer);
+    const tracer = oscFor((a) => a.playEvents([fire], 0, 0, 0));
+    beamBus.turretFire.set(42, FIRE_CODE.massdriver);
+    const md = oscFor((a) => a.playEvents([fire], 0, 0, 0));
+    expect(tracer.freqs).toEqual(plain.freqs);
+    expect(md.osc).toBeGreaterThan(0);
+    expect(md.freqs).not.toEqual(plain.freqs);
+    expect(md.freqs[0]).toBeLessThan(plain.freqs[0]); // deeper
+  });
+
+  it('transform cues: play once when fresh and in range; before sync, stale or far cues never play', () => {
+    const a = fresh();
+    publishCue(CUE_CAP_UP, 0, 0); // raised before this AudioFx synced
+    stats.osc = 0;
+    a.playEvents([], 0, 0, 0);
+    expect(stats.osc).toBe(0);
+    publishCue(CUE_CAP_UP, 100, 0);
+    a.playEvents([], 0, 0, 0);
+    const up = stats.osc;
+    expect(up).toBeGreaterThan(0);
+    stats.osc = 0;
+    a.playEvents([], 0, 0, 0); // same cue again: nothing
+    expect(stats.osc).toBe(0);
+    const b = fresh();
+    b.playEvents([], 0, 0, 0);
+    publishCue(CUE_CAP_DOWN, 0, 0);
+    beamBus.cues[beamBus.cueSeq % CUE_RING].at = performance.now() - CUE_FRESH_MS - 100; // stale
+    stats.osc = 0;
+    b.playEvents([], 0, 0, 0);
+    expect(stats.osc).toBe(0);
+    const c = fresh();
+    c.playEvents([], 0, 0, 0);
+    publishCue(CUE_CAP_DOWN, 99_999, 0); // out of hearing range
+    stats.osc = 0;
+    c.playEvents([], 0, 0, 0);
+    expect(stats.osc).toBe(0);
+    const d = fresh();
+    d.playEvents([], 0, 0, 0);
+    publishCue(CUE_CAP_DOWN, 0, 0);
+    stats.osc = 0;
+    d.playEvents([], 0, 0, 0);
+    expect(stats.osc).toBeGreaterThan(0);
+    expect(stats.osc).toBeLessThan(up + 1); // the fold-back is the lighter of the two
   });
 });

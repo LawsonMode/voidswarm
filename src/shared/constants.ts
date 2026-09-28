@@ -39,6 +39,19 @@ export const TURRET_RECHARGE_MULT = 1.5;
 /** Host max speed & thrust are multiplied by (1 - this * turretCount), floored at 0.5. */
 export const HOST_SPEED_PENALTY_PER_TURRET = 0.07;
 
+// ---- v0.5 hardpoints + capital ships ----
+/** Turret hardpoints on any host: a ship never carries more turrets than this (maxTurrets is capped to it). */
+export const MAX_HARDPOINTS = 5;
+/** Capital variant scale (hull + hitbox) = CAPITAL_SCALE_BASE + CAPITAL_SCALE_PER_TURRET × turrets (1 → 1.27, 5 → 1.55). */
+export const CAPITAL_SCALE_BASE = 1.2;
+export const CAPITAL_SCALE_PER_TURRET = 0.07;
+/** Hardpoint seat, as a fraction of the host's effective radius (domes sit on the hull, not beside it). */
+export const HARDPOINT_SEAT = 0.82;
+/** A docked turret is a bubble dome: this is its hitbox radius (px) while attached. */
+export const TURRET_BUBBLE_RADIUS = 9;
+/** Capital armor bonus per docked turret (added to armor; the normal 0.6 cap still applies). */
+export const CAPITAL_ARMOR_PER_TURRET = 0.03;
+
 /** Turret offense draws HOST energy; it stops when the host is below this fraction of max energy. */
 export const TURRET_HOST_FLOOR_FRAC = 0.2;
 /** Laser resonance: each laser beam on a host deals × LASER_RESONANCE^(firingLasers - 1) and draws the same factor. */

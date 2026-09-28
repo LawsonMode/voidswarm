@@ -2,6 +2,63 @@
 # Voidswarm moderation CLI on the VPS:  sudo voidswarm-mod <command> [args]
 # e.g.  sudo voidswarm-mod promote YourName     sudo voidswarm-mod bans     sudo voidswarm-mod log --since 2h
 set -euo pipefail
-cd /opt/voidswarm
-set -a; . /etc/voidswarm/voidswarm.env; set +a
-exec sudo -u voidswarm --preserve-env=DB_PATH,CHAT_FILTER,CHAT_LOG_RETENTION_DAYS env HOME=/opt/voidswarm npm run --silent mod -- "$@"
+APP_DIR=/opt/voidswarm
+ENV_FILE=/etc/voidswarm/voidswarm.env
+# The settings the moderation CLI reads (src/server/moderation/cliCore.ts + service.ts configFromEnv).
+KEYS=(DB_PATH CHAT_FILTER CHAT_LOG_RETENTION_DAYS MOD_STRIKE_LIMIT MOD_STRIKE_WINDOW_MIN MOD_AUTOMUTE_MIN)
+
+# ---- env file reader ----
+# Print one setting from a NAME=value env file the way systemd's EnvironmentFile= reads it, so this script
+# sees exactly what the server sees. Nothing in the file is run or expanded (the file is never sourced, so
+# an unquoted value with spaces can't break anything): quotes are removed (inside double quotes, \" \\ \$
+# and \` stand for the plain character), unquoted text runs to the end of the line with trailing spaces
+# trimmed, and the last line for a name wins. Returns 1 when the name isn't set.
+env_get() {
+  local want=$1 file=$2 line val out result='' found=1 i n c state ws
+  while IFS= read -r line || [[ -n $line ]]; do
+    [[ $line =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=(.*)$ ]] || continue
+    [[ ${BASH_REMATCH[1]} == "$want" ]] || continue
+    val=${BASH_REMATCH[2]%$'\r'} out='' state=pre ws=-1 n=${#val}
+    for (( i = 0; i < n; i++ )); do
+      c=${val:i:1}
+      case $state in
+        pre) # after the = or a closing quote
+          case $c in
+            ' ' | $'\t') ;;
+            "'") state=sq ;;
+            '"') state=dq ;;
+            '\') i=$((i + 1)); out+=${val:i:1}; state=plain ;;
+            *) out+=$c; state=plain ;;
+          esac ;;
+        plain)
+          case $c in
+            '\') i=$((i + 1)); out+=${val:i:1}; ws=-1 ;;
+            ' ' | $'\t') if (( ws < 0 )); then ws=${#out}; fi; out+=$c ;;
+            *) out+=$c; ws=-1 ;;
+          esac ;;
+        sq) if [[ $c == "'" ]]; then state=pre; else out+=$c; fi ;;
+        dq)
+          case $c in
+            '"') state=pre ;;
+            '\') if [[ ${val:i+1:1} == [\"\\\`\$] ]]; then i=$((i + 1)); out+=${val:i:1}; else out+=$c; fi ;;
+            *) out+=$c ;;
+          esac ;;
+      esac
+    done
+    if [[ $state == plain ]] && (( ws >= 0 )); then out=${out:0:ws}; fi
+    result=$out found=0
+  done <"$file"
+  if (( found == 0 )); then printf '%s' "$result"; fi
+  return "$found"
+}
+# ---- end env file reader ----
+
+if [[ $EUID -ne 0 ]]; then echo "Run as root: sudo voidswarm-mod $*" >&2; exit 1; fi
+if [[ ! -r $ENV_FILE ]]; then echo "Can't read $ENV_FILE - has setup.sh been run on this server?" >&2; exit 1; fi
+
+vars=("HOME=$APP_DIR")
+for key in "${KEYS[@]}"; do
+  if value=$(env_get "$key" "$ENV_FILE"); then vars+=("$key=$value"); fi
+done
+cd "$APP_DIR"
+exec sudo -u voidswarm env "${vars[@]}" npm run --silent mod -- "$@"

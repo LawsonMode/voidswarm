@@ -3,6 +3,7 @@ import { GAME_TYPES } from '../../shared/data/gameTypes';
 import type { RoomSettings } from '../../shared/protocol';
 import type { GameType } from '../../shared/types';
 import type { ClientSettings } from '../settings';
+import { capitalControlsLine, capitalRoster } from './capitalInfo';
 import { h, replaceChildren } from './dom';
 import { createDefaults, defaultCommandType, normalizeDraft, typeAccentCss } from './gameTypeInfo';
 import { GameSettingsForm } from './GameSettingsForm';
@@ -90,7 +91,7 @@ const CONTROLS: [string, string, string][] = [
   ['Aim', 'Mouse', 'Right stick'],
   ['Primary skill  (turret: offense)', 'Left mouse', 'RT'],
   ['Secondary skill  (turret: defense, hold)', 'Right mouse', 'RB'],
-  ['Mobility skill', 'Space', 'A'],
+  ['Mobility skill  (capital ship: capital skill)', 'Space', 'A'],
   ['Utility skill', 'E', 'LB'],
   ['Afterburner', 'Shift', 'LT'],
   ['Attach as turret', 'F (teammate under cursor)', 'Y'],
@@ -112,6 +113,10 @@ export class ControlsModal extends Modal {
         h('thead', null, h('tr', null, h('th', null, 'Action'), h('th', null, 'Mouse + keyboard'), h('th', null, 'Gamepad'))),
         h('tbody', null, CONTROLS.map(([a, k, p]) => h('tr', null, h('td', null, a), h('td', null, h('kbd', null, k)), h('td', null, h('kbd', null, p)))))),
       h('p', { class: 'muted small' }, 'Energy is health AND ammo: skills drain it, so does damage. Attach to a teammate to ride as a turret — your offense then burns the HOST’s energy. Pick your build path at level 3; level-up cards are picked live — the game never pauses.'),
+      // v0.5: every class's capital form (carry a teammate to transform).
+      h('p', { class: 'muted small' }, capitalControlsLine()),
+      h('ul', { class: 'controls-capitals' }, capitalRoster().map((r) => h('li', null,
+        `${r.className} → `, h('span', { class: 'cc-name' }, r.capital), ` · ${r.icon} ${r.skill}`))),
       h('div', { class: 'modal-buttons' }, h('button', { class: 'btn btn-primary', 'data-nav': 'c-close', onclick: () => this.close() }, 'Close')));
   }
 }

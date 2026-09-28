@@ -9,16 +9,23 @@
 // - Blink is server-authoritative: the first reconcile that includes it snaps instead of smoothing;
 // - v0.3 M3: a CTF flag carrier (SHIPFLAG_CARRIER) moves (and Ram Charges) at × carrierSpeedMult, on top of the
 //   turret slow-down, and recharges at × Flag Overload (PredictCtx.rechargeMult).
+// - v0.5: a host (≥ 1 turret) flies its capital variant: the capital skill (Broadside / Overcharge / Repair Bay, no
+//   movement effect) replaces the mobility skill on Space with its own cost + cooldown, so no Ram Charge / Repair boost
+//   is predicted; and its hull collides walls at capitalScale(turrets) × the normal hull (predictStats).
 // Local presses are predicted from the last known cooldown/energy; every snapshot re-anchors them on
 // server truth (cooldown remaining tells us the exact tick the server used the skill, SHIPFLAG_CHARGING
 // whether a charge is still running), so a refused or early-ended charge is dropped at once.
 import { TICK_RATE } from '../../shared/constants';
-import { SHIP_CLASSES } from '../../shared/data/ships';
+import { pathKey, SHIP_CLASSES } from '../../shared/data/ships';
 import { collideCircle } from '../../shared/sim/map';
 import { carrierSpeedMult, flagOverloadMult } from '../../shared/sim/objectives/rules';
 import { THRUST_DEADZONE, type MovementBody } from '../../shared/sim/movement';
+import { computeStats } from '../../shared/sim/pve/upgrades';
 import { REPAIR_BOOST_MULT, REPAIR_BOOST_SEC, UNSTOPPABLE_DIST_MULT } from '../../shared/sim/skills';
-import { SHIPFLAG_CHARGING, type GameMap, type InputState, type ShipStats, type ShipView, type YouState } from '../../shared/types';
+import { capitalScale } from '../../shared/sim/world';
+import {
+  SHIPFLAG_CHARGING, type GameMap, type InputState, type PathId, type ShipClassId, type ShipStats, type ShipView, type YouState,
+} from '../../shared/types';
 import { angleDiff, wrapAngle } from '../../shared/util/math';
 import { hostSpeedMult } from './attach';
 
@@ -37,7 +44,10 @@ const MAX_INPUTS = 120;
 
 /** Movement-relevant skill state the client can see; rebuilt from each snapshot (moveSkillsFor). */
 export interface MoveSkills {
-  /** Own class mobility skill: 'ram' | 'blink' | 'repair' (anything else: no movement effect). */
+  /**
+   * The skill on Space: the class mobility skill 'ram' | 'blink' | 'repair', or (v0.5, while hosting) the capital skill
+   * 'broadside' | 'overcharge' | 'repairbay'. Anything but ram / blink / repair has no movement effect.
+   */
   mobility: string;
   mobilityCost: number;
   /** Mobility cooldown in ticks, as the server computes it (max(1, round(cooldown·TICK_RATE))). */
@@ -87,16 +97,23 @@ export function predictRechargeMult(carrySec: number): number {
   return carrySec >= 0 ? flagOverloadMult(carrySec) : 1;
 }
 
-/** Build MoveSkills from the own YouState + ShipView (same rules as the server's skills.ts / Sim.ts). */
+/**
+ * Build MoveSkills from the own YouState + ShipView (same rules as the server's skills.ts / Sim.ts). v0.5: while the ship
+ * hosts turrets the capital skill holds Space, with the capCost / capCooldown knobs (the mobility ones otherwise).
+ */
 export function moveSkillsFor(you: YouState, view: ShipView | undefined): MoveSkills {
   const cls = SHIP_CLASSES[view?.shipClass ?? 'brute'];
   const st = you.stats;
   const sk = st.skill ?? {};
   const unstoppable = you.talents?.includes('ram_unstoppable') ?? false;
+  const capital = !you.attachedTo && (you.turrets?.length ?? 0) > 0 ? cls?.capital?.skill : undefined;
+  const knob = (v: number | undefined, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+  const cost = capital ? knob(sk.capCost, st.mobilityCost) : st.mobilityCost;
+  const cooldown = capital ? knob(sk.capCooldown, st.mobilityCooldown) : st.mobilityCooldown;
   return {
-    mobility: cls?.skills.mobility.id ?? '',
-    mobilityCost: st.mobilityCost,
-    cooldownTicks: Math.max(1, Math.round(st.mobilityCooldown * TICK_RATE)),
+    mobility: capital ? capital.id : cls?.skills.mobility.id ?? '',
+    mobilityCost: cost,
+    cooldownTicks: Math.max(1, Math.round(cooldown * TICK_RATE)),
     readyIn: Math.max(0, Math.round((you.cdSec?.mobility ?? 0) * TICK_RATE)),
     charging: !!view && (view.flags & SHIPFLAG_CHARGING) !== 0,
     chargeTicks: Math.max(1, Math.round((sk.chargeTime ?? 0.35) * (unstoppable ? UNSTOPPABLE_DIST_MULT : 1) * TICK_RATE)),
@@ -105,6 +122,51 @@ export function moveSkillsFor(you: YouState, view: ShipView | undefined): MoveSk
     boostTicks: Math.round(REPAIR_BOOST_SEC * TICK_RATE),
     boostMult: REPAIR_BOOST_MULT,
   };
+}
+
+const hullMemo = new Map<string, number>();
+
+/**
+ * The own ship's normal (non-capital) hull radius: the class hull with its path talents applied (Bulwark's Titan is
+ * ×1.15), via the Sim's own computeStats. Memoized per class + path + talents.
+ */
+export function normalHullRadius(shipClass: ShipClassId, path: PathId | null | undefined, talents: readonly string[] | undefined): number {
+  const def = SHIP_CLASSES[shipClass] ?? SHIP_CLASSES.brute;
+  const key = `${def.id}|${path ?? ''}|${(talents ?? []).join(',')}`;
+  let r = hullMemo.get(key);
+  if (r === undefined) {
+    const upgrades: Record<string, number> = {};
+    if (path) upgrades[pathKey(path)] = 1;
+    for (const t of talents ?? []) upgrades[t] = 1;
+    try { r = computeStats(def.id, upgrades).radius; } catch { r = def.base.radius; }
+    if (!(r > 0)) r = def.base.radius;
+    if (hullMemo.size > 64) hullMemo.clear();
+    hullMemo.set(key, r);
+  }
+  return r;
+}
+
+/**
+ * v0.5: the hull radius the server collides the own ship with. A host with n ≥ 1 docked turrets is its capital variant,
+ * hull + hitbox × capitalScale(n). The Sim writes that into ship.stats.radius (ARCHITECTURE "Hardpoints + capital
+ * ships"), so `statsRadius` normally carries it already; if it still reads as the normal hull (below the midpoint
+ * between the normal and the capital hull), it is scaled here. Either way prediction never collides a smaller hull
+ * than the server's, and never scales twice.
+ */
+export function capitalRadius(statsRadius: number, normalRadius: number, turretCount: number): number {
+  const k = capitalScale(turretCount);
+  if (!(k > 1) || !(statsRadius > 0)) return statsRadius;
+  const normal = normalRadius > 0 ? normalRadius : statsRadius;
+  return statsRadius < normal * (1 + k) / 2 ? statsRadius * k : statsRadius;
+}
+
+/** Own stats for prediction, with the capital hull radius while hosting (the same object when nothing changes). */
+export function predictStats(you: YouState, shipClass: ShipClassId): ShipStats {
+  const st = you.stats;
+  const n = you.attachedTo ? 0 : (you.turrets?.length ?? 0);
+  if (n <= 0) return st;
+  const r = capitalRadius(st.radius, normalHullRadius(shipClass, you.path, you.talents), n);
+  return r === st.radius ? st : { ...st, radius: r };
 }
 
 /** Sim.ts afterburner rule: held, actually thrusting, and enough energy for this tick's cost. */

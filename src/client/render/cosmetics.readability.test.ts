@@ -4,6 +4,8 @@
 //  3. death presets: ≤ 70 particles, linger ≤ 1.5 s
 //  4. engine: rateMul ≤ 1.5, accent mix ≤ 0.5
 //  5. hull silhouette ≤ 1.12×, patterns stay inside the hull
+//  6. v0.5: the same rules on the capital hulls (Dreadnought / Spire / Foundry), and turret fire presets that carry
+//     no colours of their own (team colour + the item accent above) and stay within FIRE_BOUNDS
 //  + look resolution fallbacks and the per-frame cost of the pure look path at 32 ships.
 import { describe, expect, it } from 'vitest';
 import { COSMETIC_LIST, COSMETICS, type DeathParams, type EngineParams } from '../../shared/data/cosmetics';
@@ -17,7 +19,8 @@ import {
   isReadableAccent, killIconFor, minDeltaE, resolveLook, safeAccent, titleFor, turretFor, weaponFor, weaponVisualRatio,
 } from './cosmeticLook';
 import { emitDeathPreset, emitEngine, pastel, type FxAtlas } from './cosmeticFx';
-import { hullPatternSegments, hullPolys, modHullPolys, pointInPoly, polyExtent } from './shapes';
+import { CAPITAL_GEOM, hullPatternSegments, hullPolys, modCapitalPolys, modHullPolys, pointInPoly, polyExtent } from './shapes';
+import { FIRE_BOUNDS, FIRE_PRESETS, TURRET_FIRE } from './capital';
 
 /** Every colour a catalog item uses as an accent (hull/weapon/turret/death accents, engine tints, title colours). */
 function catalogAccents(): { id: string; what: string; c: number }[] {
@@ -240,6 +243,38 @@ describe('readability: hull silhouettes and patterns', () => {
         const mx = (segs[i] + segs[i + 2]) / 2, my = (segs[i + 1] + segs[i + 3]) / 2;
         expect(pointInPoly(mx, my, main), `${d.id} seg ${i / 4}`).toBe(true);
       }
+    }
+  });
+});
+
+describe('readability: v0.5 capital hulls and turret fire', () => {
+  const classes: ShipClassId[] = ['brute', 'tech', 'engineer'];
+
+  it('capital cosmetic shapes keep the silhouette ≤ 1.12× the capital hull, patterns inside its main poly', () => {
+    for (const cls of classes) {
+      const base = polyExtent(CAPITAL_GEOM[cls].polys);
+      for (const shape of ['std', 'spiked', 'swept', 'crest'] as const) {
+        for (const a of [0, 0.5, 1, 3]) expect(polyExtent(modCapitalPolys(cls, shape, a)) / base, `${cls} ${shape} ${a}`).toBeLessThanOrEqual(READABILITY.silhouetteMax + 1e-9);
+      }
+    }
+    for (const d of COSMETIC_LIST) {
+      if (d.slot !== 'hull' || d.p.pattern === 'none') continue;
+      const main = modCapitalPolys(d.shipClass, d.p.shape, d.p.amount)[0];
+      const segs = hullPatternSegments(main, d.p.pattern, d.p.amount);
+      expect(segs.length, d.id).toBeGreaterThan(0);
+      for (let i = 0; i < segs.length; i += 4) {
+        expect(pointInPoly((segs[i] + segs[i + 2]) / 2, (segs[i + 1] + segs[i + 3]) / 2, main), `${d.id} capital seg ${i / 4}`).toBe(true);
+      }
+    }
+  });
+
+  it('every catalog turret item has a fire preset; presets are bounded and colourless', () => {
+    for (const d of COSMETIC_LIST) if (d.slot === 'turret') expect(FIRE_PRESETS[TURRET_FIRE[d.id]]?.kit, d.id).toBe(d.kit);
+    for (const p of Object.values(FIRE_PRESETS)) {
+      expect(p.tail).toBeLessThanOrEqual(FIRE_BOUNDS.tailMax);
+      expect(p.muzzle).toBeLessThanOrEqual(FIRE_BOUNDS.muzzleMax);
+      expect(p.puffs).toBeLessThanOrEqual(FIRE_BOUNDS.puffsMax);
+      expect(Object.keys(p).some((k) => /colou?r|tint|accent/i.test(k)), p.id).toBe(false);
     }
   });
 });

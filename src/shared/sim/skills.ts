@@ -3,14 +3,16 @@ import { DT } from '../constants';
 import { SHIP_CLASSES } from '../data/ships';
 import type { Enemy, Ship, SkillId, SkillSlot, UpgradeId, World } from '../types';
 import { angleDiff, wrapAngle } from '../util/math';
+import { SPACE_CD_TICKS, useCapital } from './capital';
 import { damageEnemy, damageShip, healShip, splashDamage } from './combat';
 import { deployNanite, deploySentry, deployWall, deployWell } from './deployables';
+import { isCapital } from './hull';
 import { collideCircle } from './map';
 import { THRUST_DEADZONE } from './movement';
 import { isCarrier, objSpeedMult } from './objectives/index';
 import { CTF_CARRIER_BLINK_MULT } from './objectives/rules';
 import { side } from './state';
-import { found, has, isHostileShip, nearestHostile } from './targeting';
+import { crewSafe, found, has, isHostileShip, nearestHostile } from './targeting';
 import {
   canDamageShip, emit, forEachEnemyNear, forEachShipNear, projectileDefaults, sameTeam, secToTicks, spawnProjectile,
 } from './world';
@@ -226,7 +228,7 @@ function ramEnemy(e: Enemy): void {
   damageEnemy(rW, e, rDmg, rS.id);
 }
 function ramShip(s: Ship): void {
-  if (s.id === rS.id || rHits.has(s.id) || !canDamageShip(rW, rS.team, rS.id, s.team, s.id)) return;
+  if (s.id === rS.id || rHits.has(s.id) || !canDamageShip(rW, rS.team, rS.id, s.team, s.id) || crewSafe(rW, rS.team, rS.id, s)) return;
   rHits.add(s.id);
   const dx = s.x - rS.x, dy = s.y - rS.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
   if (!s.attachedTo) { s.vx += (dx / d) * RAM_KNOCK_SHIP; s.vy += (dy / d) * RAM_KNOCK_SHIP; }
@@ -353,7 +355,9 @@ function useMobility(world: World, ship: Ship): void {
     default: return;
   }
   ship.energy -= st.mobilityCost;
-  ship.mobilityReadyTick = tick + Math.max(1, secToTicks(st.mobilityCooldown));
+  const cd = Math.max(1, secToTicks(st.mobilityCooldown));
+  ship.mobilityReadyTick = tick + cd;
+  ship.skillState[SPACE_CD_TICKS] = cd; // v0.5: the HUD's Space sweep (room/snapshot.ts spaceCooldownSec)
   ability(world, ship, id);
 }
 
@@ -410,12 +414,19 @@ function useUtility(world: World, ship: Ship): void {
   ability(world, ship, id);
 }
 
-/** All class skills for one alive, non-turret ship (after movement). */
+/**
+ * All class skills for one alive, non-turret ship (after movement). v0.5: while the ship hosts ≥ 1 turret (capital
+ * form) Space fires its capital skill instead (capital.ts: its own capCost / capCooldown knobs, on the Space slot's
+ * mobilityReadyTick).
+ */
 export function stepClassSkills(world: World, ship: Ship): void {
   const inp = ship.input, prev = ship.prevInput;
   if (inp.primary) firePrimary(world, ship);
   if (inp.secondary) useSecondary(world, ship);
-  if (inp.mobility && !prev.mobility) useMobility(world, ship);
+  if (inp.mobility && !prev.mobility) {
+    if (isCapital(ship)) useCapital(world, ship);
+    else useMobility(world, ship);
+  }
   if (inp.utility && !prev.utility) useUtility(world, ship);
 }
 

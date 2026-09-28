@@ -1,14 +1,19 @@
 // OWNER: SIM agent. Turret attach/detach helpers shared by Sim and combat.
-import { ATTACH_COOLDOWN_SEC, ATTACH_MIN_ENERGY_FRAC } from '../constants';
+import { ATTACH_COOLDOWN_SEC, ATTACH_MIN_ENERGY_FRAC, MAX_HARDPOINTS } from '../constants';
 import { SHIP_CLASSES, hasUpgrade } from '../data/ships';
 import type { Ship, World } from '../types';
+import { seatTurret, syncHull } from './hull';
 import { isCarrier, objMaxTurrets } from './objectives/index';
-import { emit, sameTeam, secToTicks, turretOffset } from './world';
+import { emit, sameTeam, secToTicks } from './world';
 
 /** Outward push speed (px/s) given to a turret when it detaches. */
 export const DETACH_PUSH = 160;
 
-/** Detach `turret` from its host (if any). Gives host velocity + outward push; emits 'detach'. */
+/**
+ * Detach `turret` from its host (if any). Gives host velocity + outward push; emits 'detach'.
+ * v0.5: the turret gets its own hull back (bubble → base radius) and the host re-sizes its capital hull and
+ * re-flows its remaining turrets onto the new hardpoint layout at once.
+ */
 export function detachTurret(world: World, turret: Ship, push = DETACH_PUSH): void {
   const hostId = turret.attachedTo;
   if (!hostId) return;
@@ -28,6 +33,8 @@ export function detachTurret(world: World, turret: Ship, push = DETACH_PUSH): vo
   }
   turret.vx = hvx + ax * push;
   turret.vy = hvy + ay * push;
+  syncHull(world, turret);
+  if (host) syncHull(world, host);
   emit(world, { t: 'detach', turretShipId: turret.id, hostShipId: hostId });
 }
 
@@ -49,24 +56,19 @@ export function detachAll(world: World, ship: Ship, push = DETACH_PUSH): void {
 /**
  * A host `ship` may warp onto: alive, free, an ally, and with a free slot. v0.3: the slot count is
  * objMaxTurrets (a CTF flag carrier keeps only the gunner seat, CTF_CARRIER_MAX_TURRETS; outside an
- * objective match it is host.stats.maxTurrets).
+ * objective match it is host.stats.maxTurrets). v0.5: never more than MAX_HARDPOINTS (the hull's mounts).
  */
 export function isValidHost(world: World, ship: Ship, host: Ship | undefined): host is Ship {
   return !!host && host.id !== ship.id && host.alive && host.attachedTo === 0 &&
-    sameTeam(host.team, ship.team) && host.turrets.length < objMaxTurrets(world, host);
+    sameTeam(host.team, ship.team) && host.turrets.length < Math.min(MAX_HARDPOINTS, objMaxTurrets(world, host));
 }
 
-/** Place a turret at its host's slot position (no-op if not attached). */
+/**
+ * Place a turret at its host's slot position (no-op if not attached): the v0.5 hardpoint of its slot, at the
+ * host's effective (capital-scaled) radius (hull.ts seatTurret).
+ */
 export function placeTurret(world: World, turret: Ship): void {
-  const host = world.ships.get(turret.attachedTo);
-  if (!host) return;
-  const slot = host.turrets.indexOf(turret.id);
-  if (slot < 0) return;
-  const o = turretOffset(host.angle, slot, host.turrets.length, host.stats.radius);
-  turret.x = host.x + o.dx;
-  turret.y = host.y + o.dy;
-  turret.vx = host.vx;
-  turret.vy = host.vy;
+  seatTurret(world, turret);
 }
 
 /** bul_clamp host: teammates attach with no energy minimum / cooldown. */
@@ -100,6 +102,8 @@ export function tryAttach(world: World, ship: Ship): boolean {
   if (!host) return false;
   host.turrets.push(ship.id);
   ship.attachedTo = host.id;
+  syncHull(world, ship); // bubble dome
+  syncHull(world, host); // capital hull grows (wall push-out) and its turrets re-flow
   placeTurret(world, ship);
   ship.attachReadyTick = world.tick + secToTicks(ATTACH_COOLDOWN_SEC);
   emit(world, { t: 'attach', turretShipId: ship.id, hostShipId: host.id });

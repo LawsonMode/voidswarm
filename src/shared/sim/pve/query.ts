@@ -1,11 +1,14 @@
 // OWNER: PVE agent. Allocation-free grid queries (the world.ts helpers take closures).
 import type { Enemy, Ship, World } from '../../types';
 
+/** Largest ship radius headroom for the grid scan (v0.5 capital hulls reach ~40 px: brute 22 × Titan 1.15 × 1.55). */
+const SHIP_REACH_PAD = 48;
+
 /** Fill `out` with alive ships whose bodies intersect circle (x,y,r). Returns count. */
 export function queryShips(world: World, x: number, y: number, r: number, out: Ship[]): number {
   out.length = 0;
   const g = world.grid;
-  const reach = r + 32;
+  const reach = r + SHIP_REACH_PAD;
   const x0 = Math.max(0, Math.floor((x - reach) / g.cell)), x1 = Math.min(g.cols - 1, Math.floor((x + reach) / g.cell));
   const y0 = Math.max(0, Math.floor((y - reach) / g.cell)), y1 = Math.min(g.rows - 1, Math.floor((y + reach) / g.cell));
   for (let cy = y0; cy <= y1; cy++) {

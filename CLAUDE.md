@@ -22,8 +22,15 @@ The stack is TypeScript + Vite + PixiJS v8 on the client and an authoritative No
 
 **v0.4 (0.4.0) adds chat moderation** (guide: `docs/MODERATION.md`; seams: ARCHITECTURE.md "Moderation"): a shared word filter (`src/shared/moderation/`, strict by default, `CHAT_FILTER=standard` relaxes the mild tier) on every chat line and human-chosen name, online and offline; and, on the server (needs accounts), a SQLite chat log, strikes → auto-mute, bans / mutes (account, guest callsign, network), `/report`, moderator chat commands, the `/admin` dashboard and `npm run mod -- <cmd>` (promote, ban, log, export-log, purge-log, ...). The word lists are ROT13 / ROT5 data in `lists.ts`: never paste the decoded terms into docs, chat or commits.
 
+**v0.5 (0.5.0) adds hardpoints + capital ships** (design + integration decisions: ARCHITECTURE.md "Hardpoints + capital ships (v0.5)"):
+- **Hardpoints:** up to 5 turret mounts per host (3 fore, 2 aft; `HARDPOINT_LAYOUT` in `sim/world.ts`), re-flowing as turrets join and leave. A docked turret is a bubble dome (hitbox `TURRET_BUBBLE_RADIUS`) seated on the hull.
+- **Capital variants:** a host with ≥ 1 turret becomes Dreadnought / Spire / Foundry (`ShipClassDef.capital`): hull + hitbox × `capitalScale(n)` and armor per turret (`sim/hull.ts`), and a capital skill on Space (`sim/capital.ts`): Broadside (slugs from both flanks converging on the aim point), Resonance Overcharge (+1 laser for resonance), Repair Bay (heal + shield turrets and allies). It shares the Space slot's cooldown tick (`mobilityReadyTick`, knobs `capCost` / `capCooldown`).
+- **Client:** capital hulls, domes, morphs and turret fire styles (tracers, mass drivers, laser beams) in `src/client/render/capital.ts` + `GameRenderer.ts`; the HUD capital badge and skill-bar swap in `src/client/ui/capitalInfo.ts`; capital-aware prediction and bots (`src/shared/ai/bots.ts` planCapital).
+- **Hosting:** `scripts/host-local.bat` (Windows double-click LAN host) + `docs/LOCAL-HOSTING.md`.
+- The no-turret Deathmatch golden digests are the v0.4.0 values; the with-turret golden was re-pinned (reasons in `sim.v03.test.ts`).
+
 ## Version location
-The root `package.json` `version` (currently 0.4.0). `src/shared/version.ts` reads it, and it also holds `PROTOCOL_VERSION` (currently 4, bump it on wire changes; moderation added none). Don't hardcode versions anywhere else.
+The root `package.json` `version` (currently 0.5.0; `package-lock.json` carries the same, keep them in step). `src/shared/version.ts` reads it, and it also holds `PROTOCOL_VERSION` (currently 5, bumped in v0.5 because the capital skill knobs changed the codec's knob table; bump it on wire changes). Don't hardcode versions anywhere else.
 
 ## How to run
 ```

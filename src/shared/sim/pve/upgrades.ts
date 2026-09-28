@@ -1,4 +1,5 @@
 // OWNER: PVE agent. Frozen signatures.
+import { MAX_HARDPOINTS } from '../../constants';
 import { PATHS, SHIP_CLASSES, pathKey } from '../../data/ships';
 import type { PathId, ShipClassId, ShipStats, UpgradeId } from '../../types';
 
@@ -86,7 +87,7 @@ const defs: UpgradeDef[] = [
   { id: 'overclock', name: 'Overclock', icon: '🔥', category: 'passive', maxLevel: 5,
     describe: () => `All damage +8%.` },
   { id: 'turretmount', name: 'Turret Mount', icon: '⊕', category: 'passive', maxLevel: 2,
-    describe: () => `+1 turret slot for teammates.` },
+    describe: () => `+1 turret slot for teammates (${MAX_HARDPOINTS} hardpoints at most).` },
   { id: 'medkit', name: 'Field Medkit', icon: '💉', category: 'passive', maxLevel: 5, classes: ['engineer'],
     describe: () => `Healing +15%.` },
   // --- auto-weapons ---
@@ -178,10 +179,12 @@ export function computeStats(shipClass: ShipClassId, upgrades: Record<UpgradeId,
   if ((l = lv('fluxcore'))) {
     const m = Math.pow(0.9, l);
     s.secondaryCooldown *= m; s.mobilityCooldown *= m; s.utilityCooldown *= m;
+    if (k.capCooldown !== undefined) k.capCooldown *= m; // v0.5 capital skill (replaces mobility while hosting)
   }
   if ((l = lv('efficiency'))) {
     const m = Math.pow(0.9, l);
     s.gunCost *= m; s.secondaryCost *= m; s.mobilityCost *= m; s.utilityCost *= m;
+    if (k.capCost !== undefined) k.capCost *= m; // v0.5 capital skill (replaces mobility while hosting)
   }
   if ((l = lv('capacitor'))) s.maxEnergy *= 1 + 0.12 * l;
   if ((l = lv('reactor'))) s.rechargePerSec *= 1 + 0.12 * l;
@@ -197,5 +200,7 @@ export function computeStats(shipClass: ShipClassId, upgrades: Record<UpgradeId,
 
   s.armor = Math.min(0.6, Math.max(0, s.armor));
   s.maxEnergy = Math.round(s.maxEnergy);
+  // v0.5: a host has MAX_HARDPOINTS turret mounts at most (Bulwark / Turret Bay / Turret Mount stack up to it).
+  s.maxTurrets = Math.min(MAX_HARDPOINTS, s.maxTurrets);
   return s;
 }

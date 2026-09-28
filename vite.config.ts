@@ -12,10 +12,12 @@ function normalizeBase(b: string): string {
 //                         also knows it has no same-origin game server (see src/client/net/serverUrl.ts).
 // VITE_BASE=/sub/path/  → overrides the base in any mode (a fork's Pages site, another static host).
 // Only index.html is built; the dev harnesses (render-demo.html, music-demo.html) are served by `npm run dev` only.
+// src/client/public/ (web manifest + home-screen icons) is copied as-is to the dist root and served at the base in dev;
+// index.html links it root-absolute ("/manifest.webmanifest"), which Vite rewrites under the base.
 export default defineConfig(({ mode }) => ({
   root: 'src/client',
   base: normalizeBase(process.env.VITE_BASE ?? (mode === 'pages' ? '/voidswarm/' : '/')),
-  publicDir: false,
+  publicDir: 'public',
   build: { outDir: '../../dist', emptyOutDir: true, target: 'es2022' },
   server: { port: 5173, host: true },
 }));

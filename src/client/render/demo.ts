@@ -8,11 +8,15 @@
 // v0.3 M4: R = cycle rift floors (off / F1 hive / F3 hive boss / F4 prism / F6 prism final, see demoRift.ts; each goes
 // through renderer.setMap like a floorStart), T = descend now, Y = boss telegraph, U = spawn cracks at the cursor,
 // I = instability pulse.
+// v0.5: capital ships (demoCapital.ts): a Dreadnought, a Spire and a Foundry cycle 0 → 5 turrets (hardpoint re-flow,
+// the transform and back) with every turret fire preset; Z = park the capital row beside you, X = fire every capital
+// skill (Broadside / Overcharge / Repair Bay), 0 = capital bench (32 ships: 8 capitals × 3 domes vs 32 free ships).
 // Click once to unlock audio.
 import { GameRenderer } from './GameRenderer';
 import { AudioFx } from '../audio/AudioFx';
 import { ObjectiveDemo, type DemoWorld } from './demoObjectives';
 import { RiftDemo, type RiftDemoWorld } from './demoRift';
+import { CapitalDemo, type CapitalDemoWorld } from './demoCapital';
 import type { RenderFrame } from '../contracts';
 import type { PlayerInfo } from '../../shared/protocol';
 import {
@@ -28,7 +32,7 @@ import {
 } from '../../shared/types';
 import { ENEMY_TEAM, MAP_SIZE, MAP_TILE, TICK_RATE } from '../../shared/constants';
 import { SHIP_CLASSES } from '../../shared/data/ships';
-import { turretOffset } from '../../shared/sim/world';
+import { capitalScale, turretOffset } from '../../shared/sim/world';
 
 // ---------- fake map
 function fakeMap(): GameMap {
@@ -106,6 +110,14 @@ const medic = showcase[7]; // engineer / Medic
 const summoner = showcase[6]; // engineer / Summoner
 const allyInvuln = addShip(40, 'tech', 0, CX - 150, CY + 140, -1);
 allyInvuln.flags = SHIPFLAG_INVULN;
+// v0.5 capital showcase (its turrets are placed / fired by demoCapital.ts)
+const capWorld: CapitalDemoWorld = {
+  me, ships, byId: shipMap, events: [] as GameEvent[], cx: CX, cy: CY,
+  addShip: (id, cls, team, x, y, pathIdx) => addShip(id, cls, team, x, y, pathIdx),
+  shoot: (s, kind, ang, speed, life, level) => shoot(s, kind, ang, speed, life, level),
+  nearestEnemy: (x, y, max) => nearestEnemy(x, y, max),
+};
+const capDemo = new CapitalDemo(capWorld);
 
 const kinds: EnemyKind[] = ['drone', 'dart', 'weaver', 'splitter', 'splitling', 'spinner', 'brute', 'blackhole', 'hive'];
 const radius: Record<EnemyKind, number> = {
@@ -192,7 +204,7 @@ async function main(): Promise<void> {
     me, bulwark, architect, showcase, deploys, demoState, loot, bench, startBench,
     setLookMode: (m: number) => { lookMode = ((m % LOOK_MODES.length) + LOOK_MODES.length) % LOOK_MODES.length; applyLooks(); },
     playDeathPreset, spawnCaches, spillMine, audio, objDemo, setObjMode, enemies, projs, advance,
-    riftDemo, setRiftMode,
+    riftDemo, setRiftMode, capDemo, capWorld, startCapBench,
   };
   renderer.setMap(baseMap);
   applyLooks();
@@ -218,6 +230,9 @@ async function main(): Promise<void> {
     if (k === 'y' && !e.repeat) riftDemo.fireTelegraph(riftWorld, w.x, w.y);
     if (k === 'u' && !e.repeat) riftDemo.spawnWarnAt(riftWorld, w.x, w.y);
     if (k === 'i' && !e.repeat) riftDemo.instability(riftWorld);
+    if (k === 'z' && !e.repeat) capDemo.near = !capDemo.near;
+    if (k === 'x' && !e.repeat) capDemo.fireSkills(capWorld);
+    if (k === '0' && !e.repeat) startCapBench();
     if (k === 'v') { me.shipClass = CLASSES[(CLASSES.indexOf(me.shipClass) + 1) % 3]; applyLooks(); events.push({ t: 'shipSpawn', shipId: me.id, playerId: 1, x: me.x, y: me.y }); }
     if (k === 'p') { me.pathIdx = me.pathIdx >= 2 ? -1 : me.pathIdx + 1; if (me.pathIdx >= 0) events.push({ t: 'upgrade', playerId: 1, upgradeId: 'path:' + SHIP_CLASSES[me.shipClass].paths[me.pathIdx].id, level: 1 }); }
     if (k === ' ' && !e.repeat) useMobility(w.x, w.y);
@@ -317,6 +332,7 @@ function step(now: number): void {
       objEl.textContent = riftDemo.active
         ? `${riftDemo.status()} · layer ${renderer.riftMs.toFixed(3)} ms` + (riftDemo.log.length ? `\n${riftDemo.log.join('\n')}` : '')
         : `${objDemo.status()} · layer ${renderer.objectiveMs.toFixed(3)} ms` + (objDemo.log.length ? `\n${objDemo.log.join('\n')}` : '');
+      objEl.textContent += `\n${capDemo.status()}`;
     }
     fpsAcc = 0; fpsN = 0;
   }
@@ -365,16 +381,21 @@ function step(now: number): void {
   }
   // Iron Hide on the Bulwark every few seconds
   if (Math.floor(time / 3) % 2 === 0) bulwark.flags |= SHIPFLAG_SHIELD;
+  // v0.5 capitals (their turrets, skills and events)
+  capWorld.events = events;
+  capDemo.step(dt, time, capWorld);
 
   // turrets
   const phase = 1 + (Math.floor(time / 2.5) % 4);
   for (const t of ships) {
-    if (!t.attachedTo) continue;
+    if (!t.attachedTo || capDemo.owns(t.id)) continue;
     const host = shipMap.get(t.attachedTo)!;
-    const o = turretOffset(host.angle, t.turretSlot, t.turretCount, SHIP_CLASSES[host.shipClass].base.radius);
+    // v0.5: hardpoints sit on the capital-scaled hull (the sim's ship.stats.radius)
+    const o = turretOffset(host.angle, t.turretSlot, t.turretCount, SHIP_CLASSES[host.shipClass].base.radius * capitalScale(t.turretCount));
     t.x = host.x + o.dx; t.y = host.y + o.dy; t.vx = host.vx; t.vy = host.vy;
     t.energyFrac = 0.8;
     t.beamLen = 0; t.beamKind = BEAM_NONE; t.resonance = 1;
+    if (capBenchState) { t.angle = host.angle + t.turretSlot; continue; } // capital bench: docking cost only, no fire
     if (t.shipClass === 'tech') {
       const tgt = nearestEnemy(t.x, t.y, 620);
       t.angle = tgt ? Math.atan2(tgt.y - t.y, tgt.x - t.x) : host.angle + (t.turretSlot - 1.5) * 0.3;
@@ -531,6 +552,7 @@ function step(now: number): void {
   const r0 = performance.now();
   renderer.render(frame);
   benchSample(performance.now() - r0);
+  capBenchSample(performance.now() - r0);
   audio.playEvents(frame.events, me.x, me.y, me.id);
 }
 
@@ -567,7 +589,9 @@ function applyLooks(): void {
     if (pid === VICTIM) continue;
     const cls = shipMap.get(pid)?.shipClass ?? info.shipClass;
     const set = lookMode < MODE_SETS.length ? MODE_SETS[lookMode] : MODE_SETS[1 + (i++ % 4)];
-    m.set(pid, { ...info, shipClass: cls, cosmetics: setLoadout(set, cls) });
+    const lo = setLoadout(set, cls);
+    const fixed = capDemo.loadouts.get(pid); // v0.5 showcase turrets keep their fire preset in every look mode
+    m.set(pid, { ...info, shipClass: cls, cosmetics: fixed ? { ...lo, ...fixed } : lo });
   }
   m.set(VICTIM, {
     playerId: VICTIM, name: 'Target', team: 2, shipClass: 'brute', isBot: true, isHost: false, ready: true, ping: 0, inMatch: true,
@@ -644,13 +668,14 @@ function stepLoot(dt: number): void {
   // bench wingmen fly a loose formation around you and fire their (cosmetic) primaries
   for (let i = 0; i < wingmen.length; i++) {
     const s = wingmen[i];
+    if (s.attachedTo) continue; // v0.5 capital bench: docked wingmen ride their host
     const a = time * 0.5 + (i * Math.PI * 2) / wingmen.length, R = 230 + (i % 3) * 60;
     const tx = me.x + Math.cos(a) * R, ty = me.y + Math.sin(a) * R * 0.6;
     s.vx = (tx - s.x) / Math.max(dt, 1e-3); s.vy = (ty - s.y) / Math.max(dt, 1e-3);
     s.x = tx; s.y = ty; s.angle = a + Math.PI / 2;
     s.flags = SHIPFLAG_THRUSTING | (i % 3 === 0 ? SHIPFLAG_AFTERBURNER : 0);
     const p = PRIMARY[s.shipClass];
-    if (Math.random() < dt / (p.cd * 3)) { shoot(s, p.kind, s.angle, p.speed, 0.8); events.push({ t: 'fire', shipId: s.id, skill: p.skill, x: s.x, y: s.y }); }
+    if (!capBenchState && Math.random() < dt / (p.cd * 3)) { shoot(s, p.kind, s.angle, p.speed, 0.8); events.push({ t: 'fire', shipId: s.id, skill: p.skill, x: s.x, y: s.y }); }
   }
 }
 
@@ -700,6 +725,63 @@ function benchSample(ms: number): void {
   wingmen.length = 0;
   applyLooks();
 }
+
+// ---- v0.5 capital bench (0): 32 wingmen alternate between all flying free and 8 capitals × 3 bubble domes (no
+// turret fire, so only the capital hulls, sockets, domes, hardpoint glows and morphs differ); reports the added ms
+// per frame of renderer.render.
+interface CapBenchState { mode: 0 | 1; seen: number; acc: [number, number]; n: [number, number]; halves: number }
+let capBenchState: CapBenchState | null = null;
+const capMen: ShipView[] = [];
+const capBench: { done: boolean; ships: number; freeMs: number; capitalMs: number; addedMs: number; samples: number } =
+  { done: false, ships: 0, freeMs: 0, capitalMs: 0, addedMs: 0, samples: 0 };
+
+function dockCapMen(docked: boolean): void {
+  for (let g = 0; g < 8; g++) {
+    const host = capMen[g * 4];
+    host.turretCount = docked ? 3 : 0;
+    for (let k = 1; k < 4; k++) {
+      const t = capMen[g * 4 + k];
+      if (docked) attach(t, host, k - 1, 3);
+      else { t.attachedTo = 0; t.turretSlot = -1; t.turretCount = 0; t.beamLen = 0; t.beamKind = BEAM_NONE; }
+    }
+  }
+}
+
+function startCapBench(): void {
+  if (capBenchState || benchState) return;
+  for (let i = 0; i < 32; i++) {
+    const g = Math.floor(i / 4);
+    const s = addShip(900 + i, CLASSES[(g + (i % 4)) % 3], g % 4, me.x, me.y, i % 3);
+    capMen.push(s); wingmen.push(s);
+  }
+  applyLooks();
+  capBench.done = false;
+  capBenchState = { mode: 0, seen: 0, acc: [0, 0], n: [0, 0], halves: 0 };
+}
+
+function capBenchSample(ms: number): void {
+  const b = capBenchState;
+  if (!b) return;
+  b.seen++;
+  if (b.seen > BENCH_WARMUP) { b.acc[b.mode] += ms; b.n[b.mode]++; }
+  if (b.seen < BENCH_WARMUP + BENCH_SAMPLES) { benchText = ` · capital bench ${b.halves + 1}/${BENCH_HALVES}`; return; }
+  b.halves++; b.seen = 0;
+  if (b.halves < BENCH_HALVES) { b.mode = b.mode === 0 ? 1 : 0; dockCapMen(b.mode === 1); return; }
+  capBench.ships = capMen.length;
+  capBench.freeMs = b.acc[0] / Math.max(1, b.n[0]);
+  capBench.capitalMs = b.acc[1] / Math.max(1, b.n[1]);
+  capBench.addedMs = capBench.capitalMs - capBench.freeMs;
+  capBench.samples = b.n[0] + b.n[1];
+  capBench.done = true;
+  benchText = ` · capital bench: +${capBench.addedMs.toFixed(3)} ms/frame (${capBench.freeMs.toFixed(2)} free → ${capBench.capitalMs.toFixed(2)} as 8 capitals × 3 domes)`;
+  console.log('[capital bench]', JSON.stringify(capBench));
+  capBenchState = null;
+  dockCapMen(false);
+  for (const s of capMen) { ships.splice(ships.indexOf(s), 1); shipMap.delete(s.id); players.delete(s.id); wingmen.splice(wingmen.indexOf(s), 1); }
+  capMen.length = 0;
+  applyLooks();
+}
+(window as unknown as { __capBench: typeof capBench }).__capBench = capBench;
 
 void main();
 

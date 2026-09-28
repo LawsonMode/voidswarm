@@ -1,5 +1,6 @@
 // Room lobby: team (or party) select, class picker + build planner, room chat, type-aware host settings,
 // ready/start, countdown. v0.3: typed title, "Back to Command", Loadout button, equipped titles.
+// v0.5: each class card and the planner show the class's capital form + capital skill (carry a teammate to transform).
 import { NO_TEAM } from '../../shared/constants';
 import { isSubMode, objectiveTarget } from '../../shared/data/gameTypes';
 import { COSMETICS } from '../../shared/data/cosmetics';
@@ -8,6 +9,7 @@ import { hexToCss, TEAM_COLORS, teamName } from '../../shared/data/teams';
 import { TEAM_UNASSIGNED, type ClientMsg, type PlayerInfo, type RoomSettings } from '../../shared/protocol';
 import type { ShipClassId, TeamId } from '../../shared/types';
 import type { GameClient } from '../net/GameClient';
+import { capitalLobbyLine } from './capitalInfo';
 import { ChatView } from './ChatView';
 import { h, replaceChildren, teamCss } from './dom';
 import { PATH_HINT, pathBlock, accentCss, SLOT_ORDER, slotGlyph, statBars } from './classInfo';
@@ -237,6 +239,8 @@ export class RoomLobby {
         shipIcon(id, id === cur ? color : '#8fa0d8', 40),
         h('div', null, h('div', { class: 'class-name' }, def.name), h('div', { class: 'class-arch' }, `${def.archetype} · ${def.role}`))),
       h('div', { class: 'class-desc' }, def.description),
+      h('div', { class: 'class-capital', title: capitalLobbyLine(id) },
+        '⚓ Capital: ', h('span', { class: 'cc-name' }, def.capital.name), ` · ${def.capital.skill.icon} ${def.capital.skill.name}`),
       statBars(def.base));
       const preview = () => { if (this.previewClass !== id) { this.previewClass = id; this.pathTab = 0; this.renderDetail(cur); } };
       b.addEventListener('mouseenter', preview);
@@ -246,7 +250,7 @@ export class RoomLobby {
     this.renderDetail(cur);
   }
 
-  /** Skills, turret kit and the 3-path build planner for the previewed (or selected) class. */
+  /** Skills, turret kit, capital form (v0.5) and the 3-path build planner for the previewed (or selected) class. */
   private renderDetail(cur: ShipClassId): void {
     const id = this.previewClass ?? cur;
     const key = `${id}|${cur}|${this.pathTab}`;
@@ -277,6 +281,16 @@ export class RoomLobby {
           h('li', { class: 'skill-row' }, h('span', { class: 'skill-icon' }, kit.defense.icon),
             h('span', { class: 'skill-body' }, h('span', { class: 'skill-name' }, kit.defense.name), ' ', h('span', { class: 'skill-desc' }, kit.defense.description)),
             slotGlyph('secondary')))),
+      h('div', { class: 'detail-section' },
+        h('div', { class: 'path-label' }, 'Capital form — ', h('span', { class: 'capital-name' }, def.capital.name)),
+        h('div', { class: 'capital-block' },
+          h('div', { class: 'capital-desc' }, def.capital.description),
+          h('ul', { class: 'skill-list' },
+            h('li', { class: 'skill-row' }, h('span', { class: 'skill-icon' }, def.capital.skill.icon),
+              h('span', { class: 'skill-body' }, h('span', { class: 'skill-name' }, def.capital.skill.name), ' ',
+                h('span', { class: 'skill-desc' }, def.capital.skill.description)),
+              slotGlyph('mobility'))),
+          h('div', { class: 'capital-how' }, capitalLobbyLine(id)))),
       h('div', { class: 'detail-section planner' },
         h('div', { class: 'path-label' }, 'Build planner — ', h('span', { class: 'muted' }, PATH_HINT)),
         h('div', { class: 'path-tabs', role: 'tablist' }, def.paths.map((p, i) => h('button', {

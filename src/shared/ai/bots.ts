@@ -33,15 +33,28 @@
 // and teleports (seal recall, doorway nudge) drop the cached path; so does map.rev (door seals; nav.ts rebuilds its
 // grid). onFloorChange() (Room, on floorStart) clears path, goal and target. Everything rift-only is gated on
 // world.dungeon, so Arena / Warzone bots behave exactly as in M3.
-import { ATTACH_MIN_ENERGY_FRAC, DT, ENEMY_TEAM, TICK_RATE, TURRET_HOST_FLOOR_FRAC } from '../constants';
+//
+// v0.5 (hardpoints + capital ships): a host with >= 1 turret flies its class's capital variant, and the Space slot
+// fires the capital skill instead of Ram / Blink / Repair (mobilitySkillOf). Dreadnought Broadside (both flanks'
+// slugs converge on the aim point, sim/capital.ts broadsideFocus): aim it at the led fight target within
+// BROADSIDE_RANGE when the volley there is worth it (a hostile ship, or enough swarm / big enemies; broadsideScore),
+// never through an ally with friendly fire on. Spire Resonance Overcharge: >= 2 laser turrets on the host have their beams on
+// a target, and the host has the energy for the extra draw. Foundry Repair Bay: a turret or an ally in the bay radius
+// is low, two are worn, or one is worn mid-fight (the bay never covers the Foundry itself). Seat picks outside
+// Deathmatch prefer a capital that is already forming (every turret grows the hull, its armor and its skill) and
+// big-hulled hosts (formCapitals); everywhere, battle stations still count and lasers prefer a Spire, and hostSeats()
+// caps every host at MAX_HARDPOINTS. Turret kits are unchanged.
+import { ATTACH_MIN_ENERGY_FRAC, DT, ENEMY_TEAM, LASER_RESONANCE, TICK_RATE, TURRET_HOST_FLOOR_FRAC } from '../constants';
 import { SHIP_CLASSES, hasUpgrade } from '../data/ships';
+import { BROADSIDE_FOCUS_MAX, BROADSIDE_FOCUS_MIN, BROADSIDE_FOCUS_SPREAD, BROADSIDE_INHERIT, BROADSIDE_RADIUS } from '../sim/capital';
 import { CTF_CARRIER_BLINK_MULT } from '../sim/objectives/rules';
 import { isSolidAt, lineOfSight } from '../sim/map';
 import { countDeployables, forEachEnemyNear, forEachShipNear, sameTeam, subModeOf } from '../sim/world';
 import {
   SHIPFLAG_CLOAKED,
   emptyInput,
-  type BotSkill, type Enemy, type EntityId, type GameMap, type InputState, type Ship, type UpgradeChoice, type World,
+  type BotSkill, type Enemy, type EntityId, type GameMap, type InputState, type Ship, type SkillId, type UpgradeChoice,
+  type World,
 } from '../types';
 import { angleDiff, clamp } from '../util/math';
 import { Rng } from '../util/rng';
@@ -218,6 +231,45 @@ export const RIFT_BOSS_FOCUS_PX = 450;
 const RIFT_ADD_CLOSE_PX = 170;
 const RIFT_ADD_CLOSE_BONUS = 700;
 
+// ---- v0.5: capital ships ----
+/** Broadside reach the bot plans with (px): a hostile at the (led) aim point inside this is worth a volley. */
+export const BROADSIDE_RANGE = Math.min(600, BROADSIDE_FOCUS_MAX);
+/** Closer than this (px) the slugs have not converged yet (the focus is clamped to BROADSIDE_FOCUS_MIN). */
+const BROADSIDE_MIN_PX = Math.round(BROADSIDE_FOCUS_MIN * 0.75);
+/** Fire when the volley at the aim point covers at least this much: 1 ship = 1, a big / elite enemy 0.8, a drone 0.3. */
+export const BROADSIDE_FIRE_SCORE = 1;
+/** Overcharge needs this many laser turrets with their beams on a target... */
+export const OVERCHARGE_MIN_LASERS = 2;
+/**
+ * ...and the host above this energy fraction, with enough left after capCost plus OVERCHARGE_WINDOW_SEC of the extra
+ * resonance draw to stay over the turret floor (the overcharge multiplies every laser's host draw too).
+ */
+export const OVERCHARGE_MIN_EF = 0.6;
+const OVERCHARGE_WINDOW_SEC = 1.5;
+/** A laser bank updated within this many ticks means that beam is on a target now. */
+const LASER_FRESH_TICKS = 3;
+/**
+ * Repair Bay covers the host's turrets (any distance) and allies in bayRadius, never the Foundry itself: a covered
+ * ship below BAY_NEED_EF counts 1, below BAY_WORN_EF 0.5; the bay goes up at a need of 1 (one hurt, or two worn).
+ */
+export const BAY_NEED_EF = 0.55;
+const BAY_WORN_EF = 0.75;
+/** Seat picks: bonus per turret already on a host (a capital is forming), counted up to 3. */
+const CAPITAL_JOIN_BONUS = 0.2;
+/** Seat picks: a laser onto a Spire (tech host, Resonance Overcharge). */
+const SPIRE_LASER_BONUS = 0.25;
+/** Seat-roll chance x this when the best host is already a capital or a battle station with a free seat. */
+export const CAPITAL_SEAT_MULT = 1.35;
+/**
+ * Capital forming (CAPITAL_JOIN_BONUS, the big-hull bonus and CAPITAL_SEAT_MULT) is for objective sub-modes and the
+ * rift. In Deathmatch (Arena and Warzone Classic) free pilots make the kills: over 40 seeds on the real Sim it cost
+ * ~2.3 Arena DM PvP kills a minute, so there seat picks stay v0.4 (battle stations and lasers-on-a-Spire still count).
+ */
+export const formCapitals = (world: World): boolean => subModeOf(world.config) !== 'deathmatch';
+
+/** Default hull-alignment tolerance (rad) for an aimed edge press. */
+const EDGE_AIM_TOL = 0.3;
+
 /** An edge-triggered skill waiting to be pressed, optionally with its own aim. */
 interface PendingEdge {
   active: boolean;
@@ -226,7 +278,27 @@ interface PendingEdge {
   /** input.aimDist for the press (px); NaN = distance to the current target. */
   dist: number;
   deadline: number;
+  /**
+   * v0.5 Broadside: 0 = off; else the slug speed (px/s) to lead the current target with: input.aim and aimDist go
+   * to the led target on the press tick (the volley converges on the aim point).
+   */
+  lead: number;
+  /** Hull-alignment tolerance (rad) for the press. */
+  tol: number;
+  /** Queued while the ship was a capital (hosting): a capital status change drops the press (other skill now). */
+  cap: boolean;
 }
+
+/** What decide() hands the skill layer (perception summary for this decision). */
+interface SkillCtx {
+  ef: number; bestShip: Ship | null; bestShipD: number; enemiesClose: number; hostilesClose: number;
+  hostilesNear: number; incoming: number; incX: number; incY: number; hurtAlliesInHeal: number;
+  bigThreat: Enemy | null;
+}
+
+const newEdge = (): PendingEdge => ({
+  active: false, aim: null, dist: NaN, deadline: 0, lead: 0, tol: EDGE_AIM_TOL, cap: false,
+});
 
 /** Default aim distance when nothing is targeted (matches emptyInput). */
 const DEFAULT_AIM_DIST = 300;
@@ -249,6 +321,138 @@ function isLootCarrier(s: Ship): boolean {
 /** Battle-station hosts: Bulwark, or Architect with Turret Bay. */
 export function isBattleStation(s: Ship): boolean {
   return s.path === 'bulwark' || (s.path === 'architect' && hasUpgrade(s.upgrades, 'arc_turretbay'));
+}
+
+// ---------------------------------------------------------------------------------------------
+// v0.5 capital ships (pure reads of world state; exported for tests)
+// ---------------------------------------------------------------------------------------------
+
+
+/** The skill the mobility (Space) slot fires right now: the class's capital skill while hosting >= 1 turret. */
+export function mobilitySkillOf(s: Ship): SkillId {
+  const cls = SHIP_CLASSES[s.shipClass];
+  return s.turrets.length > 0 && cls.capital ? cls.capital.skill.id : cls.skills.mobility.id;
+}
+
+/**
+ * Bearing (rad) from `me` to aim a projectile at `speed` px/s so it meets a body at (tx, ty) moving (tvx, tvy):
+ * one-step lead (flight time from the current distance), projectiles inheriting BULLET_INHERIT of our velocity.
+ */
+export function leadBearing(me: Ship, tx: number, ty: number, tvx: number, tvy: number, speed: number): number {
+  const dx = tx - me.x, dy = ty - me.y;
+  const tf = Math.hypot(dx, dy) / Math.max(1, speed);
+  return Math.atan2(dy + (tvy - me.vy * BULLET_INHERIT) * tf, dx + (tvx - me.vx * BULLET_INHERIT) * tf);
+}
+
+/**
+ * Where a projectile at `speed` px/s (inheriting `inherit` of our velocity) meets a body at (tx, ty) moving
+ * (tvx, tvy): the same one-step lead as leadBearing, as a point.
+ */
+export function leadPoint(
+  me: Ship, tx: number, ty: number, tvx: number, tvy: number, speed: number, inherit = BULLET_INHERIT,
+): { x: number; y: number } {
+  const tf = Math.hypot(tx - me.x, ty - me.y) / Math.max(1, speed);
+  return { x: tx + (tvx - me.vx * inherit) * tf, y: ty + (tvy - me.vy * inherit) * tf };
+}
+
+/** Distance from (px, py) to the segment (ax, ay)-(bx, by). */
+function segDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const vx = bx - ax, vy = by - ay, l2 = vx * vx + vy * vy;
+  const k = l2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / l2)) : 0;
+  return Math.hypot(px - ax - vx * k, py - ay - vy * k);
+}
+
+const isBigEnemy = (e: Enemy): boolean => e.elite || e.kind === 'brute' || e.kind === 'hive' || e.kind === 'matriarch';
+
+/**
+ * Broadside: how much a volley aimed at (fx, fy) now would hit, both flanks together (sim/capital.ts: every slug
+ * crosses the aim line within BROADSIDE_FOCUS_SPREAD / 2 of the focus). Bodies are scored where the slugs meet them
+ * (led): a hostile ship 1 (1.3 when weak), a big / elite enemy 0.8, any other enemy 0.3, each needing line of sight
+ * to the hull. With friendly fire on, an ally near the slugs' path (hull to focus) costs 1.5. Hostile turrets ride
+ * on their host, so the host is what counts. An aim point beyond BROADSIDE_RANGE scores 0.
+ */
+export function broadsideScore(world: World, me: Ship, fx: number, fy: number): number {
+  const fd = Math.hypot(fx - me.x, fy - me.y);
+  if (fd > BROADSIDE_RANGE) return 0;
+  const speed = knob(me, 'broadsideSpeed', 1150);
+  // the focus as the sim clamps it
+  const k = fd > 1 ? Math.max(BROADSIDE_FOCUS_MIN, Math.min(BROADSIDE_FOCUS_MAX, fd)) / fd : 0;
+  const cx = me.x + (fx - me.x) * k, cy = me.y + (fy - me.y) * k;
+  const zone = BROADSIDE_FOCUS_SPREAD * 0.5 + BROADSIDE_RADIUS;
+  const lane = me.stats.radius + BROADSIDE_RADIUS * 2;
+  const teams = world.config.mode === 'teams';
+  const ff = !!world.config.friendlyFire;
+  let score = 0;
+  forEachShipNear(world, me.x, me.y, BROADSIDE_RANGE + 60, (s) => {
+    if (s.id === me.id || s.attachedTo !== 0) return;
+    const ally = teams && sameTeam(s.team, me.team);
+    if (ally && !ff) return;
+    if (!ally && (s.flags & SHIPFLAG_CLOAKED) && Math.hypot(s.x - me.x, s.y - me.y) > 180) return;
+    const p = leadPoint(me, s.x, s.y, s.vx, s.vy, speed, BROADSIDE_INHERIT);
+    if (ally) {
+      if (segDist(p.x, p.y, me.x, me.y, cx, cy) <= lane + s.stats.radius) score -= 1.5;
+      return;
+    }
+    if (Math.hypot(p.x - cx, p.y - cy) > zone + s.stats.radius) return;
+    if (!lineOfSight(world.map, me.x, me.y, s.x, s.y)) return;
+    score += efOf(s) < FINISH_FRAC ? 1.3 : 1;
+  });
+  forEachEnemyNear(world, cx, cy, zone + 100, (e) => {
+    if (e.kind === 'blackhole') return;
+    const p = leadPoint(me, e.x, e.y, e.vx, e.vy, speed, BROADSIDE_INHERIT);
+    if (Math.hypot(p.x - cx, p.y - cy) > zone + e.radius) return;
+    if (!lineOfSight(world.map, me.x, me.y, e.x, e.y)) return;
+    score += isBigEnemy(e) ? 0.8 : 0.3;
+  });
+  return score;
+}
+
+/**
+ * Overcharge: laser turrets on `host` whose beams are on a target right now (trigger held and the laser bank
+ * updated within LASER_FRESH_TICKS; the brain reads the sim state of the last step).
+ */
+export function lasersOnTarget(world: World, host: Ship): number {
+  let n = 0;
+  for (const id of host.turrets) {
+    const tr = world.ships.get(id);
+    if (!tr || !tr.alive || tr.attachedTo !== host.id || tr.shipClass !== 'tech' || !tr.input.primary) continue;
+    if ((tr.skillState.laserAccTick ?? -1e9) >= world.tick - LASER_FRESH_TICKS) n++;
+  }
+  return n;
+}
+
+const bayWant = (s: Ship): number => { const e = efOf(s); return e < BAY_NEED_EF ? 1 : e < BAY_WORN_EF ? 0.5 : 0; };
+
+/**
+ * Repair Bay need over the ships it covers (sim/capital.ts): the host's turrets (any distance) and allies inside
+ * bayRadius, never the Foundry itself. Each counts 1 below BAY_NEED_EF, 0.5 below BAY_WORN_EF.
+ */
+export function repairBayNeed(world: World, host: Ship): number {
+  let need = 0;
+  for (const id of host.turrets) {
+    const tr = world.ships.get(id);
+    if (tr && tr.alive && tr.attachedTo === host.id) need += bayWant(tr);
+  }
+  if (world.config.mode === 'teams') {
+    const r = knob(host, 'bayRadius', 420);
+    forEachShipNear(world, host.x, host.y, r, (s) => {
+      if (s.id === host.id || s.attachedTo === host.id || !sameTeam(s.team, host.team)) return;
+      if (Math.hypot(s.x - host.x, s.y - host.y) <= r) need += bayWant(s);
+    });
+  }
+  return need;
+}
+
+/**
+ * Overcharge affordability: the host's energy after capCost plus OVERCHARGE_WINDOW_SEC of the overcharged laser draw
+ * (net of recharge) for `lasers` firing lasers stays above the TURRET_HOST_FLOOR_FRAC floor the lasers need.
+ */
+export function overchargeAffordable(host: Ship, lasers: number, perLaserDraw = 90): boolean {
+  const bonus = Math.max(0, Math.round(knob(host, 'overchargeBonus', 1)));
+  const drain = lasers * perLaserDraw * Math.pow(LASER_RESONANCE, Math.max(0, lasers + bonus - 1));
+  const spend = knob(host, 'capCost', host.stats.mobilityCost) +
+    Math.max(0, drain - host.stats.rechargePerSec) * Math.min(OVERCHARGE_WINDOW_SEC, knob(host, 'overchargeTime', 4));
+  return host.energy - spend >= host.stats.maxEnergy * TURRET_HOST_FLOOR_FRAC;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -337,8 +541,10 @@ class Brain implements BotBrain {
   private secondaryAimed = false;
   /** Projectile speed used for leading while the secondary is wanted (0 = instant). */
   private secondarySpeed = 0;
-  private readonly mob: PendingEdge = { active: false, aim: null, dist: NaN, deadline: 0 };
-  private readonly util: PendingEdge = { active: false, aim: null, dist: NaN, deadline: 0 };
+  private readonly mob: PendingEdge = newEdge();
+  private readonly util: PendingEdge = newEdge();
+  /** Capital status (hosting >= 1 turret) at the current skill decision; stamped on queued presses. */
+  private capNow = false;
   /** The aimed edge that held input.aim last tick (only one aimed press owns the aim at a time). */
   private aimOwner: PendingEdge | null = null;
 
@@ -499,6 +705,9 @@ class Brain implements BotBrain {
     e.aim = aim;
     e.dist = dist;
     e.deadline = t + AIM_EDGE_TIMEOUT;
+    e.lead = 0;
+    e.tol = EDGE_AIM_TOL;
+    e.cap = this.capNow;
   }
 
   // -------------------------------------------------------------------------------------------
@@ -745,7 +954,11 @@ class Brain implements BotBrain {
       if (medic) chance *= 1.8;
       if (me.shipClass === 'tech') chance *= 1.2;
       if (gunnerSeat) chance *= 2; // §5.7: turret rolls prefer our carrier
-      if (this.rng.chance(Math.min(1, chance))) host = this.findHost(world, me);
+      // v0.5: a capital that is already forming (or a battle station with a free seat) is worth joining (not in
+      // Deathmatch, where free pilots make the kills: measured over 40 seeds it cost ~2 PvP kills a minute there)
+      const cand = this.findHost(world, me);
+      if (cand && formCapitals(world) && (cand.turrets.length > 0 || isBattleStation(cand))) chance *= CAPITAL_SEAT_MULT;
+      if (this.rng.chance(Math.min(1, chance))) host = cand;
     }
     if (host) {
       this.pulseAttach = true;
@@ -925,9 +1138,12 @@ class Brain implements BotBrain {
 
   private findHost(world: World, me: Ship): Ship | null {
     let best: Ship | null = null, bestS = -Infinity;
+    const form = formCapitals(world);
     for (const s of world.ships.values()) {
       if (s.id === me.id || !s.alive || !sameTeam(s.team, me.team)) continue;
-      if (s.attachedTo !== 0 || s.turrets.length >= hostSeats(world, s)) continue;
+      // hostSeats() is capped at MAX_HARDPOINTS (v0.5): a full capital has no mount left
+      const seats = hostSeats(world, s);
+      if (s.attachedTo !== 0 || s.turrets.length >= seats) continue;
       const hef = efOf(s);
       // Never warp onto a host we would leave on the next decision (engineers stay to weld).
       if (me.shipClass !== 'engineer' && hef < HOST_LEAVE_FRAC + HOST_PICK_MARGIN) continue;
@@ -938,9 +1154,13 @@ class Brain implements BotBrain {
       if (s.shipClass === 'brute') sc += 0.2; // tanky
       if (!s.isBot) sc += 0.5;
       if (hef < 0.4) sc -= 0.6;
+      // v0.5 capitals (outside Deathmatch): join one that is forming (each turret grows its hull and armor and arms its
+      // capital skill), and prefer big-hulled hosts with room for a full capital (3+ seats)
+      if (form) sc += Math.min(s.turrets.length, 3) * CAPITAL_JOIN_BONUS + Math.max(0, Math.min(seats, 5) - 2) * 0.05;
       if (me.shipClass === 'tech') {
-        // laser resonance: stack with other lasers
+        // laser resonance: stack with other lasers; a Spire host overcharges them
         for (const id of s.turrets) if (world.ships.get(id)?.shipClass === 'tech') sc += 0.45;
+        if (s.shipClass === 'tech') sc += SPIRE_LASER_BONUS;
       }
       // CTF: the gunner seat on our flag carrier beats any other host (§5.7 "turret rolls prefer our carrier")
       if (carriedFlagOf(world, s)) sc = Math.max(sc, 0) * 2 + 1;
@@ -1106,11 +1326,7 @@ class Brain implements BotBrain {
   // Class skills
   // -------------------------------------------------------------------------------------------
 
-  private decideSkills(world: World, me: Ship, c: {
-    ef: number; bestShip: Ship | null; bestShipD: number; enemiesClose: number; hostilesClose: number;
-    hostilesNear: number; incoming: number; incX: number; incY: number; hurtAlliesInHeal: number;
-    bigThreat: Enemy | null;
-  }): void {
+  private decideSkills(world: World, me: Ship, c: SkillCtx): void {
     const t = world.tick;
     const st = me.stats;
     const tg = this.resolveTarget(world);
@@ -1180,8 +1396,18 @@ class Brain implements BotBrain {
     }
 
     // ---------- mobility (edge) ----------
-    if (!this.mob.active && t >= me.mobilityReadyTick && t >= me.mobilityActiveUntilTick &&
-        me.energy > st.mobilityCost * 1.5) {
+    // v0.5: while hosting, the Space slot fires the capital skill (capCost / capCooldown knobs): a press planned for
+    // the other skill is dropped when the capital status flips
+    const capital = me.turrets.length > 0;
+    this.capNow = capital;
+    if (this.mob.active && this.mob.cap !== capital) this.mob.active = false;
+    const mobCost = capital ? knob(me, 'capCost', st.mobilityCost) : st.mobilityCost;
+    if (capital) {
+      if (!this.mob.active && t >= me.mobilityReadyTick && t >= me.mobilityActiveUntilTick && me.energy > mobCost * 1.5) {
+        this.planCapital(world, me, c, tg, d, escaping, t);
+      }
+    } else if (!this.mob.active && t >= me.mobilityReadyTick && t >= me.mobilityActiveUntilTick &&
+        me.energy > mobCost * 1.5) {
       const chance = this.p.abilityChance * (me.shipClass === 'brute' && me.path === 'ram' ? 1.6 : 1) * (chased ? CARRIER_ESCAPE_SKILL_MULT : 1);
       if (this.rng.chance(Math.min(1, chance))) {
         switch (me.shipClass) {
@@ -1207,10 +1433,11 @@ class Brain implements BotBrain {
             break;
           }
           case 'engineer': {
-            // Repair Pulse: self or allies in heal radius hurt (medics are eager)
+            // Repair Pulse: self or allies in heal radius hurt (medics are eager). A host flies Repair Bay instead
+            // (planCapital), which also covers its turrets.
             const medic = me.path === 'medic';
             const selfTh = medic ? 0.7 : 0.55;
-            if (ef < selfTh || c.hurtAlliesInHeal >= (medic ? 1 : 1) || this.turretsHurt(world, me)) {
+            if (ef < selfTh || c.hurtAlliesInHeal >= 1) {
               this.queueEdge(this.mob, null, t);
             }
             break;
@@ -1258,6 +1485,57 @@ class Brain implements BotBrain {
         }
       }
     }
+  }
+
+  /**
+   * v0.5 capital skill (the Space slot while hosting). Broadside: aimed (led) at the fight target when the volley
+   * there is worth it (broadsideScore; the slugs converge on the aim point). Overcharge:
+   * >= 2 beams on a target and energy for the draw. Repair Bay: covered turrets / allies need it (repairBayNeed).
+   */
+  private planCapital(
+    world: World, me: Ship, c: SkillCtx, tg: Ship | Enemy | null, d: number, escaping: boolean, t: number,
+  ): void {
+    const ef = c.ef;
+    switch (mobilitySkillOf(me)) {
+      case 'broadside': {
+        // a volley costs capCost, and energy is health: not from the bottom of the tank (more margin while escaping).
+        // The slugs converge on the aim point, so it is aimed like a shot: at the led fight target.
+        if (ef < (escaping ? 0.45 : 0.3) || !this.rng.chance(Math.min(1, this.p.abilityChance * 1.5))) return;
+        if (!tg || !this.losOk || d < BROADSIDE_MIN_PX || d > BROADSIDE_RANGE) return;
+        const speed = knob(me, 'broadsideSpeed', 1150);
+        const lp = leadPoint(me, tg.x, tg.y, tg.vx, tg.vy, speed, BROADSIDE_INHERIT);
+        // worth it: a ship, or enough swarm / big enemies at the aim point, and never an ally in the way (FF)
+        if (broadsideScore(world, me, lp.x, lp.y) < BROADSIDE_FIRE_SCORE) return;
+        this.queueEdge(this.mob, NaN, t);
+        this.mob.lead = speed;
+        this.mob.tol = Math.PI; // the volley converges on the aim point wherever the hull points
+        return;
+      }
+      case 'overcharge': {
+        if (ef < OVERCHARGE_MIN_EF || c.bigThreat) return;
+        const n = lasersOnTarget(world, me);
+        if (n < OVERCHARGE_MIN_LASERS || !overchargeAffordable(me, n, this.laserDraw(world, me))) return;
+        if (this.rng.chance(Math.min(1, this.p.abilityChance * 2))) this.queueEdge(this.mob, null, t);
+        return;
+      }
+      case 'repairbay': {
+        // free (capCost 0) but on a 16 s cooldown: a real need, or one worn covered ship while the crew is fighting
+        const need = repairBayNeed(world, me);
+        const engaged = c.hostilesNear > 0 || c.enemiesClose > 0 || c.incoming > 0;
+        if (need < 1 && !(need >= 0.5 && engaged)) return;
+        if (this.rng.chance(Math.min(1, this.p.abilityChance * (need >= 2 ? 2.5 : 1.5)))) this.queueEdge(this.mob, null, t);
+        return;
+      }
+    }
+  }
+
+  /** Host energy per second one Laser Lance on `host` draws at resonance 1 (a docked laser's knob). */
+  private laserDraw(world: World, host: Ship): number {
+    for (const id of host.turrets) {
+      const tr = world.ships.get(id);
+      if (tr && tr.shipClass === 'tech') return knob(tr, 'laserHostCostPerSec', 90);
+    }
+    return 90;
   }
 
   /** Brute Ram Charge: through a lined-up swarm, at a weak ship, or as an escape. */
@@ -1314,14 +1592,6 @@ class Brain implements BotBrain {
       if (!best || n > best.n) best = { x: sx / n, y: sy / n, n };
     }
     return best;
-  }
-
-  private turretsHurt(world: World, me: Ship): boolean {
-    for (const id of me.turrets) {
-      const tr = world.ships.get(id);
-      if (tr && efOf(tr) < 0.5) return true;
-    }
-    return false;
   }
 
   private clearAlong(world: World, me: Ship, a: number, dist: number): boolean {
@@ -1476,6 +1746,9 @@ class Brain implements BotBrain {
     let aimDist = tgDist;
     let owner: PendingEdge | null = null;
     if (!attached) {
+      // v0.5: a press planned for the other Space skill (capital status flipped), or a led Broadside that lost its
+      // target, is dropped
+      if (this.mob.active && (this.mob.cap !== (me.turrets.length > 0) || (this.mob.lead !== 0 && !tg))) this.mob.active = false;
       if (this.mob.active && this.mob.aim !== null) owner = this.mob;
       else if (this.util.active && this.util.aim !== null) owner = this.util;
     }
@@ -1485,6 +1758,12 @@ class Brain implements BotBrain {
       const ea = owner.aim as number;
       aim = Number.isNaN(ea) ? (tg ? Math.atan2(tg.y - me.y, tg.x - me.x) : me.angle) : ea;
       aimDist = Number.isNaN(owner.dist) ? tgDist : owner.dist;
+      if (owner.lead !== 0 && tg) {
+        // Broadside: the volley converges on the aim point, so aim + aimDist go to where the slugs meet the target
+        const lp = leadPoint(me, tg.x, tg.y, tg.vx, tg.vy, owner.lead, BROADSIDE_INHERIT);
+        aim = Math.atan2(lp.y - me.y, lp.x - me.x);
+        aimDist = Math.hypot(lp.x - me.x, lp.y - me.y);
+      }
       fire = false;
       inp.secondary = inp.secondary && this.secondaryAimed === false;
     }
@@ -1531,7 +1810,7 @@ class Brain implements BotBrain {
     if (!e.active || prevHeld) return false;
     if (e.aim !== null) {
       if (e !== owner) return false; // the other aimed press holds input.aim this tick
-      if (Math.abs(angleDiff(me.angle, aim)) > 0.3 && t < e.deadline) return false;
+      if (Math.abs(angleDiff(me.angle, aim)) > e.tol && t < e.deadline) return false;
     }
     e.active = false;
     return true;
@@ -1606,8 +1885,8 @@ export function interceptTime(rx: number, ry: number, vx: number, vy: number, s:
   return tt === Infinity ? straight : Math.min(tt, 3);
 }
 
-/** True when this ship's mobility skill relocates it (Blink, Ram Charge) rather than acting in place. */
+/** True when this ship's mobility skill relocates it (Blink, Ram Charge) rather than acting in place (v0.5 capital skills don't). */
 function displacingMobility(me: Ship): boolean {
-  const id = SHIP_CLASSES[me.shipClass]?.skills.mobility.id;
+  const id = mobilitySkillOf(me);
   return id === 'blink' || id === 'ram';
 }

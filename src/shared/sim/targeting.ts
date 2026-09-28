@@ -26,8 +26,31 @@ function clearFound(): void {
   found.e = null; found.s = null; found.x = 0; found.y = 0; found.r = 0; found.d2 = Infinity;
 }
 
+/**
+ * Is ship `s` a valid target for something owned by (team, ownerId)? v0.5: with friendly fire on, a turret crew
+ * (a host and the turrets docked on it) never targets or hits itself: bubble domes sit on the host's hull, in the
+ * line of its guns and of each other's. Without friendly fire a crew is never hostile to itself anyway.
+ */
 export function isHostileShip(world: World, team: TeamId, ownerId: EntityId, s: Ship): boolean {
-  return s.alive && canDamageShip(world, team, ownerId, s.team, s.id);
+  if (!s.alive || !canDamageShip(world, team, ownerId, s.team, s.id)) return false;
+  return !crewSafe(world, team, ownerId, s);
+}
+
+/**
+ * v0.5 friendly-fire crew safety for area / contact damage that checks canDamageShip itself (splash, auto-weapons,
+ * Ram): true = `s` is in the same turret crew as the ship `ownerId` (host + docked turrets) with friendly fire on,
+ * so it takes no damage. Always false with friendly fire off (a crew is never hostile to itself there anyway).
+ */
+export function crewSafe(world: World, team: TeamId, ownerId: EntityId, s: Ship): boolean {
+  return !!world.config.friendlyFire && team !== ENEMY_TEAM && sameCrew(world, ownerId, s);
+}
+
+/** `s` is docked on ship `ownerId`, is its host, or shares its host. */
+function sameCrew(world: World, ownerId: EntityId, s: Ship): boolean {
+  if (!ownerId) return false;
+  if (s.attachedTo === ownerId) return true;
+  const o = world.ships.get(ownerId);
+  return !!o && o.attachedTo !== 0 && (o.attachedTo === s.id || o.attachedTo === s.attachedTo);
 }
 
 /**

@@ -10,23 +10,24 @@
   <a href="https://lawsonmode.github.io/voidswarm/"><img alt="Play in browser" src="https://img.shields.io/badge/PLAY-IN%20BROWSER-ff3bd4?style=for-the-badge&labelColor=12051f"></a>
   <img alt="Players: 32" src="https://img.shields.io/badge/PLAYERS-32-3bf2ff?style=for-the-badge&labelColor=12051f">
   <img alt="Teams: FFA or 2 to 8" src="https://img.shields.io/badge/TEAMS-FFA%20%C2%B7%202%E2%80%938-b45bff?style=for-the-badge&labelColor=12051f">
-  <img alt="Version 0.4.0" src="https://img.shields.io/badge/VERSION-0.4.0-ffc53d?style=for-the-badge&labelColor=12051f">
+  <img alt="Version 0.5.0" src="https://img.shields.io/badge/VERSION-0.5.0-ffc53d?style=for-the-badge&labelColor=12051f">
   <br>
   <img alt="TypeScript 5.9" src="https://img.shields.io/badge/TypeScript-5.9-3bf2ff?style=for-the-badge&logo=typescript&logoColor=white&labelColor=12051f">
   <img alt="PixiJS 8" src="https://img.shields.io/badge/PixiJS-8-ff3bd4?style=for-the-badge&labelColor=12051f">
   <img alt="Vite 8" src="https://img.shields.io/badge/Vite-8-b45bff?style=for-the-badge&logo=vite&logoColor=white&labelColor=12051f">
   <img alt="Node ws" src="https://img.shields.io/badge/Node-ws-c6ff3b?style=for-the-badge&logo=nodedotjs&logoColor=white&labelColor=12051f">
-  <img alt="Tests: 1556 passing" src="https://img.shields.io/badge/TESTS-1556%20passing-c6ff3b?style=for-the-badge&logo=vitest&logoColor=white&labelColor=12051f">
+  <img alt="Tests: 1661 passing" src="https://img.shields.io/badge/TESTS-1661%20passing-c6ff3b?style=for-the-badge&logo=vitest&logoColor=white&labelColor=12051f">
 </p>
 
 <h2 align="center"><a href="https://lawsonmode.github.io/voidswarm/">▶&#xFE0E; PLAY IN YOUR BROWSER</a></h2>
 
 <p align="center">
   <b>Play offline vs bots</b> starts right away: no install, no account, no server.<br>
-  Online multiplayer needs someone to host a server (see <a href="#play--host">Play / Host</a>).
+  Online multiplayer needs someone to host a server. You can <a href="#download--host-the-whole-game-on-your-pc">host the whole game on your own PC</a> in a few clicks (more options in <a href="#play--host">Play / Host</a>).
 </p>
 
 <p align="center">
+  <a href="#download--host-the-whole-game-on-your-pc">Host it yourself</a> ·
   <a href="#what-is-voidswarm">About</a> ·
   <a href="#screenshots">Screenshots</a> ·
   <a href="#game-types">Game types</a> ·
@@ -44,6 +45,35 @@
 
 <p align="center"><img src="docs/assets/divider.svg" width="100%" alt=""></p>
 
+## Download & host the whole game on your PC
+
+This runs everything from one computer: online play, accounts, loot and moderation. Anyone on the same Wi-Fi or network can join from a browser. It's free, and no coding is needed.
+
+1. **Install Node.js** (the LTS version, 24 or newer) from [nodejs.org](https://nodejs.org/). Keep the default options.
+2. **Download the game.**
+   - **ZIP:** click the green **Code** button on this page, then **Download ZIP**. Right-click the ZIP and choose **Extract All**, into a folder that doesn't sync to OneDrive (for example `C:\Voidswarm`).
+   - **Or git:** `git clone https://github.com/LawsonMode/voidswarm.git`.
+3. **Start it.**
+   - **Windows:** open the extracted folder, then `scripts`, and double-click **`host-local.bat`**. The first start takes a minute or two. If you don't see `scripts`, open the `voidswarm-main` folder inside first.
+   - **Mac/Linux:** in a terminal in the game folder, run `npm ci && npm run build && npm start`.
+4. **Play.**
+   - **On this PC:** open **http://localhost:7777**.
+   - **Friends on the same Wi-Fi:** they open `http://<your-PC-IP>:7777`. The window prints the exact address.
+   - If Windows or your antivirus asks about Node.js, allow **Private networks** only.
+5. **Make yourself the moderator.**
+   - Create your account in the game.
+   - Open a terminal in the game folder (on Windows, type `cmd` in the folder's address bar and press Enter), then run `npm run mod -- promote NovaPilot`, with your own username in place of `NovaPilot` (no `< >`).
+   - The dashboard is at http://localhost:7777/admin.
+
+- **Stop:** close the window, or press **Ctrl+C**.
+- **Update:** either `git pull`, or download the ZIP again and copy your old `data` folder into the new one. Then start it again.
+- **Your saves** (accounts, loot, chat log) live in `data/voidswarm.db`. Back up the `data` folder.
+- **Passwords:** this is plain http, so don't reuse real passwords for game accounts.
+
+Details and troubleshooting are in **[docs/LOCAL-HOSTING.md](docs/LOCAL-HOSTING.md)**. To host over the internet, use [docs/HOSTING.md](docs/HOSTING.md) (a free tunnel from your PC) or [docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md) (an always-on server).
+
+<p align="center"><img src="docs/assets/divider.svg" width="100%" alt=""></p>
+
 ## What is Voidswarm?
 
 Voidswarm is a top-down, twin-stick arena shooter that runs in the browser. Its core comes from **SubSpace / Continuum**:
@@ -51,7 +81,7 @@ Voidswarm is a top-down, twin-stick arena shooter that runs in the browser. Its 
 - **Newtonian ships.** You thrust and drift, and you aim independently of where you're flying.
 - **Energy is your health and your ammo.** Every shot spends the same bar that keeps you alive, and it recharges all the time. Drop below zero and you're scrap.
 - **Bounties.** Every pilot carries a bounty of `10 + 2 × level + 5 × kill streak`. Whoever kills you scores 10 plus your bounty.
-- **Turrets.** Warp onto a teammate and ride their hull as a gun. Stack enough pilots on one ship and it becomes a battle station.
+- **Turrets.** Warp onto a teammate and ride their hull as a bubble turret. Every turret you carry grows your ship into its **capital** form, with up to 5 hardpoints and a capital skill of its own.
 
 On top of that sits a swarm that attacks everybody:
 
@@ -84,7 +114,7 @@ The same deterministic simulation runs on a Node server for online play and insi
   </tr>
   <tr>
     <td width="50%"><img src="docs/assets/ctf.png" width="100%" alt="Arena Capture the Flag: a Juggernaut carrying the Azure pennant among enemy pilots"><br><sub><b>Arena · Capture the Flag.</b> Running the Azure pennant home, 57 seconds before Flag Overload starts cutting the carrier's recharge.</sub></td>
-    <td width="50%"><img src="docs/assets/warzone.png" width="100%" alt="Warzone Classic wave 3: a Bulwark Juggernaut with three turrets in a dense swarm, level-6 talent cards on screen"><br><sub><b>Warzone · Classic.</b> Wave 3. A Bulwark Juggernaut carries 3 turrets through the swarm while the level-6 talent cards are up.</sub></td>
+    <td width="50%"><img src="docs/assets/warzone.png" width="100%" alt="Warzone Classic wave 3: a Bulwark Juggernaut in its Dreadnought capital form with three bubble turrets, level-6 talent cards and the CAPITAL: DREADNOUGHT, HARDPOINTS 3/5 badge on screen"><br><sub><b>Warzone · Classic.</b> Wave 3. Three turrets aboard turn a Bulwark Juggernaut into a Dreadnought (Space is now Broadside) while the level-6 talent cards are up.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/assets/dungeon.png" width="100%" alt="Dungeon Runner floor 1 of 6: the party inside a freshly sealed arena room with a magenta force-field door"><br><sub><b>Dungeon Runner.</b> Floor 1/6 (Hive). The door seals behind the party and nobody leaves until the room is clear.</sub></td>
@@ -164,6 +194,7 @@ Each class has four skills, a **turret kit** it uses while attached to a teammat
 | **Build paths** | Ram · Barrage · Bulwark | Storm · Void · Lance | Summoner · Medic · Architect |
 | **Turret kit** | Flak Mount: Flak Cannon / Brace | Laser Mount: Laser Lance / Deflector | Seeker Pod: Seeker Volley / Hull Weld |
 | **Hull** | Largest hull, 1800 energy, 2 turret slots | Smallest and fastest, 1100 energy, 2 turret slots | 1300 energy, 3 turret slots |
+| **Capital form** (carrying turrets) | **Dreadnought**: armored gun-deck · 💥 **Broadside** | **Spire**: crystal spire · 🔆 **Resonance Overcharge** | **Foundry**: mobile shipyard · 🛠 **Repair Bay** |
 
 **Level-up schedule.** Every level offers a pick-1-of-3 card, and the game never pauses for it.
 - **Level 3:** choose your path.
@@ -211,9 +242,30 @@ Every number and description lives in [`src/shared/data/ships.ts`](src/shared/da
 
 In team modes, press **F** (gamepad **Y**) to warp onto a teammate from anywhere on the map: the one under your cursor, or else the nearest. You need at least half your energy, and the host needs a free turret slot. Once you're attached:
 
-- You're locked to the host's hull. You aim freely and recharge 1.5× faster.
+- You become a **bubble turret**: a small dome with your kit's barrel, seated on one of the host's **hardpoints**. You aim freely and recharge 1.5× faster.
 - Your skills are replaced by your class's **turret kit**. **LMB** offense spends the **host's** energy and stops when the host drops below 20%. **RMB** defense (hold) spends your own.
 - Every turret slows its host by 7%. The host can shake you off (**X** / **B**), you can let go yourself, and if the host dies you're thrown clear.
+
+### Hardpoints + capital ships
+
+A host has up to **5 hardpoints**, 3 fore and 2 aft. The mounts re-flow as turrets join and leave:
+
+| Turrets | Mounts |
+|:---:|---|
+| 1 | bow |
+| 2 | fore port, fore starboard |
+| 3 | fore port, fore starboard, center aft |
+| 4 | fore port, fore starboard, aft port, aft starboard |
+| 5 | bow, fore port, fore starboard, aft port, aft starboard |
+
+The moment the first turret docks, the host **transforms into its class's capital ship**, and it changes back when the last one leaves:
+
+- **Bigger, tougher, easier to hit.** The hull and hitbox grow with every turret (×1.27 with 1, up to ×1.55 with 5), and each turret adds 3% armor.
+- **A capital skill replaces your Space skill:**
+  - **Dreadnought → Broadside:** mass-driver slugs from both flanks' gunports that cross on your aim point. Aim it like any shot.
+  - **Spire → Resonance Overcharge:** for 4 s your lasers resonate as if one more laser were firing (2 lasers count as 3), which raises both their damage and their energy draw.
+  - **Foundry → Repair Bay:** for 4 s it repairs and shields (30%) your turrets and allies nearby. It never heals the Foundry itself.
+- **Turret fire styles.** Every turret shot has its own look, set by your equipped turret cosmetic: glowing tracer rounds, flak and spore bursts, and heavy **mass-driver** slugs with muzzle blasts and shockwaves for flak mounts; solid, pulse, helix and sun-lance **laser beams**; smoke, ion-flame and hornet **seekers**.
 
 | Turret kit | LMB offense (host's energy) | RMB defense, hold (your energy) |
 |---|---|---|
@@ -230,11 +282,11 @@ In team modes, press **F** (gamepad **Y**) to warp onto a teammate from anywhere
 | 3 | ×2.25 | ×6.75 | ×6.75 |
 | 4 | ×3.375 | **×13.5** | **×13.5** |
 
-Four lasers put 13.5 times a single beam's damage down one line, and they drain their host about 1,200 energy a second. So somebody had better be flying a battle-station build: **Bulwark** (+3 slots, +35% energy, +25% turret damage, and Magnetic Clamp lets teammates attach with no energy minimum or cooldown), **Architect** with Turret Bay (+2 slots, +30% turret damage), or the **Turret Mount** card (+1 slot, twice). FFA has no attaching.
+Four lasers put 13.5 times a single beam's damage down one line, and they drain their host about 1,200 energy a second. So somebody had better be flying a battle-station build: **Bulwark** (+3 slots, +35% energy, +25% turret damage, and Magnetic Clamp lets teammates attach with no energy minimum or cooldown), **Architect** with Turret Bay (+2 slots, +30% turret damage), or the **Turret Mount** card (+1 slot, twice). Slots stop at the 5 hardpoints, so Turret Mount is no longer offered once a ship has all 5. FFA has no attaching.
 
 <p align="center">
-  <img src="docs/assets/resonance.gif" width="90%" alt="Animated: a Bulwark Juggernaut carrying four Arcanist Laser Lance turrets fires one converged resonance beam into a stream of drones; the HUD reads TURRETS: 4, DRAWING -1215/S">
-  <br><sub>Four Laser Lances on a Bulwark host: one converged resonance beam (×1.5³ each), drawing 1215 energy a second.</sub>
+  <img src="docs/assets/resonance.gif" width="90%" alt="Animated: a Bulwark Dreadnought carrying four Arcanist Laser Lance bubble turrets burns resonance beams into a stream of drones; the HUD reads CAPITAL: DREADNOUGHT, HARDPOINTS 4/5, DRAWING -1215/S">
+  <br><sub>Four Laser Lances on a Bulwark Dreadnought: resonance beams at ×1.5³ each, drawing 1215 energy a second.</sub>
 </p>
 
 <p align="center"><img src="docs/assets/divider.svg" width="100%" alt=""></p>
@@ -293,6 +345,8 @@ Twin-stick and world-relative: WASD (or the arrow keys) thrusts in a direction o
 | Chat / team chat | Enter / T (or start a line with `//`) | — |
 | Menu | Esc | Start |
 
+**On a phone or tablet**, pair a Bluetooth controller (Xbox, PlayStation or MFi) and play in landscape. There are no touch controls yet. The Title and Command screens suggest a controller until one connects, and **Play fullscreen** (Android / Chrome) goes fullscreen and locks the screen to landscape. A match or room lobby held in portrait shows a "Rotate to landscape" overlay, and the game keeps running underneath. On Android, adding it to the home screen launches it fullscreen and locked to landscape; on iPhone / iPad it opens without the browser bar, and the rotate prompt asks you to turn the device (the web manifest is in `src/client/public/`; `node scripts/make-icons.mjs` regenerates its icons).
+
 <p align="center"><img src="docs/assets/divider.svg" width="100%" alt=""></p>
 
 ## Soundtrack
@@ -319,7 +373,7 @@ The score is original synthwave in the style of mid-80s film-score synth rock, a
 |---|---|---|---|
 | **Offline vs bots** | https://lawsonmode.github.io/voidswarm/ | Anyone with a browser | Nothing |
 | **Online, hosted from your PC** | A Cloudflare Tunnel from your PC | Anyone you send the link to, while you host | `cloudflared` (free) |
-| **LAN** (classroom / home) | `http://<your-ip>:7777` | Your network | Node 24 |
+| **LAN** (classroom / home) | `http://<your-ip>:7777`, started with [`scripts\host-local.bat`](#download--host-the-whole-game-on-your-pc) | Your network | Node 24 |
 | **Your own server** | A VPS behind HTTPS/WSS | Anyone | Node 24 + a reverse proxy or tunnel |
 
 ### In the browser (GitHub Pages)
@@ -347,7 +401,7 @@ Friends open that link. The page, the game connection and the accounts API all c
 
 A quick-tunnel address changes on every run. For a permanent address (a named tunnel on your own domain) and antivirus notes, see **[docs/HOSTING.md](docs/HOSTING.md)**.
 
-### Always-on server (VPS, ~$4–6/month)
+### Always-on server (VPS, ~$7–12/month)
 
 To host 24/7 on your own domain without leaving your PC on, rent a small Ubuntu 24.04 VPS (Hetzner, DigitalOcean or Lightsail), then run one command on it:
 
@@ -356,6 +410,8 @@ sudo DOMAIN=play.example.com EMAIL=you@example.com bash setup.sh
 ```
 
 This gives you automatic HTTPS, a hardened service, nightly database backups and a `voidswarm-update` command. The full walkthrough, including the one DNS record to add, is in **[docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md)**.
+
+On **AWS Lightsail**, follow **[docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md)**: a click-by-click guide with the measured bandwidth per player, a monthly cost table (the $12 plan covers casual and active groups) and tips for avoiding surprise charges.
 
 ### LAN, VPS or any other host
 
@@ -367,6 +423,7 @@ npm run build && npm start     # game page + ws + accounts API on port 7777
 ```
 
 - **LAN:** players open `http://<your-ip>:7777`. Plain http/ws is only acceptable on a LAN, so don't reuse real passwords there.
+  - On Windows, [`scripts/host-local.bat`](scripts/host-local.bat) does all of this in one double-click and prints the LAN addresses. See [docs/LOCAL-HOSTING.md](docs/LOCAL-HOSTING.md).
 - **Internet:** always put the server behind **HTTPS/WSS**, with `BIND=127.0.0.1` and `TRUST_PROXY=1`.
   - **Caddy** gives you automatic HTTPS: `play.example.com { reverse_proxy 127.0.0.1:7777 }`.
   - **Cloudflare Tunnel** needs no open ports: `cloudflared tunnel --url http://localhost:7777`.
@@ -515,7 +572,7 @@ npm run dev          # then "Continue as guest" (or log in) in two browser tabs
 | `npm run build` · `npm start` | Build the client, then serve it with the ws server and API on :7777. |
 | `npm run build:pages` · `npm run preview:pages` | Pages build (base `/voidswarm/`) and a local preview on :4173. |
 | `npm run typecheck` | `tsc --noEmit`. |
-| `npm test` | Vitest: 1556 tests in 87 files. |
+| `npm test` | Vitest: 1661 tests in 94 files. |
 | `npm run smoke` | A headless 60 s bot match. |
 | `npm run mod -- <cmd>` | The moderation CLI (see [docs/MODERATION.md](docs/MODERATION.md)). |
 
@@ -559,7 +616,8 @@ npm test -- src/shared/ai/riftParity.test.ts
 **Shipped**
 - **v0.2:** three classes with build paths and talents, turret kits and laser resonance, deployables, and accounts.
 - **v0.3:** Dungeon Runner, Arena and Warzone; the Command screen; cosmetic loot, profiles and the Hangar; the adaptive soundtrack.
-- **v0.4.0** *(current)*: chat moderation. It adds the word filter, chat log, strikes, bans and mutes, `/report`, and the `/admin` dashboard and CLI.
+- **v0.4.0:** chat moderation. It adds the word filter, chat log, strikes, bans and mutes, `/report`, and the `/admin` dashboard and CLI.
+- **v0.5.0** *(current)*: hardpoints and capital ships. Turrets ride the hull as bubble domes on up to 5 hardpoints, hosts transform into the Dreadnought, Spire or Foundry with a capital skill each, and turret fire got its own styles (tracers, mass drivers, laser beams). Plus a one-double-click LAN host script for Windows.
 
 **Next.** The contract already reserves slots for these, but none of them is playable yet, and none is promised.
 - **Escort** (Arena): push the payload through 3 checkpoints, then defend it. Two rounds, stopwatch scoring.

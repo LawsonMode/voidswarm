@@ -4,6 +4,7 @@ import {
   ATTACH_COOLDOWN_SEC, INTEREST_RADIUS, LOOT_BEACON_RARITY, MAX_CARRIED, MAX_CARRIED_DUNGEON, TICK_RATE,
 } from '../constants';
 import { TALENTS, pathIndex } from '../data/ships';
+import { SPACE_CD_TICKS } from '../sim/capital';
 import { buildRiftView, riftYou } from '../sim/dungeon';
 import { carryCap } from '../sim/loot';
 import { buildObjectiveView } from '../sim/objectives/index';
@@ -37,6 +38,26 @@ function cdFrac(readyTick: number, tick: number, cooldownSec: number): number {
   if (readyTick <= tick) return 0;
   const total = Math.max(1, cooldownSec * TICK_RATE);
   return Math.min(1, (readyTick - tick) / total);
+}
+
+/**
+ * v0.5: the cooldown the Space slot's sweep is normalized by. While the ship hosts ≥ 1 turret the capital skill
+ * replaces the mobility skill on the same ready tick, with the `capCooldown` knob in place of mobilityCooldown
+ * (SKILL_KNOBS); anything else keeps mobilityCooldown. A cooldown that is running is normalized by the one that
+ * started it (skillState SPACE_CD_TICKS), so gaining or losing the capital form mid-cooldown keeps the sweep right.
+ */
+export function spaceCooldownSec(
+  s: Pick<Ship, 'turrets' | 'attachedTo' | 'stats'> & { skillState?: Ship['skillState']; mobilityReadyTick?: number },
+  tick = -1,
+): number {
+  const st = s.stats;
+  const used = s.skillState?.[SPACE_CD_TICKS];
+  if (used !== undefined && used > 0 && s.mobilityReadyTick !== undefined && s.mobilityReadyTick > tick && tick >= 0) {
+    return used / TICK_RATE;
+  }
+  if (s.attachedTo || !s.turrets.length) return st.mobilityCooldown;
+  const cap = st.skill?.capCooldown;
+  return typeof cap === 'number' && Number.isFinite(cap) && cap > 0 ? cap : st.mobilityCooldown;
 }
 
 export class SnapshotBuilder {
@@ -326,7 +347,7 @@ export class SnapshotBuilder {
       cd: {
         primary: cdFrac(s.gunReadyTick, tick, st.gunCooldown),
         secondary: cdFrac(s.secondaryReadyTick, tick, st.secondaryCooldown),
-        mobility: cdFrac(s.mobilityReadyTick, tick, st.mobilityCooldown),
+        mobility: cdFrac(s.mobilityReadyTick, tick, spaceCooldownSec(s, tick)),
         utility: cdFrac(s.utilityReadyTick, tick, st.utilityCooldown),
         attach: cdFrac(s.attachReadyTick, tick, ATTACH_COOLDOWN_SEC),
       },

@@ -5,6 +5,7 @@ import type { Enemy, EntityId, Ship, World } from '../../types';
 import { damageEnemy, damageShip, splashDamage } from '../combat';
 import { canDamageShip, emit, projectileDefaults, secToTicks, spawnProjectile } from '../world';
 import { queryEnemies, queryShips } from './query';
+import { crewSafe } from '../targeting';
 import { AUTO } from './upgrades';
 
 const enemyBuf: Enemy[] = [];
@@ -20,7 +21,7 @@ function orbitKey(shipId: EntityId): string {
 }
 
 function hostile(world: World, me: Ship, s: Ship): boolean {
-  return s !== me && s.alive && canDamageShip(world, me.team, me.id, s.team, s.id);
+  return s !== me && s.alive && canDamageShip(world, me.team, me.id, s.team, s.id) && !crewSafe(world, me.team, me.id, s);
 }
 
 function outMult(ship: Ship): number {

@@ -18,6 +18,13 @@
   --glow-c: 0 0 0.5rem rgba(59, 242, 255, 0.55), 0 0 1.4rem rgba(59, 242, 255, 0.25);
   --glow-m: 0 0 0.5rem rgba(255, 59, 212, 0.6), 0 0 1.4rem rgba(255, 59, 212, 0.25);
   --radius: 0.5rem;
+  /* v0.5 mobile: notch / home-indicator insets (index.html viewport-fit=cover); 0 everywhere else */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  /* the width of #ui / #game (the viewport minus the side insets): HUD columns size against this, not 100vw */
+  --ui-w: calc(100vw - var(--safe-l) - var(--safe-r));
   font-size: clamp(13px, calc(0.55vw + 0.6vh + 3px), 30px);
   color-scheme: dark;
 }
@@ -41,6 +48,10 @@ kbd { font-family: var(--font-display); font-size: 0.72em; padding: 0.05em 0.45e
 
 #app { position: fixed; inset: 0; overflow: hidden; }
 #game, #ui, #overlays { position: absolute; inset: 0; }
+/* The game view (the canvas, whose radar sits 16 px from its corner) and every screen / the HUD stay inside the
+   safe area, so nothing lands under a notch or the home indicator; the backdrop (#bg, the title scene, modal dimming)
+   still runs edge to edge. The HUD measures itself against its own root (hudInsets.ts), so this needs nothing there. */
+#game, #ui { top: var(--safe-t); right: var(--safe-r); bottom: var(--safe-b); left: var(--safe-l); }
 #game { z-index: 1; }
 #ui { z-index: 2; pointer-events: none; }
 #overlays { z-index: 3; pointer-events: none; }
@@ -80,6 +91,10 @@ body.in-game #bg { display: none; }
 .btn-fit { display: flex; align-items: baseline; justify-content: center; gap: 0.45em; width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
 .btn-fit-label { flex: none; }
 .btn-fit-host { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: 0.02em; font-size: 0.9em; }
+/* The same for the title footer's "Server: <host>…" link (fitText.ts shrinks the host first, then it ellipsizes). */
+.link-fit { display: inline-flex; align-items: baseline; gap: 0.3em; max-width: 100%; min-width: 0; white-space: nowrap; }
+.link-fit-label { flex: none; }
+.link-fit-host { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn:hover:not(:disabled), .btn:focus-visible { background: rgba(59, 242, 255, 0.18); box-shadow: var(--glow-c); outline: none; }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: 0.4; cursor: default; }
@@ -413,7 +428,7 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 .spectate .big { color: var(--cyan); text-shadow: var(--glow-c); font-size: 1.3rem; }
 .respawn .small, .spectate .small { color: var(--text); font-size: 1.1rem; }
 .spectate { top: auto; bottom: 2rem; }
-.hud-chat { position: absolute; left: 0.8rem; bottom: 0.8rem; width: min(30rem, 34vw); height: 14rem; display: flex; }
+.hud-chat { position: absolute; left: 0.8rem; bottom: 0.8rem; width: min(30rem, calc(var(--ui-w) * 0.34)); height: 14rem; display: flex; }
 .hud-chat .chat-log { font-size: 0.95rem; text-shadow: 0 1px 2px #000, 0 0 4px #000; scrollbar-width: none; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
 .chat-fading .chat-line { transition: opacity 1.5s; }
 .chat-fading .chat-line.faded { opacity: 0; }
@@ -424,7 +439,7 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 .upgrade-list { position: absolute; right: 0.8rem; bottom: 0.8rem; display: flex; flex-wrap: wrap-reverse; justify-content: flex-end; gap: 0.3rem; width: 14rem; }
 .upg { position: relative; width: 2.1rem; height: 2.1rem; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; background: rgba(7, 4, 15, 0.65); border: 1px solid var(--line); border-radius: 0.3rem; }
 .upg-lv { position: absolute; right: 0.1rem; bottom: 0; font-family: var(--font-display); font-size: 0.55rem; color: var(--cyan); }
-.hud-bottom { position: absolute; left: 50%; bottom: 0.8rem; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: min(34rem, 44vw); }
+.hud-bottom { position: absolute; left: 50%; bottom: 0.8rem; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: min(34rem, calc(var(--ui-w) * 0.44)); }
 .hud-panel { width: 100%; background: rgba(7, 4, 15, 0.55); border: 1px solid var(--line); border-radius: 0.45rem; padding: 0.45rem 0.6rem; display: flex; flex-direction: column; gap: 0.35rem; }
 .hud-row { display: flex; align-items: center; gap: 0.6rem; }
 .level { font-family: var(--font-display); font-weight: 700; font-size: 0.8rem; color: var(--yellow); min-width: 3.2rem; }
@@ -465,7 +480,9 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 .card-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.2; }
 
 /* ---------- overlays ---------- */
-.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: auto;
+  padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l); }
+.overlay > * { max-width: 100%; }
 .overlay.modal { background: rgba(4, 2, 10, 0.6); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
 .scoreboard { pointer-events: none; background: rgba(4, 2, 10, 0.35); }
 .overlay-panel { background: var(--glass-strong); max-height: 90vh; overflow-y: auto; width: min(30rem, 92vw); padding: 1.2rem 1.4rem; }
@@ -488,7 +505,7 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 .award-name { font-weight: 700; font-size: 1.1rem; }
 .results-count { text-align: center; margin-top: 0.8rem; }
 .controls-table td:first-child { color: var(--muted); }
-.toasts { position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 0.4rem; align-items: center; pointer-events: none; }
+.toasts { position: absolute; top: calc(1rem + var(--safe-t)); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 0.4rem; align-items: center; pointer-events: none; }
 .toast { background: var(--glass-strong); border: 1px solid var(--cyan); box-shadow: var(--glow-c); padding: 0.5rem 1rem; border-radius: 0.35rem; transition: opacity 0.4s; max-width: 80vw; }
 .toast.error { border-color: var(--red); box-shadow: 0 0 0.6rem rgba(255, 59, 92, 0.6); }
 .toast.out { opacity: 0; }
@@ -584,9 +601,10 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 .talent-desc { color: var(--muted); }
 
 /* ---------- HUD: skill bar, turret mode, path ---------- */
-.hud-bottom { width: min(40rem, 50vw); }
-/* Keep the chat column clear of the centred bottom panel: half the panel (min(20rem, 25vw)) + gutters. */
-.hud-chat { width: min(30rem, 34vw, calc(50vw - min(20rem, 25vw) - 1.6rem)); }
+/* Sized against the HUD's own width (--ui-w: the viewport minus a notch's side insets), since both are laid out in #ui. */
+.hud-bottom { width: min(40rem, calc(var(--ui-w) * 0.5)); }
+/* Keep the chat column clear of the centred bottom panel: half the panel (min(20rem, 25% of the HUD)) + gutters. */
+.hud-chat { width: min(30rem, calc(var(--ui-w) * 0.34), calc(var(--ui-w) * 0.5 - min(20rem, calc(var(--ui-w) * 0.25)) - 1.6rem)); }
 .skills-row { align-items: flex-end; }
 .skillbar { display: flex; gap: 0.4rem; }
 .skill { --p: 0; display: flex; flex-direction: column; align-items: center; gap: 0.1rem; width: 3.6rem; }
@@ -835,7 +853,7 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 .loot-toast { font-family: var(--font-display); font-weight: 900; font-size: 0.78rem; letter-spacing: 0.2em; color: var(--red); text-shadow: 0 0 0.5rem var(--red);
   background: rgba(7, 4, 15, 0.7); border: 1px solid rgba(255, 59, 92, 0.6); border-radius: 0.3rem; padding: 0.1rem 0.7rem; }
 .loot-toast.pop { animation: banner-pop 0.3s ease-out; }
-.loot-tip { position: absolute; top: 46%; left: 50%; transform: translateX(-50%); width: min(30rem, calc(100vw - 32px)); text-align: center; padding: 0.55rem 0.9rem;
+.loot-tip { position: absolute; top: 46%; left: 50%; transform: translateX(-50%); width: min(30rem, calc(var(--ui-w) - 32px)); text-align: center; padding: 0.55rem 0.9rem;
   background: rgba(7, 4, 15, 0.78); border: 1px solid rgba(255, 212, 59, 0.55); border-radius: 0.45rem; box-shadow: 0 0 1rem rgba(255, 212, 59, 0.25); font-size: 0.98rem; }
 .lt-tip-head { font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.22em; color: var(--yellow); margin-bottom: 0.2rem; }
 
@@ -974,7 +992,7 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 /* The hidden score strip leaves the grid flow: pin the strip to the centre column and the stats to the right one. */
 .hud-top.has-obj > .hud-top-mid { grid-column: 2; }
 .hud-top.has-obj > .hud-stats { grid-column: 3; }
-.obj-strip { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; max-width: min(46rem, calc(100vw - 2rem)); }
+.obj-strip { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; max-width: min(46rem, calc(var(--ui-w) - 2rem)); }
 .obj-clock { display: flex; align-items: baseline; justify-content: center; gap: 0.5rem; }
 .obj-time { font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; letter-spacing: 0.08em; color: var(--text); text-shadow: var(--glow-c); }
 .obj-time.low { color: var(--red); text-shadow: 0 0 0.6rem var(--red); }
@@ -1041,7 +1059,7 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 .obj-wave { font-family: var(--font-display); font-weight: 900; font-size: 0.7rem; letter-spacing: 0.18em; color: #ffffff; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.85), 0 0 8px rgba(255, 59, 212, 0.45); }
 
 /* Centre capture bar (you are inside a zone / the hot point), or a CTF carrier hint */
-.obj-bar { --cap: #9aa4c7; position: absolute; left: 50%; top: calc(50% + 3.6rem); transform: translateX(-50%); width: min(20rem, calc(100vw - 32px));
+.obj-bar { --cap: #9aa4c7; position: absolute; left: 50%; top: calc(50% + 3.6rem); transform: translateX(-50%); width: min(20rem, calc(var(--ui-w) - 32px));
   display: flex; flex-direction: column; gap: 0.2rem; padding: 0.3rem 0.6rem; border-radius: 0.4rem; background: rgba(7, 4, 15, 0.62);
   border: 1px solid color-mix(in srgb, var(--cap) 55%, transparent); }
 .ob-head { display: flex; align-items: baseline; gap: 0.5rem; font-family: var(--font-display); min-width: 0; }
@@ -1099,7 +1117,7 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 .hud-top.has-rift > .rift-roster { grid-column: 1; }
 .hud-top.has-rift > .hud-top-mid { grid-column: 2; display: flex; flex-direction: column; align-items: center; gap: 0.35rem; }
 .hud-top.has-rift > .hud-stats { grid-column: 3; }
-.rift-strip { --rift: #2bf0c8; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0.2rem 0.45rem; max-width: min(46rem, calc(100vw - 2rem));
+.rift-strip { --rift: #2bf0c8; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0.2rem 0.45rem; max-width: min(46rem, calc(var(--ui-w) - 2rem));
   padding: 0.18rem 0.75rem; border-radius: 0.35rem; background: rgba(7, 4, 15, 0.66); border: 1px solid color-mix(in srgb, var(--rift) 45%, transparent);
   font-family: var(--font-display); font-size: 0.7rem; letter-spacing: 0.12em; white-space: nowrap; }
 .rs-dot { color: var(--muted); }
@@ -1120,7 +1138,7 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 .rs-badge.k-exit, .rs-badge.k-extract { color: var(--green); border-color: rgba(59, 255, 154, 0.6); text-shadow: 0 0 0.35rem var(--green); }
 
 /* Boss bar (below the strip) */
-.rift-boss { width: min(28rem, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 0.2rem; padding: 0.25rem 0.6rem; border-radius: 0.4rem;
+.rift-boss { width: min(28rem, calc(var(--ui-w) - 32px)); display: flex; flex-direction: column; gap: 0.2rem; padding: 0.25rem 0.6rem; border-radius: 0.4rem;
   background: rgba(7, 4, 15, 0.7); border: 1px solid rgba(255, 59, 92, 0.55); box-shadow: 0 0 0.8rem rgba(255, 59, 92, 0.25); }
 .rb-head { display: flex; align-items: baseline; gap: 0.45rem; font-family: var(--font-display); min-width: 0; }
 .rb-skull { color: var(--red); text-shadow: 0 0 0.4rem var(--red); }
@@ -1211,4 +1229,114 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
   .rift-wait .small { font-size: 0.9rem; }
   .rift-ring { width: 6rem; height: 6rem; }
   .hud-banner.rift, .hud-banner.rift-good, .hud-banner.rift-bad, .hud-banner.rift-alert { font-size: 1.05rem; letter-spacing: 0.1em; }
+}
+
+/* =================== v0.5: hardpoints + capital ships =================== */
+/* The turret line names its mount; a long host name ellipsizes instead of widening the HUD. */
+.turret-status { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Host: "CAPITAL: Dreadnought", one pip per hardpoint, HARDPOINTS n/5, laser draw. */
+.capital-badge { display: flex; align-items: center; gap: 0.5rem; max-width: 100%; min-width: 0; overflow: hidden; white-space: nowrap;
+  font-family: var(--font-display); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--yellow);
+  background: rgba(7, 4, 15, 0.6); border: 1px solid rgba(255, 212, 59, 0.55); border-radius: 0.3rem; padding: 0.2rem 0.7rem;
+  box-shadow: 0 0 0.6rem rgba(255, 212, 59, 0.22); }
+.cap-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 0 0.5rem rgba(255, 212, 59, 0.7); }
+.cap-icon { margin-right: 0.15em; }
+.cap-pips { display: flex; gap: 0.2rem; flex: none; }
+.cap-pip { width: 0.55rem; height: 0.55rem; border-radius: 50%; border: 1px solid rgba(255, 212, 59, 0.75); background: rgba(255, 212, 59, 0.08); }
+.cap-pip.on { background: var(--yellow); box-shadow: 0 0 0.4rem var(--yellow); }
+.cap-pip.locked { border-style: dashed; border-color: rgba(138, 147, 189, 0.45); background: transparent; }
+.cap-count { flex: none; color: #fff2bf; letter-spacing: 0.08em; }
+.cap-draw { flex: none; color: var(--muted); letter-spacing: 0.06em; font-size: 0.9em; }
+.cap-draw:empty { display: none; }
+/* The capital skill in the Space slot: gold frame + CAP tag. */
+.skill.capital .sk-face { border-color: rgba(255, 212, 59, 0.85); background: rgba(38, 26, 6, 0.88); }
+.skill.capital.ready .sk-face { box-shadow: 0 0 0.6rem rgba(255, 212, 59, 0.75); }
+.skill.capital .sk-name { color: var(--yellow); }
+.skill.capital.active .sk-face { border-color: #fff; box-shadow: 0 0 0.8rem #fff, 0 0 1.4rem var(--yellow); }
+.sk-cap { color: var(--yellow); }
+/* Room lobby: the capital form on each class card and in the build planner. */
+.class-capital { font-size: 0.74rem; line-height: 1.2; color: #ffe89a; }
+.class-capital .cc-name { font-family: var(--font-display); font-weight: 700; font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--yellow); }
+.capital-block { border: 1px solid rgba(255, 212, 59, 0.45); border-radius: 0.4rem; padding: 0.45rem 0.55rem; background: rgba(255, 212, 59, 0.05); display: flex; flex-direction: column; gap: 0.3rem; }
+.capital-block .skill-row { background: rgba(255, 212, 59, 0.06); }
+.capital-block .capital-desc { font-size: 0.88rem; color: #c9cff0; }
+.capital-block .capital-how { font-size: 0.82rem; color: var(--muted); }
+.capital-name { color: var(--yellow); text-shadow: 0 0 0.4rem rgba(255, 212, 59, 0.6); }
+/* Controls overlay: the capital roster. */
+.controls-capitals { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.9rem; }
+.controls-capitals .cc-name { color: var(--yellow); font-weight: 700; }
+@media (max-width: 719px) {
+  .capital-badge { font-size: 0.6rem; gap: 0.35rem; padding: 0.15rem 0.5rem; letter-spacing: 0.08em; }
+  .cap-draw, .cap-count-label, .cap-prefix { display: none; }
+}
+
+/* =================== v0.5 — mobile: controller card, fullscreen, rotate overlay (ui/mobile.ts) ===================
+   Phones / tablets without a mouse only (isMobileLike); a desktop never gets these elements shown. No touch controls. */
+.mobile-slot { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; width: 100%; }
+.pad-prompt { position: relative; display: flex; align-items: flex-start; gap: 0.8rem; width: 100%; padding: 0.75rem 3rem 0.75rem 0.85rem;
+  border: 1px solid rgba(59, 242, 255, 0.65); border-radius: var(--radius); color: #fff; text-align: left; pointer-events: auto;
+  background: linear-gradient(180deg, rgba(59, 242, 255, 0.14), rgba(59, 242, 255, 0.02) 60%), rgba(10, 6, 24, 0.9);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05) inset, 0 0 0.9rem rgba(59, 242, 255, 0.28), 0 0.5rem 1.6rem rgba(0, 0, 0, 0.5); }
+.pad-prompt-icon { flex: none; width: 3.2rem; min-width: 42px; height: auto; color: var(--cyan); filter: drop-shadow(0 0 4px rgba(59, 242, 255, 0.8)); margin-top: 0.1rem; }
+.pad-prompt-text { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.pad-prompt-title { font-family: var(--font-display); font-weight: 900; font-size: max(0.82rem, 12px); letter-spacing: 0.1em; line-height: 1.3;
+  text-transform: uppercase; color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.85), 0 0 8px rgba(59, 242, 255, 0.55); }
+.pad-prompt-body { margin: 0; font-size: max(1rem, 15px); font-weight: 600; line-height: 1.3; color: #fff; }
+.pad-prompt-note { margin: 0; font-size: max(0.9rem, 13px); line-height: 1.3; color: #d6dcf5; }
+.pad-prompt-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem; }
+.pad-prompt-close { position: absolute; top: 0.2rem; right: 0.2rem; width: 44px; height: 44px; display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 0.35rem; background: transparent; color: #fff; font-size: 26px; line-height: 1; cursor: pointer; }
+.pad-prompt-close:hover, .pad-prompt-close:focus-visible { background: rgba(59, 242, 255, 0.14); box-shadow: var(--glow-c); outline: none; }
+/* "Play fullscreen": touch-sized */
+.pad-prompt-fs, .mobile-fs-solo, .rotate-overlay .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5em; min-height: 40px;
+  padding: 0.4rem 1rem; font-size: max(0.72rem, 12px); }
+.fs-icon { width: 1.3em; height: 1.3em; flex: none; }
+.mobile-fs-solo { color: #fff; }
+/* Command (and Title on a short landscape screen): the card as a compact row, the button beside the text */
+.pad-prompt.compact { align-items: center; gap: 0.7rem; padding: 0.4rem 3rem 0.4rem 0.7rem; flex-shrink: 0; }
+.pad-prompt.compact .pad-prompt-icon { width: 2.4rem; min-width: 34px; margin-top: 0; }
+.pad-prompt.compact .pad-prompt-text { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 0.8rem; row-gap: 0.1rem; align-items: center; flex: 1; }
+.pad-prompt.compact .pad-prompt-text > * { grid-column: 1; }
+.pad-prompt.compact .pad-prompt-actions { grid-column: 2; grid-row: 1 / span 4; margin: 0; }
+.pad-prompt.compact .pad-prompt-body { font-size: max(0.92rem, 14px); }
+.pad-prompt.compact .pad-prompt-note { font-size: max(0.82rem, 12px); }
+@media (max-height: 520px) and (min-width: 561px) {
+  /* a phone on its side: the card runs wider than the login column (centred over it), so it stays a few lines tall */
+  .mobile-slot-title { width: min(calc(100vw - 32px), 46rem); }
+  .pad-prompt { align-items: center; padding: 0.55rem 3rem 0.55rem 0.8rem; }
+  .pad-prompt-text { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 0.8rem; row-gap: 0.15rem; align-items: center; flex: 1; }
+  .pad-prompt-text > * { grid-column: 1; }
+  .pad-prompt-actions { grid-column: 2; grid-row: 1 / span 4; margin: 0; }
+}
+@media (max-width: 560px) {
+  .pad-prompt.compact { align-items: flex-start; }
+  .pad-prompt.compact .pad-prompt-text { display: flex; align-items: flex-start; }
+}
+@media (max-width: 359px) {
+  /* the smallest phones: the Title card's button row (well below the X) also takes the X's column, and the button
+     tightens, so "Play fullscreen" isn't clipped by the title buttons' overflow: hidden */
+  .pad-prompt:not(.compact) .pad-prompt-actions { margin-right: -2.2rem; }
+  .pad-prompt-fs { padding-inline: 0.7rem; letter-spacing: 0.06em; gap: 0.4em; }
+}
+
+/* Rotate to landscape: covers the room lobby / the match in portrait (the sim keeps running underneath). */
+.rotate-overlay { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  padding: calc(24px + var(--safe-t)) calc(24px + var(--safe-r)) calc(24px + var(--safe-b)) calc(24px + var(--safe-l));
+  background: radial-gradient(ellipse at 50% 38%, rgba(42, 15, 74, 0.97) 0%, rgba(18, 7, 42, 0.98) 45%, rgba(7, 4, 15, 0.99) 80%);
+  color: #fff; text-align: center; pointer-events: auto; touch-action: none; }
+.rotate-icon { position: relative; width: 120px; height: 120px; color: var(--cyan); filter: drop-shadow(0 0 6px rgba(59, 242, 255, 0.85)); }
+.rotate-icon svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rotate-phone { transform-origin: 50% 50%; animation: rotate-phone 2.6s ease-in-out infinite; }
+.rotate-arrow { color: var(--magenta); filter: drop-shadow(0 0 4px rgba(255, 59, 212, 0.8)); }
+@keyframes rotate-phone { 0%, 18% { transform: rotate(0deg); } 45%, 78% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }
+@media (prefers-reduced-motion: reduce) { .rotate-phone { animation: none; transform: rotate(-90deg); } }
+.rotate-title { font-family: var(--font-display); font-weight: 900; font-size: 20px; letter-spacing: 0.12em; line-height: 1.3; text-transform: uppercase;
+  color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.85), 0 0 10px rgba(59, 242, 255, 0.6); max-width: 22rem; }
+.rotate-note { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.35; color: #fff; max-width: 22rem; }
+.rotate-note.muted-note { font-weight: 500; font-size: 14px; color: #c9cff0; }
+
+/* phone Command drawer / chat button: fixed to the viewport, so they add the insets themselves */
+@media (max-width: 719px) {
+  .screen-command.chat-open .cmd-chat { left: calc(16px + var(--safe-l)); right: calc(16px + var(--safe-r)); bottom: calc(0.6rem + var(--safe-b)); }
+  .chat-toggle { right: calc(16px + var(--safe-r)); bottom: calc(0.8rem + var(--safe-b)); }
 }

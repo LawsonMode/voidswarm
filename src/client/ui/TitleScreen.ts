@@ -21,6 +21,7 @@ import { featureLines } from '../title/features';
 import { LogoFx } from '../title/logoFx';
 import { TitleScene } from '../title/TitleScene';
 import { h } from './dom';
+import { FIT_CLASS, fitTextIn } from './fitText';
 
 export interface TitleCallbacks {
   /** token = session token (logged in) or undefined (guest). */
@@ -93,6 +94,7 @@ export class TitleScreen {
   private logoFx: LogoFx | null = null;
   private shown = false;
   private measureQueued = 0;
+  private fitQueued = 0;
   private readonly reducedMq: MediaQueryList | null;
   private typingTimer: ReturnType<typeof setTimeout> | null = null;
   /** Offline-first layout: the login fields were opened ("or log in to a server"). */
@@ -100,7 +102,7 @@ export class TitleScreen {
   /** Offline-first login form parts, toggled without a re-render (so typed values survive). */
   private loginFold: { more: HTMLElement; expand: HTMLElement; divider: HTMLElement } | null = null;
   /** Window / visual-viewport resize: the column moves without changing size (ResizeObserver misses that). */
-  private readonly onViewport = (): void => this.queueMeasure();
+  private readonly onViewport = (): void => { this.queueMeasure(); this.queueFit(); };
 
   constructor(private cb: TitleCallbacks, opts: TitleOptions) {
     const { name, server, resetToken } = opts;
@@ -125,7 +127,7 @@ export class TitleScreen {
         ? 'The address of a Voidswarm game server, e.g. wss://play.example.com. Use wss:// for servers on the internet.'
         : 'Default: this page\'s host on port 7777. Use wss:// for servers on the internet.'));
     this.serverLink = h('button', {
-      class: 'link subtle', type: 'button', 'data-nav': 'server-link', 'aria-expanded': 'false',
+      class: 'link subtle link-fit', type: 'button', 'data-nav': 'server-link', 'aria-expanded': 'false',
       onclick: () => this.toggleServer(),
     });
     this.insecure = h('div', { class: 'warn-line hidden', role: 'note' }, '⚠ Unencrypted connection — don’t reuse a real password.');
@@ -200,11 +202,11 @@ export class TitleScreen {
     new MutationObserver(() => this.syncShown()).observe(this.root, { attributes: true, attributeFilter: ['class'] });
     if (typeof ResizeObserver === 'function') {
       // the logo's own box too: it changes width when the display font finishes loading
-      const ro = new ResizeObserver(() => this.queueMeasure());
+      const ro = new ResizeObserver(() => { this.queueMeasure(); this.queueFit(); });
       ro.observe(this.wrap);
       ro.observe(this.logo);
     }
-    void document.fonts?.ready.then(() => this.queueMeasure());
+    void document.fonts?.ready.then(() => { this.queueMeasure(); this.queueFit(); });
     this.root.addEventListener('scroll', () => this.queueMeasure(), { passive: true });
     this.reducedMq?.addEventListener?.('change', () => {
       this.root.classList.toggle('reduced-motion', this.reducedMotion());
@@ -240,6 +242,7 @@ export class TitleScreen {
       window.visualViewport?.addEventListener('resize', this.onViewport);
       window.visualViewport?.addEventListener('scroll', this.onViewport);
       this.measureNow();
+      this.queueFit();
       this.scene?.start();
     } else {
       // Leaving the Title screen: tear everything down (no rAF, no canvas, no listeners left behind).
@@ -254,6 +257,15 @@ export class TitleScreen {
       if (this.typingTimer) { clearTimeout(this.typingTimer); this.typingTimer = null; }
       if (this.measureQueued) { cancelAnimationFrame(this.measureQueued); this.measureQueued = 0; }
     }
+  }
+
+  /**
+   * Long server hosts (Stay on / Connect to buttons, the "Server:" link) shrink to fit their box, then ellipsize
+   * (fitText.ts). Runs after layout: on render, resize, font load and when the screen shows.
+   */
+  private queueFit(): void {
+    if (this.fitQueued || typeof requestAnimationFrame !== 'function') return;
+    this.fitQueued = requestAnimationFrame(() => { this.fitQueued = 0; fitTextIn(this.panel); });
   }
 
   private queueMeasure(): void {
@@ -279,6 +291,12 @@ export class TitleScreen {
 
   // ------------------------------------------------------------------ public API (main.ts)
   get serverUrl(): string { return this.urlInput.value.trim(); }
+
+  /** v0.5 mobile: the controller card + "Play fullscreen" (ui/mobile.ts) sit in the column, above the panel. */
+  mountNotice(el: HTMLElement): void {
+    this.wrap.insertBefore(el, this.panel);
+    this.queueMeasure();
+  }
 
   /** False for a URL that only came from a ?server= link: those are used for this visit but never saved. */
   isPersistable(url: string): boolean {
@@ -366,7 +384,14 @@ export class TitleScreen {
     this.insecure.classList.toggle('hidden', !isInsecureRemote(url));
     const label = serverHost(this.serverUrl) || this.serverUrl;
     // A blank address only happens on a static host (no default server there): say so, not "default".
-    this.serverLink.textContent = `Server: ${label || (this.offlineFirst ? 'not set' : 'default')}…`;
+    // A long host shrinks to fit the footer, then ellipsizes (the menu "…" is part of the fitted text, so a cut
+    // host ends in a single ellipsis); the full address is on hover.
+    const shown = label || (this.offlineFirst ? 'not set' : 'default');
+    this.serverLink.title = `Server: ${shown}`;
+    this.serverLink.setAttribute('aria-label', `Server: ${shown}. Change server`);
+    this.serverLink.replaceChildren(
+      h('span', { class: 'link-fit-label' }, 'Server:'), h('span', { class: `link-fit-host ${FIT_CLASS}` }, `${shown}…`));
+    this.queueFit();
     // Where passwords go, spelled out on every auth form.
     const host = serverHost(url);
     let hostname = '';
@@ -490,6 +515,7 @@ export class TitleScreen {
     this.updateServerUi();
     this.applyBusy();
     this.queueMeasure();
+    this.queueFit();
   }
 
   /** A ?server= link pointed at someone else's host: ask before anything (login, token, socket) goes there. */
@@ -505,10 +531,10 @@ export class TitleScreen {
         class: 'btn btn-primary btn-big btn-fit', type: 'button', 'data-nav': 'server-stay', 'data-autofocus': true,
         title: `Stay on ${stay}`, 'aria-label': `Stay on ${stay}`,
         onclick: () => { this.pendingServer = null; this.setView('login'); },
-      }, h('span', { class: 'btn-fit-label' }, 'Stay on'), h('span', { class: 'btn-fit-host' }, stay)),
+      }, h('span', { class: 'btn-fit-label' }, 'Stay on'), h('span', { class: `btn-fit-host ${FIT_CLASS}` }, stay)),
       h('button', {
         class: 'btn btn-danger btn-fit', type: 'button', 'data-nav': 'server-accept',
-        // Long hosts (e.g. *.trycloudflare.com) shrink + ellipsize inside the button; full name on hover.
+        // Long hosts (e.g. *.trycloudflare.com) shrink to fit the button, then ellipsize; full name on hover.
         title: `Connect to ${host}`, 'aria-label': `Connect to ${host}`,
         onclick: () => {
           this.pendingServer = null;
@@ -517,7 +543,7 @@ export class TitleScreen {
           this.setView('login');
           void this.checkSession();
         },
-      }, h('span', { class: 'btn-fit-label' }, 'Connect to'), h('span', { class: 'btn-fit-host' }, host)),
+      }, h('span', { class: 'btn-fit-label' }, 'Connect to'), h('span', { class: `btn-fit-host ${FIT_CLASS}` }, host)),
       h('div', { class: 'title-links' }, this.offlineLink()));
   }
 

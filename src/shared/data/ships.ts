@@ -23,6 +23,11 @@ export const SKILL_KNOBS = {
     chargeDamageTaken: 'fraction of damage taken while charging',
     hideAbsorb: 'Iron Hide damage absorbed fraction',
     hideTime: 'Iron Hide duration s',
+    capCooldown: 'capital skill cooldown s (v0.5; replaces mobilityCooldown while hosting)',
+    capCost: 'capital skill energy cost',
+    broadsideSlugs: 'Broadside: mass-driver slugs per flank',
+    broadsideDamage: 'Broadside: damage per slug (x mobilityPower x damageMult)',
+    broadsideSpeed: 'Broadside: slug speed px/s',
   },
   tech: {
     arcHops: 'targets hit by Arc Lightning',
@@ -34,6 +39,10 @@ export const SKILL_KNOBS = {
     wellDuration: 'Singularity lifetime s',
     wellDps: 'damage/s inside the core (× utilityPower)',
     wellPull: 'pull acceleration px/s²',
+    capCooldown: 'capital skill cooldown s (v0.5; replaces mobilityCooldown while hosting)',
+    capCost: 'capital skill energy cost',
+    overchargeTime: 'Resonance Overcharge duration s',
+    overchargeBonus: 'extra lasers counted for resonance on this host while overcharged',
   },
   engineer: {
     sentryMax: 'max active sentries (oldest replaced)',
@@ -47,6 +56,12 @@ export const SKILL_KNOBS = {
     wallLength: 'Shield Wall length px',
     wallHp: 'Shield Wall hp (× utilityPower)',
     wallLife: 'Shield Wall lifetime s',
+    capCooldown: 'capital skill cooldown s (v0.5; replaces mobilityCooldown while hosting)',
+    capCost: 'capital skill energy cost',
+    bayHealFrac: 'Repair Bay: heal over its duration as a fraction of each target maxEnergy (x healMult)',
+    bayTime: 'Repair Bay duration s',
+    bayRadius: 'Repair Bay radius px (turrets on this host always count)',
+    bayShield: 'Repair Bay: damage absorbed by covered ships while active',
   },
 } as const;
 
@@ -230,6 +245,11 @@ export const SHIP_CLASSES: Record<ShipClassId, ShipClassDef> = {
       offense: { name: 'Flak Cannon', icon: '💥', description: 'Short-range shotgun bursts. Draws host energy.' },
       defense: { name: 'Brace', icon: '🧱', description: 'Hold: your host takes 50% less damage. Drains your energy.' },
     },
+    capital: {
+      name: 'Dreadnought',
+      description: "The Juggernaut's capital form: an armored gun-deck that grows with every turret it carries.",
+      skill: { id: 'broadside', slot: 'mobility', name: 'Broadside', icon: '💥', description: 'Mass-driver volley from both flanks at once (replaces Ram Charge while you carry turrets).' },
+    },
     paths: BRUTE_PATHS,
     base: {
       ...common,
@@ -244,6 +264,7 @@ export const SHIP_CLASSES: Record<ShipClassId, ShipClassDef> = {
         rocketCount: 3, rocketDamage: 180, rocketSplash: 70, rocketSpeed: 700,
         ramDamage: 400, chargeSpeed: 1500, chargeTime: 0.35, chargeDamageTaken: 0.4,
         hideAbsorb: 0.6, hideTime: 3,
+        capCooldown: 8, capCost: 180, broadsideSlugs: 4, broadsideDamage: 160, broadsideSpeed: 1150,
       },
     },
   },
@@ -262,6 +283,11 @@ export const SHIP_CLASSES: Record<ShipClassId, ShipClassDef> = {
       offense: { name: 'Laser Lance', icon: '🔆', description: 'Continuous beam. Each other laser on the same host multiplies it ×1.5 — and its host-energy draw.' },
       defense: { name: 'Deflector', icon: '🔰', description: 'Hold: shoot down hostile projectiles near your host. Costs your energy per shot.' },
     },
+    capital: {
+      name: 'Spire',
+      description: "The Arcanist's capital form: a crystal spire that focuses every laser on board.",
+      skill: { id: 'overcharge', slot: 'mobility', name: 'Resonance Overcharge', icon: '🔆', description: 'For 4 s every laser turret on you counts one extra for resonance (replaces Blink while you carry turrets).' },
+    },
     paths: TECH_PATHS,
     base: {
       ...common,
@@ -275,6 +301,7 @@ export const SHIP_CLASSES: Record<ShipClassId, ShipClassDef> = {
         arcHops: 4, arcDamage: 220, arcRange: 600, arcHopRange: 260,
         blinkRange: 480,
         wellRadius: 280, wellDuration: 3, wellDps: 120, wellPull: 900,
+        capCooldown: 14, capCost: 200, overchargeTime: 4, overchargeBonus: 1,
       },
     },
   },
@@ -293,6 +320,11 @@ export const SHIP_CLASSES: Record<ShipClassId, ShipClassDef> = {
       offense: { name: 'Seeker Volley', icon: '🎯', description: 'Homing missile volleys. Draws host energy.' },
       defense: { name: 'Hull Weld', icon: '🔧', description: 'Hold: transfer your energy into your host to repair it.' },
     },
+    capital: {
+      name: 'Foundry',
+      description: "The Artificer's capital form: a mobile shipyard that keeps its crew alive.",
+      skill: { id: 'repairbay', slot: 'mobility', name: 'Repair Bay', icon: '🛠', description: 'Repair and shield your turrets and nearby allies for 4 s (replaces Repair Pulse while you carry turrets).' },
+    },
     paths: ENGINEER_PATHS,
     base: {
       ...common,
@@ -307,6 +339,7 @@ export const SHIP_CLASSES: Record<ShipClassId, ShipClassDef> = {
         sentryMax: 2, sentryHp: 600, sentryLife: 15, sentryFireCd: 1.2, sentryDamage: 90, sentryRange: 550,
         healFrac: 0.25, healRadius: 380,
         wallLength: 220, wallHp: 1500, wallLife: 6,
+        capCooldown: 16, capCost: 0, bayHealFrac: 0.35, bayTime: 4, bayRadius: 420, bayShield: 0.3,
       },
     },
   },

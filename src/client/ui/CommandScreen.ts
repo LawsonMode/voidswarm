@@ -140,6 +140,17 @@ export class CommandScreen {
 
   get selectedType(): GameType { return this.selected; }
 
+  /** v0.5 mobile: the controller card (ui/mobile.ts) sits under the top banner. */
+  mountNotice(el: HTMLElement): void {
+    this.banner.after(el);
+  }
+
+  /** v0.5 mobile: where focus goes when the card's X (keyboard / gamepad) hides it: the selected game-type card. */
+  focusDefault(): void {
+    const el = this.root.querySelector<HTMLElement>(`[data-nav="gt-${this.selected}"]`) ?? this.root.querySelector<HTMLElement>('.gt-card-body');
+    el?.focus({ preventScroll: true });
+  }
+
   refresh(): void {
     const c = this.client;
     replaceChildren(this.pilotChip,

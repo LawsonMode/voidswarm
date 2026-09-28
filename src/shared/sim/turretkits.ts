@@ -7,6 +7,7 @@ import { DT, ENEMY_TEAM, LASER_RESONANCE, TURRET_HOST_FLOOR_FRAC } from '../cons
 import { SHIP_CLASSES } from '../data/ships';
 import type { Ship, World } from '../types';
 import { BEAM_LASER, BEAM_WELD } from '../types';
+import { overchargeBonus } from './capital';
 import { damageEnemy, damageShip, healShip } from './combat';
 import { found, firstHitOnSegment, has, hostileTo, isHostileShip, onPath, raycastWall } from './targeting';
 import { emit, projectileDefaults, secToTicks, spawnProjectile } from './world';
@@ -121,8 +122,17 @@ export function flushLaser(world: World, t: Ship): void {
   if (s && isHostileShip(world, t.team, t.id, s)) damageShip(world, s, amt, t.id, 'player');
 }
 
-function laser(world: World, t: Ship, host: Ship, mult: number): void {
+/**
+ * Lasers counted for resonance on `host` this tick: the firing lasers, plus the v0.5 Resonance Overcharge bonus
+ * while the host's overcharge runs (capital.ts). 0 when none fire (an overcharge alone never fires a beam).
+ */
+export function resonantLasers(world: World, host: Ship): number {
   const n = firingLasers(world, host);
+  return n > 0 ? n + overchargeBonus(world, host) : 0;
+}
+
+function laser(world: World, t: Ship, host: Ship, mult: number): void {
+  const n = resonantLasers(world, host);
   if (n <= 0) { flushLaser(world, t); return; }
   const sk = t.stats.skill, ss = t.skillState;
   const f = resonanceFactor(n);

@@ -10,13 +10,19 @@
 // portals with channel arcs, spawnWarn cracks, boss telegraphs, rift event FX), the sealed-room screen vignette,
 // biome wall / grid palettes (walls.ts), minimap room fog by party.seen, the Matriarch body + phases, and the open
 // portals on beamBus (portal hum). setMap is re-entrant for every floorStart.
+// v0.5: capital ships + bubble turrets (capital.ts, shapes.ts). A host with ≥ 1 turret morphs (0.35 s scale-up +
+// crossfade + flash) into its class's capital hull (Dreadnought / Spire / Foundry) scaled by capitalScale, with
+// hardpoint sockets; docked turrets are domes on HARDPOINT_LAYOUT mounts (eased re-flow) on their own layer above
+// the hulls, with a kit barrel on the turret's own aim, recoil, and a name tag only under the reticle. Turret fire
+// presets (tracer / laser / mass driver / flak burst / seeker exhaust) from the turret cosmetic; capital skill FX
+// (Broadside gunports, Overcharge glow + thick beams, Repair Bay lights + field). Cues for AudioFx over beamBus.
 import {
   Application, Container, Graphics, type GraphicsContext, Rectangle, Sprite, Text, Texture, TilingSprite,
 } from 'pixi.js';
 import { AdvancedBloomFilter, ShockwaveFilter } from 'pixi-filters';
 import type { IGameRenderer, RenderFrame } from '../contracts';
 import {
-  ENEMY_TEAM, LASER_RESONANCE, MAX_VIEW_HALF_EXTENT, ORBIT_RADIUS, ORBIT_SPEED, TICK_RATE,
+  ENEMY_TEAM, MAX_VIEW_HALF_EXTENT, ORBIT_RADIUS, ORBIT_SPEED, TICK_RATE,
 } from '../../shared/constants';
 import {
   BEAM_LASER, BEAM_WELD, SHIPFLAG_AFTERBURNER, SHIPFLAG_CHARGING, SHIPFLAG_CLOAKED, SHIPFLAG_INVULN, SHIPFLAG_SHIELD,
@@ -26,19 +32,26 @@ import {
 } from '../../shared/types';
 import { ENEMY_COLOR, colorFor } from '../../shared/data/teams';
 import { PATHS, SHIP_CLASSES, TALENTS } from '../../shared/data/ships';
-import { turretOffset } from '../../shared/sim/world';
+import { capitalScale } from '../../shared/sim/world';
+import { FLAK_LIFE, FLAK_SPEED } from '../../shared/sim/turretkits';
+import { OVERCHARGE_END } from '../../shared/sim/capital';
 import { buildAtlas, buildStarTile, buildVignette, type Atlas } from './textures';
 import { P_ORIENT, P_SPIN, P_STRETCH, Particles, SpriteBatch } from './particles';
 import { SpringGrid } from './grid';
 import { buildMinimapCanvas, buildWalls, paletteFor, type WallChunk } from './walls';
 import {
-  EMPTY_CTX, ENEMY_BASE_R, TECH_NODES, deployBody, eliteRing, enemyBody, hiveRing, matriarchPart, shipAux, shipHull,
-  sweepShipCaches, wallBody,
+  CAPITAL_GEOM, EMPTY_CTX, ENEMY_BASE_R, TECH_NODES, capitalAux, capitalHull, deployBody, domeBarrel, domeBase, eliteRing,
+  enemyBody, hiveRing, matriarchPart, shipAux, shipHull, sweepShipCaches, wallBody,
 } from './shapes';
 import {
   BG_COLOR, ENEMY_COLORS, GOLD, MATRIARCH_GOLD, SHIELD_COLOR, brighten, darken, energyColor, gemColor, gemScale, mix,
 } from './palette';
-import { beamBus, publishBeam } from './beamBus';
+import { CUE_CAP_DOWN, CUE_CAP_UP, beamBus, publishBeam, publishCue } from './beamBus';
+import {
+  BARREL_LEN, CAP_REF, DOME_R, FIRE_CODE, domeScale, estimateHostRadius, firePresetFor, laserBeamLook, laserSparks, mountOf,
+  mountOffset, newMorph, resetMorph,
+  stepMorph, turretTagAlpha, type CapitalMorph, type FirePreset,
+} from './capital';
 import { LookTable, hullFor, turretFor, weaponFor, type TurretLook, type WeaponLook } from './cosmeticLook';
 import { emitDeathPreset, emitEngine, engineFlameTint, type DeathHost } from './cosmeticFx';
 import { LootLayer, type LootHost, type ShipAnchor } from './loot';
@@ -49,11 +62,22 @@ interface ShipDisp {
   root: Container; glow: Sprite; flame: Sprite; flame2: Sprite; hull: Graphics; aux: Graphics; key: string;
   x: number; y: number; pvx: number; pvy: number; ax: number; ay: number; thrustA: number;
   hostR: number; ghostT: number;
+  /** v0.5 docked turret: dome draw scale on its host (capital.ts domeScale; 1 = DOME_R). */
+  domeK: number;
   label: Text | null; labelStr: string; seen: number;
   /** v0.3 cosmetic title under the nameplate (pooled with the display). */
   title: Text | null; titleStr: string;
   /** Root alpha / ally flag from the last drawShips (cosmetic emission gating). */
   alpha: number; ally: boolean;
+  /** v0.5: capital hull (crossfades with `hull`) + its aux layer; the bubble dome base (turrets). */
+  cap: Graphics; capAux: Graphics; dome: Graphics; capKey: string; auxOn: boolean; capAuxOn: boolean;
+  morph: CapitalMorph; morphEv: 'up' | 'down' | null;
+  /** v0.5 turret: eased local mount [along, side] (hull radii) and the host it was eased on (0 = snap). */
+  mA: number; mS: number; mHost: EntityId;
+  /** v0.5 turret: recoil kick (px) + when it fired (render time); fire preset (projectiles, muzzle, audio). */
+  kick: number; kickT: number; fire: FirePreset | null;
+  /** v0.5 capital skill windows (render time): Overcharge / Repair Bay until, last Broadside. */
+  ocUntil: number; bayUntil: number; broadT: number;
 }
 interface EnemyDisp {
   root: Container; body: Graphics; ring: Graphics | null; hive0: Graphics | null; hive1: Graphics | null;
@@ -88,6 +112,10 @@ const HEAL_COLOR = 0x5bff8a;
 const STEEL = 0xc2d0e6;
 const VOID_COLOR = 0xb45bff;
 const LASER_COLD = 0x3ce6ff;
+/** v0.5 Repair Bay shield shell (pale green: low saturation, never a team colour). */
+const BAY_SHIELD = 0xb8f5cc;
+/** Broadside gunport streaks lean toward a point this far ahead (the real slugs converge on the pilot's aim point). */
+const BROADSIDE_FX_FOCUS = 320;
 
 export class GameRenderer implements IGameRenderer {
   private app = new Application();
@@ -109,6 +137,8 @@ export class GameRenderer implements IGameRenderer {
   private trails!: Particles;
   private ghostLayer = new Container();
   private shipLayer = new Container();
+  /** v0.5: docked turrets (bubble domes) render above every hull. */
+  private turretLayer = new Container();
   private dynG = new Graphics();
   private fx!: Particles;
   private overlay = new Container();
@@ -157,6 +187,12 @@ export class GameRenderer implements IGameRenderer {
   private tint = { color: 0, a: 0, decay: 1 };
   private frameNo = 0;
   private now = 0;
+  /** v0.5: the frame's local ship (mass-driver recoil shake for your own stack). */
+  private localShipId: EntityId = 0;
+  /** v0.5: capital-Juggernaut bullets classified at first sight (Broadside slug or not), by projectile id. */
+  private slugCls = new Map<EntityId, { slug: boolean; seen: number }>();
+  /** v0.5: active Repair Bays this frame (a shield inside one is the bay's, drawn green, not Iron Hide steel). */
+  private bays: { id: EntityId; x: number; y: number; r2: number; team: TeamId }[] = [];
 
   // --- v0.3 cosmetics + loot
   private looks = new LookTable();
@@ -264,7 +300,7 @@ export class GameRenderer implements IGameRenderer {
     this.riftRoot.addChild(this.riftPadG, this.riftLayer.glow.pc, this.riftAddG);
     this.riftAddG.blendMode = 'add';
     this.cam.addChild(this.gridG, this.mapLayer, this.riftRoot, this.objectiveRoot, this.gems.pc, this.lootLayer.batch.pc, this.deployGlow.pc, this.deployLayer,
-      this.enemyLayer, this.darkG, this.trails.pc, this.projs.pc, this.ghostLayer, this.shipLayer, this.dynG, this.fx.pc);
+      this.enemyLayer, this.darkG, this.trails.pc, this.projs.pc, this.ghostLayer, this.shipLayer, this.turretLayer, this.dynG, this.fx.pc);
     this.dynG.blendMode = 'add';
     this.gridG.blendMode = 'add';
     this.ghostLayer.blendMode = 'add';
@@ -304,6 +340,7 @@ export class GameRenderer implements IGameRenderer {
     this.grid.colors = { ...pal.grid };
     this.rings.length = 0; this.lines.length = 0; this.tethers.length = 0;
     this.fx.clear(); this.trails.clear();
+    this.slugCls.clear();
     for (const n of this.nums) { n.active = false; n.text.visible = false; }
     this.objLayer.setMap(map);
     this.riftLayer.setMap(map, pal.door);
@@ -351,12 +388,17 @@ export class GameRenderer implements IGameRenderer {
    * Pooled displays and afterimages drop their contexts first; contexts on live displays are marked and kept.
    */
   private sweepShipCaches(): void {
-    for (const d of this.shipPool) { d.hull.context = EMPTY_CTX; d.aux.context = EMPTY_CTX; d.key = ''; }
+    for (const d of this.shipPool) {
+      d.hull.context = EMPTY_CTX; d.aux.context = EMPTY_CTX; d.cap.context = EMPTY_CTX; d.capAux.context = EMPTY_CTX; d.dome.context = EMPTY_CTX;
+      d.key = ''; d.capKey = '';
+    }
     for (const gh of this.ghosts) { this.ghostLayer.removeChild(gh.g); this.ghostFree.push(gh.g); }
     this.ghosts.length = 0;
     for (const g of this.ghostFree) g.context = EMPTY_CTX;
     const keep = new Set<GraphicsContext>();
-    for (const d of this.ships.values()) { keep.add(d.hull.context); keep.add(d.aux.context); }
+    for (const d of this.ships.values()) {
+      keep.add(d.hull.context); keep.add(d.aux.context); keep.add(d.cap.context); keep.add(d.capAux.context); keep.add(d.dome.context);
+    }
     sweepShipCaches(keep);
   }
 
@@ -368,7 +410,7 @@ export class GameRenderer implements IGameRenderer {
         const d = this.ships.get(id), s = this.shipById.get(id);
         if (!d || !s || !s.alive) return null;
         const a = this.anchor;
-        a.x = d.x; a.y = d.y; a.r = this.shipRadius(s) * (s.attachedTo ? 0.8 : 1);
+        a.x = d.x; a.y = d.y; a.r = this.visR(s, d);
         a.alpha = d.alpha; a.ally = d.ally; a.cloaked = (s.flags & SHIPFLAG_CLOAKED) !== 0;
         return a;
       },
@@ -392,7 +434,7 @@ export class GameRenderer implements IGameRenderer {
         const d = this.ships.get(id), s = this.shipById.get(id);
         if (!d || !s || !s.alive) return null;
         const o = this.objShipOut;
-        o.x = d.x; o.y = d.y; o.r = this.shipRadius(s) * (s.attachedTo ? 0.8 : 1); o.vx = s.vx; o.vy = s.vy;
+        o.x = d.x; o.y = d.y; o.r = this.visR(s, d); o.vx = s.vx; o.vy = s.vy;
         o.alpha = d.alpha; o.ally = d.ally; o.cloaked = (s.flags & SHIPFLAG_CLOAKED) !== 0;
         return o;
       },
@@ -505,6 +547,7 @@ export class GameRenderer implements IGameRenderer {
     const dt = clamp(frame.dt || realDt, 0, 0.1);
     const t = frame.time;
     this.now = t;
+    this.localShipId = frame.localShipId;
     this.layout();
 
     // lookups
@@ -616,6 +659,9 @@ export class GameRenderer implements IGameRenderer {
 
     this.drawRadar(frame);
     this.sweepObjLabels();
+    if (this.frameNo % 120 === 0 && this.slugCls.size) {
+      for (const [id, c] of this.slugCls) if (c.seen < this.frameNo - 5) this.slugCls.delete(id);
+    }
     this.app.renderer.render(this.app.stage);
     // v0.3 M4: a replaced minimap texture (setMap) is kept a while before it is destroyed: bind groups of sprites
     // that were not re-rendered since (the hidden big map) still reference it
@@ -777,6 +823,10 @@ export class GameRenderer implements IGameRenderer {
   }
 
   private shipRadius(s: ShipView): number { return SHIP_CLASSES[s.shipClass].base.radius; }
+  /** v0.5 displayed radius: a docked turret is its dome; a capital host is its base radius × the morph scale. */
+  private visR(s: ShipView, d: ShipDisp | undefined): number {
+    return s.attachedTo ? DOME_R * (d ? d.domeK : 1) : this.shipRadius(s) * (d ? d.morph.vis : 1);
+  }
 
   private getShipDisp(id: EntityId): ShipDisp {
     let d = this.ships.get(id);
@@ -789,24 +839,34 @@ export class GameRenderer implements IGameRenderer {
       const flame2 = new Sprite(this.atlas.streak); flame2.anchor.set(0.95, 0.5); flame2.blendMode = 'add'; flame2.visible = false;
       const hull = new Graphics();
       const aux = new Graphics();
-      root.addChild(glow, flame, flame2, hull, aux);
+      const cap = new Graphics(); cap.visible = false;
+      const capAux = new Graphics(); capAux.visible = false;
+      const dome = new Graphics(); dome.visible = false;
+      root.addChild(glow, flame, flame2, dome, cap, hull, capAux, aux);
       d = {
-        root, glow, flame, flame2, hull, aux, key: '', x: 0, y: 0, pvx: 0, pvy: 0, ax: 0, ay: 0, thrustA: 0, hostR: 0, ghostT: 0,
+        root, glow, flame, flame2, hull, aux, key: '', x: 0, y: 0, pvx: 0, pvy: 0, ax: 0, ay: 0, thrustA: 0, hostR: 0, ghostT: 0, domeK: 1,
         label: null, labelStr: '', seen: 0, title: null, titleStr: '', alpha: 1, ally: false,
+        cap, capAux, dome, capKey: '', auxOn: false, capAuxOn: false, morph: newMorph(), morphEv: null,
+        mA: 0, mS: 0, mHost: 0, kick: 0, kickT: -9, fire: null, ocUntil: -9, bayUntil: -9, broadT: -9,
       };
     }
-    d.ax = d.ay = 0; d.pvx = d.pvy = 0; d.key = ''; d.labelStr = ''; d.hostR = 0; d.ghostT = 0; d.alpha = 1; d.ally = false;
+    d.ax = d.ay = 0; d.pvx = d.pvy = 0; d.key = ''; d.labelStr = ''; d.hostR = 0; d.ghostT = 0; d.domeK = 1; d.alpha = 1; d.ally = false;
+    d.capKey = ''; resetMorph(d.morph); d.morphEv = null; d.mHost = 0; d.kick = 0; d.kickT = -9; d.fire = null;
+    d.ocUntil = -9; d.bayUntil = -9; d.broadT = -9;
     this.shipLayer.addChild(d.root);
     this.ships.set(id, d);
     return d;
   }
 
+  private tmpO = { x: 0, y: 0 };
+
   private updateShipPositions(frame: RenderFrame, dt: number): void {
+    beamBus.turretFire.clear();
     for (const s of frame.ships) {
       if (!s.alive) continue;
       const d = this.getShipDisp(s.id);
       d.seen = this.frameNo;
-      if (s.attachedTo === 0) { d.x = s.x; d.y = s.y; }
+      if (s.attachedTo === 0) { d.x = s.x; d.y = s.y; d.mHost = 0; }
       if (dt > 0) {
         const k = 0.18;
         d.ax += ((s.vx - d.pvx) / dt - d.ax) * k;
@@ -818,24 +878,47 @@ export class GameRenderer implements IGameRenderer {
       else if (s.vx * s.vx + s.vy * s.vy > 50 * 50) d.thrustA = Math.atan2(s.vy, s.vx);
       else d.thrustA = s.angle;
     }
-    // turrets: render at interpolated host position + frozen offset formula (prevents jitter).
-    // Host radius can grow with talents (Titan), so estimate it from the snapshot separation.
+    // v0.5 turrets: domes ride the interpolated host on HARDPOINT_LAYOUT mounts (world.turretOffset's formula). The
+    // host's effective (capital-scaled, talents included) radius is recovered from the snapshot separation, and the
+    // local mount eases to its new hardpoint when turrets join or leave (the re-flow slides along the hull).
+    const o = this.tmpO;
+    const kf = 1 - Math.exp(-dt * 16);
     for (const s of frame.ships) {
       if (!s.alive || s.attachedTo === 0) continue;
       const d = this.ships.get(s.id)!;
       const host = this.shipById.get(s.attachedTo);
       const hd = this.ships.get(s.attachedTo);
+      d.fire = firePresetFor(turretFor(this.looks.get(s.playerId), s.shipClass), SHIP_CLASSES[s.shipClass].turret.id);
+      beamBus.turretFire.set(s.id, FIRE_CODE[d.fire.style]);
       if (host && hd && host.alive) {
-        const base = this.shipRadius(host);
-        const est = clamp(Math.hypot(s.x - host.x, s.y - host.y) - 12, base * 0.9, base * 1.6);
+        const n = Math.max(1, s.turretCount);
+        const base = this.shipRadius(host) * capitalScale(n);
+        const est = estimateHostRadius(Math.hypot(s.x - host.x, s.y - host.y), n, s.turretSlot, base * 0.9, base * 1.6, base);
         hd.hostR = hd.hostR ? hd.hostR + (est - hd.hostR) * 0.1 : est;
-        const o = turretOffset(host.angle, s.turretSlot, s.turretCount, hd.hostR);
-        d.x = hd.x + o.dx; d.y = hd.y + o.dy;
-      } else { d.x = s.x; d.y = s.y; }
+        const [ta, ts] = mountOf(n, s.turretSlot);
+        if (d.mHost !== s.attachedTo) { d.mHost = s.attachedTo; d.mA = ta; d.mS = ts; }
+        else { d.mA += (ta - d.mA) * kf; d.mS += (ts - d.mS) * kf; }
+        mountOffset(host.angle, d.mA, d.mS, hd.hostR, o);
+        d.x = hd.x + o.x; d.y = hd.y + o.y;
+        d.domeK = domeScale(hd.hostR);
+      } else { d.x = s.x; d.y = s.y; d.domeK = 1; }
+    }
+    // v0.5 capital morph: every free ship eases toward its capital state (offscreen too, so a ship scrolling in
+    // is already right); the transform FX / audio cue play in drawShips.
+    for (const s of frame.ships) {
+      if (!s.alive) continue;
+      const d = this.ships.get(s.id)!;
+      if (s.attachedTo) { if (d.morph.init) resetMorph(d.morph); d.hostR = 0; continue; }
+      const cap = s.turretCount > 0;
+      if (!cap) d.hostR = 0;
+      const base = this.shipRadius(s);
+      const want = cap ? (d.hostR > 0 ? d.hostR : base * capitalScale(s.turretCount)) / base : 1;
+      const ev = stepMorph(d.morph, cap, want, dt);
+      if (ev) d.morphEv = ev;
     }
     for (const [id, d] of this.ships) {
       if (d.seen === this.frameNo) continue;
-      this.shipLayer.removeChild(d.root);
+      d.root.removeFromParent();
       if (d.label) d.label.visible = false;
       if (d.title) d.title.visible = false;
       this.ships.delete(id);
@@ -843,10 +926,30 @@ export class GameRenderer implements IGameRenderer {
     }
   }
 
+  /** v0.5 per host: the docked turret whose dome is nearest the reticle (the only turret tag that may show). */
+  private readonly tagPick = new Map<EntityId, EntityId>();
+  private readonly tagPickD = new Map<EntityId, number>();
+
   private drawShips(frame: RenderFrame, t: number): void {
+    this.tagPick.clear();
+    this.tagPickD.clear();
+    for (const s of frame.ships) {
+      if (!s.alive || !s.attachedTo) continue;
+      const d = this.ships.get(s.id);
+      if (!d) continue;
+      const dist = Math.hypot(frame.aimX - d.x, frame.aimY - d.y);
+      if (dist < (this.tagPickD.get(s.attachedTo) ?? Infinity)) { this.tagPick.set(s.attachedTo, s.id); this.tagPickD.set(s.attachedTo, dist); }
+    }
     const local = this.shipById.get(frame.localShipId);
     const localTeam: TeamId = local ? local.team : (frame.players.get(frame.localPlayerId)?.team ?? -99);
     const g = this.dynG, o = this.overlayG;
+    this.bays.length = 0;
+    const bayR = SHIP_CLASSES.engineer.base.skill.bayRadius ?? 420;
+    for (const s of frame.ships) {
+      if (!s.alive || s.attachedTo || s.shipClass !== 'engineer') continue;
+      const d = this.ships.get(s.id);
+      if (d && d.bayUntil > t) this.bays.push({ id: s.id, x: d.x, y: d.y, r2: bayR * bayR, team: s.team });
+    }
     for (const s of frame.ships) {
       if (!s.alive) continue;
       const d = this.ships.get(s.id)!;
@@ -859,43 +962,98 @@ export class GameRenderer implements IGameRenderer {
       // Root-alpha rule (v0.3): cosmetic layers are multiplied by `alpha`, and nothing is emitted for a
       // non-ally below 0.2, so cloak and the invulnerability blink are never weakened.
       const fxOk = ally || alpha >= 0.2;
-      const visible = this.inView(d.x, d.y, 80 + Math.max(0, s.beamLen));
+      const turret = s.attachedTo !== 0;
+      // v0.5: docked turrets live on their own layer above every hull (domes sit ON the host)
+      const layer = turret ? this.turretLayer : this.shipLayer;
+      if (d.root.parent !== layer) layer.addChild(d.root);
+      const m = d.morph;
+      const r = this.shipRadius(s);
+      const rv = turret ? DOME_R * d.domeK : r * m.vis; // displayed radius (a dome shrinks on a small hull)
+      const visible = this.inView(d.x, d.y, 80 + rv + Math.max(0, s.beamLen) + (d.bayUntil > t ? 440 : 0));
       d.root.visible = visible;
       if (d.label) d.label.visible = false;
       if (d.title) d.title.visible = false;
-      if (!visible) continue;
-      const r = this.shipRadius(s);
       const color = this.shipColor(s);
       const accent = this.accentOf(s, color);
-      const turret = s.attachedTo !== 0;
-      const sc = turret ? 0.8 : 1;
+      if (!visible) {
+        // off screen: the transform is still heard (AudioFx range-checks the cue)
+        if (d.morphEv) { if (fxOk) publishCue(d.morphEv === 'up' ? CUE_CAP_UP : CUE_CAP_DOWN, d.x, d.y); d.morphEv = null; }
+        continue;
+      }
       const look = this.looks.get(s.playerId);
       const hullLook = hullFor(look, s.shipClass);
       const tLook = turret ? turretFor(look, s.shipClass) : null;
       const key = `${s.shipClass}|${color}|${s.pathIdx}|${turret ? 1 : 0}|${hullLook ? hullLook.id : ''}|${tLook ? tLook.id : ''}`;
       if (d.key !== key) {
-        d.hull.context = shipHull(s.shipClass, color, r, s.pathIdx, accent, turret, hullLook, tLook);
-        const nodeColor = s.shipClass === 'tech' && s.pathIdx === 0 ? accent : s.shipClass === 'engineer' ? 0xff4040 : color;
-        const aux = shipAux(s.shipClass, color, r, nodeColor);
-        d.aux.visible = !!aux;
-        if (aux) d.aux.context = aux;
+        if (turret) {
+          d.hull.context = domeBarrel(SHIP_CLASSES[s.shipClass].turret.id, color, tLook);
+          d.dome.context = domeBase(color, tLook ? tLook.p.accent : null);
+          d.auxOn = false;
+        } else {
+          d.hull.context = shipHull(s.shipClass, color, r, s.pathIdx, accent, false, hullLook, null);
+          const aux = shipAux(s.shipClass, color, r, this.nodeColor(s, color, accent));
+          d.auxOn = !!aux;
+          if (aux) d.aux.context = aux;
+        }
         d.key = key;
+        d.capKey = '';
       }
-      d.root.position.set(d.x, d.y);
+      const capOn = !turret && (m.capital || m.capA > 0.001);
+      if (capOn && d.capKey !== key) {
+        d.cap.context = capitalHull(s.shipClass, color, r * CAP_REF, s.pathIdx, accent, hullLook);
+        const ca = capitalAux(s.shipClass, color, r * CAP_REF, this.nodeColor(s, color, accent));
+        d.capAuxOn = !!ca;
+        if (ca) d.capAux.context = ca;
+        d.capKey = key;
+      }
+      // v0.5 capital transform (first turret docked / last one left): flash + rings + white silhouette + audio cue
+      if (d.morphEv) {
+        const ev = d.morphEv;
+        d.morphEv = null;
+        if (fxOk) {
+          this.capitalTransformFx(s, d, ev, color);
+          publishCue(ev === 'up' ? CUE_CAP_UP : CUE_CAP_DOWN, d.x, d.y);
+        }
+      }
+      const capA = turret ? 0 : m.capA;
+      const recoil = turret ? d.kick * Math.max(0, 1 - (t - d.kickT) / 0.16) ** 2 : 0;
+      const ca0 = Math.cos(s.angle), sa0 = Math.sin(s.angle);
+      d.root.position.set(d.x - ca0 * recoil * 0.5, d.y - sa0 * recoil * 0.5);
+      d.dome.visible = turret;
+      d.hull.visible = turret || capA < 0.999;
       d.hull.rotation = s.angle;
-      d.hull.scale.set(sc);
+      d.hull.alpha = 1 - capA;
+      if (turret) {
+        d.hull.scale.set(d.domeK);
+        d.dome.scale.set(d.domeK);
+        d.hull.position.set(-ca0 * recoil * 1.2 * d.domeK, -sa0 * recoil * 1.2 * d.domeK);
+      } else {
+        d.hull.scale.set(m.vis);
+        d.hull.position.set(0, 0);
+      }
+      d.cap.visible = capOn && capA > 0.001;
+      if (d.cap.visible) { d.cap.rotation = s.angle; d.cap.scale.set(m.vis / CAP_REF); d.cap.alpha = capA; }
+      d.aux.visible = d.auxOn && !turret && capA < 0.999;
       if (d.aux.visible) {
         d.aux.rotation = s.angle;
-        if (s.shipClass === 'tech') d.aux.scale.set(sc, sc * (1 + 0.08 * Math.sin(t * 3 + s.id)));
-        else { d.aux.scale.set(sc); d.aux.alpha = Math.floor(t * 2 + s.id) % 2 ? 1 : 0.25; }
+        if (s.shipClass === 'tech') { d.aux.scale.set(m.vis, m.vis * (1 + 0.08 * Math.sin(t * 3 + s.id))); d.aux.alpha = 1 - capA; }
+        else { d.aux.scale.set(m.vis); d.aux.alpha = (Math.floor(t * 2 + s.id) % 2 ? 1 : 0.25) * (1 - capA); }
+      }
+      d.capAux.visible = d.cap.visible && d.capAuxOn;
+      if (d.capAux.visible) {
+        const k = m.vis / CAP_REF;
+        d.capAux.rotation = s.angle;
+        if (s.shipClass === 'tech') { d.capAux.scale.set(k * (1 + 0.05 * Math.sin(t * 2.4 + s.id)), k * (1 + 0.08 * Math.sin(t * 3 + s.id))); d.capAux.alpha = capA; }
+        else { d.capAux.scale.set(k); d.capAux.alpha = (Math.floor(t * 3 + s.id) % 2 ? 1 : 0.3) * capA; }
       }
       const charging = (s.flags & SHIPFLAG_CHARGING) !== 0;
       d.root.alpha = alpha;
 
-      // ambient glow
-      d.glow.tint = charging ? mix(accent, 0xffa030, 0.5) : color;
-      d.glow.alpha = charging ? 0.6 + 0.2 * Math.sin(t * 30) : 0.22;
-      d.glow.scale.set((r / 32) * (charging ? 3.4 : 2.3) * sc);
+      // ambient glow (+ the transform flash, the Overcharge white-gold)
+      const oc = !turret && s.shipClass === 'tech' && capA > 0.5 && d.ocUntil > t;
+      d.glow.tint = oc ? 0xfff0c0 : charging ? mix(accent, 0xffa030, 0.5) : m.flash > 0 ? mix(color, 0xffffff, m.flash * 0.7) : color;
+      d.glow.alpha = oc ? 0.5 + 0.15 * Math.sin(t * 11) : charging ? 0.6 + 0.2 * Math.sin(t * 30) : (turret ? 0.3 : 0.22) + 0.35 * m.flash;
+      d.glow.scale.set((rv / 32) * (oc ? 3.1 : charging ? 3.4 : turret ? 2.6 : 2.3) * (1 + 0.4 * m.flash));
 
       // thruster (engine cosmetic: flame tint / twin / wide + particle preset)
       const thr = (s.flags & SHIPFLAG_THRUSTING) !== 0 && !turret;
@@ -906,44 +1064,50 @@ export class GameRenderer implements IGameRenderer {
         const eng = look.engine;
         const fl = (ab ? 1.5 : 0.85) * (0.8 + Math.random() * 0.35);
         const wide = eng.flame === 'wide', twin = eng.flame === 'twin';
-        const bx = -Math.cos(d.thrustA) * r * 0.7, by = -Math.sin(d.thrustA) * r * 0.7;
-        const fx = fl * (r / 20) * (wide ? 0.9 : 1), fy = (ab ? 0.9 : 0.6) * (r / 20) * (wide ? 1.5 : twin ? 0.62 : 1);
+        const bx = -Math.cos(d.thrustA) * rv * 0.7, by = -Math.sin(d.thrustA) * rv * 0.7;
+        const fx = fl * (rv / 20) * (wide ? 0.9 : 1), fy = (ab ? 0.9 : 0.6) * (rv / 20) * (wide ? 1.5 : twin ? 0.62 : 1);
         const ft = engineFlameTint(color, eng, ab);
         if (twin) {
-          const px = -Math.sin(d.thrustA) * r * 0.3, py = Math.cos(d.thrustA) * r * 0.3;
+          const px = -Math.sin(d.thrustA) * rv * 0.3, py = Math.cos(d.thrustA) * rv * 0.3;
           poseFlame(d.flame, bx + px, by + py, d.thrustA, fx, fy, ft);
           poseFlame(d.flame2, bx - px, by - py, d.thrustA, fx, fy, ft);
         } else poseFlame(d.flame, bx, by, d.thrustA, fx, fy, ft);
         if (fxOk) {
           emitEngine(this.trails, this.atlas, eng, look.engineAccent, {
-            x: d.x, y: d.y, dir: d.thrustA, vx: s.vx, vy: s.vy, r, ab, team: color, alpha, density: this.density, time: t,
+            x: d.x, y: d.y, dir: d.thrustA, vx: s.vx, vy: s.vy, r: rv, ab, team: color, alpha, density: this.density, time: t,
           });
         }
       }
 
-      // path flourishes
-      if (fxOk && s.shipClass === 'tech' && s.pathIdx === 0 && Math.random() < 0.25 * this.density) {
+      // path flourishes (the base Arcanist only: the Spire's nodes are its outrigger shards)
+      if (fxOk && !turret && capA < 0.5 && s.shipClass === 'tech' && s.pathIdx === 0 && Math.random() < 0.25 * this.density) {
         const [nx, ny] = TECH_NODES[(Math.random() * 4) | 0];
         const ca = Math.cos(s.angle), sa = Math.sin(s.angle);
-        const px = d.x + (nx * ca - ny * sa) * r * sc, py = d.y + (nx * sa + ny * ca) * r * sc;
+        const px = d.x + (nx * ca - ny * sa) * rv, py = d.y + (nx * sa + ny * ca) * rv;
         this.fx.spawn({ tex: this.atlas.dot, x: px, y: py, vx: rand(-60, 60), vy: rand(-60, 60), life: 0.12, color: brighten(accent, 0.4), s0: 0.35, s1: 0 });
         if (Math.random() < 0.3) this.lines.push({ pts: [px, py, d.x + rand(-4, 4), d.y + rand(-4, 4)], t: 0, life: 0.06, color: accent, width: 1.2 });
       }
-      if (fxOk && s.shipClass === 'tech' && s.pathIdx === 1 && Math.random() < 0.3 * this.density) {
-        const a = rand(0, TAU), rr = r * 1.6;
+      if (fxOk && !turret && s.shipClass === 'tech' && s.pathIdx === 1 && Math.random() < 0.3 * this.density) {
+        const a = rand(0, TAU), rr = rv * 1.6;
         this.fx.spawn({ tex: this.atlas.dot, x: d.x + Math.cos(a) * rr, y: d.y + Math.sin(a) * rr, vx: -Math.cos(a) * rr * 3, vy: -Math.sin(a) * rr * 3,
           life: 0.3, color: VOID_COLOR, s0: 0.3, s1: 0.05, alpha: 0.8 });
       }
 
       // Ram Charge: shockwave cone + motion-blur afterimages + streaks
-      if (charging) this.drawCharge(s, d, r, accent, t);
+      if (charging) this.drawCharge(s, d, rv, accent, t);
 
-      // Iron Hide shell (any absorb shield)
-      if (s.flags & SHIPFLAG_SHIELD) this.drawIronHide(d, r * sc, t, alpha);
+      // Iron Hide shell (any absorb shield); v0.5 a Repair Bay's shield is drawn green
+      const bayed = this.bays.length > 0 && this.inBay(s, d);
+      if (s.flags & SHIPFLAG_SHIELD) this.drawIronHide(d, rv, t, alpha, bayed ? BAY_SHIELD : STEEL);
+      // v0.5 a ship the bay covers wears a pale-green rim, so an ally can tell it is inside the field
+      else if (bayed && fxOk) g.circle(d.x, d.y, rv + 4).stroke({ width: 1.6, color: BAY_SHIELD, alpha: (0.45 + 0.2 * Math.sin(t * 6 + s.id)) * alpha });
+
+      // v0.5 capital skill FX (Overcharge / Repair Bay / Broadside afterglow)
+      if (!turret && capA > 0.5 && fxOk) this.drawCapitalFx(s, d, rv, t, alpha);
 
       // local highlight ring (dashed, rotating)
       if (isLocal) {
-        const rr = r * sc + 18;
+        const rr = rv + (turret ? 9 : 18);
         for (let i = 0; i < 4; i++) {
           const a0 = t * 0.9 + (i * TAU) / 4;
           g.moveTo(d.x + Math.cos(a0) * rr, d.y + Math.sin(a0) * rr).arc(d.x, d.y, rr, a0, a0 + 0.9);
@@ -951,18 +1115,11 @@ export class GameRenderer implements IGameRenderer {
         g.stroke({ width: 1.3, color: brighten(color, 0.5), alpha: 0.4 });
       }
 
-      // turret tether + docking clamp (turret cosmetic: line / dashed / lightning)
-      if (turret) {
-        const hd = this.ships.get(s.attachedTo);
-        if (hd && fxOk) this.drawTetherLink(hd, d, s, color, r * sc, t, alpha, tLook);
-      } else if (s.turretCount > 0) {
-        for (let i = 0; i < s.turretCount; i++) {
-          o.circle(d.x + r + 10, d.y - r - 8 - i * 5, 3.2).stroke({ width: 1.2, color, alpha: 0.9 });
-        }
-      }
+      // v0.5 hardpoint glow (the turret cosmetic's tether style: solid / dashed / crackling ring around the dome)
+      if (turret && fxOk) this.drawHardpointLink(d, s, color, t, alpha, tLook);
 
       // beams
-      if (s.beamLen > 0) this.drawBeam(s, d, r * sc, t, tLook, alpha);
+      if (s.beamLen > 0) this.drawBeam(s, d, rv, t, tLook, alpha, turret ? (BARREL_LEN - recoil * 1.2) * d.domeK : rv * 1.2);
 
       // orbit blades
       if (s.orbitals > 0) {
@@ -985,19 +1142,19 @@ export class GameRenderer implements IGameRenderer {
       // energy arc (overlay, not bloomed) — skipped on other players' turrets to reduce stack clutter
       const ef = clamp(s.energyFrac, 0, 1);
       if (!turret || isLocal) {
-      const er = r * sc + 7;
-      const a0 = Math.PI * 0.2, span = Math.PI * 0.6;
-      o.moveTo(d.x + Math.cos(a0) * er, d.y + Math.sin(a0) * er).arc(d.x, d.y, er, a0, a0 + span)
-        .stroke({ width: 2.4, color: 0x000000, alpha: 0.35 * alpha });
-      if (ef > 0.01) {
-        const aa = a0 + span * (1 - ef);
-        o.moveTo(d.x + Math.cos(aa) * er, d.y + Math.sin(aa) * er).arc(d.x, d.y, er, aa, a0 + span)
-          .stroke({ width: 2, color: energyColor(ef), alpha: 0.85 * Math.max(alpha, 0.3) });
-      }
+        const er = rv + (turret ? 5 : 7);
+        const a0 = Math.PI * 0.2, span = Math.PI * 0.6;
+        o.moveTo(d.x + Math.cos(a0) * er, d.y + Math.sin(a0) * er).arc(d.x, d.y, er, a0, a0 + span)
+          .stroke({ width: 2.4, color: 0x000000, alpha: 0.35 * alpha });
+        if (ef > 0.01) {
+          const aa = a0 + span * (1 - ef);
+          o.moveTo(d.x + Math.cos(aa) * er, d.y + Math.sin(aa) * er).arc(d.x, d.y, er, aa, a0 + span)
+            .stroke({ width: 2, color: energyColor(ef), alpha: 0.85 * Math.max(alpha, 0.3) });
+        }
       }
 
       if (s.id === frame.attachCandidateId) {
-        const b = r + 14 + Math.sin(t * 8) * 3, L = 7;
+        const b = rv + 14 + Math.sin(t * 8) * 3, L = 7;
         o.moveTo(d.x - b, d.y - b + L).lineTo(d.x - b, d.y - b).lineTo(d.x - b + L, d.y - b)
           .moveTo(d.x + b - L, d.y - b).lineTo(d.x + b, d.y - b).lineTo(d.x + b, d.y - b + L)
           .moveTo(d.x + b, d.y + b - L).lineTo(d.x + b, d.y + b).lineTo(d.x + b - L, d.y + b)
@@ -1005,7 +1162,12 @@ export class GameRenderer implements IGameRenderer {
           .stroke({ width: 2, color: 0x6bff9a, alpha: 0.9 });
       }
 
-      if (!isLocal && alpha > 0.1 && !turret) {
+      // nameplate: free ships always; a docked turret only while the reticle is on its dome, and only the nearest
+      // dome of its host (so a capital never stacks five tags over its hull)
+      const tagA = turret
+        ? (this.tagPick.get(s.attachedTo) === s.id ? turretTagAlpha(Math.hypot(frame.aimX - d.x, frame.aimY - d.y)) : 0)
+        : 1;
+      if (!isLocal && alpha > 0.1 && tagA > 0) {
         const info = frame.players.get(s.playerId);
         const str = `${info?.name ?? 'Pilot ' + s.playerId}  ${s.level}`;
         if (!d.label) {
@@ -1020,13 +1182,13 @@ export class GameRenderer implements IGameRenderer {
         if (d.labelStr !== str) { d.label.text = str; d.labelStr = str; }
         d.label.tint = brighten(color, 0.35);
         d.label.visible = true;
-        d.label.alpha = Math.min(1, alpha + 0.2) * 0.9;
-        d.label.position.set(d.x, d.y + r + 12);
-        const ls = 1 / Math.max(0.75, this.zoom);
+        d.label.alpha = Math.min(1, alpha + 0.2) * 0.9 * tagA;
+        d.label.position.set(d.x, d.y + rv + (turret ? 5 : 12));
+        const ls = (1 / Math.max(0.75, this.zoom)) * (turret ? 0.8 : 1);
         d.label.scale.set(ls);
         // v0.3 title (cosmetic): pooled Text under the nameplate, multiplied by the root alpha
         const tt = look.titleText;
-        if (tt && look.title && fxOk) {
+        if (!turret && tt && look.title && fxOk) {
           if (!d.title) {
             d.title = new Text({
               text: tt,
@@ -1040,39 +1202,142 @@ export class GameRenderer implements IGameRenderer {
           d.title.tint = look.title.color;
           d.title.visible = true;
           d.title.alpha = alpha * 0.85;
-          d.title.position.set(d.x, d.y + r + 12 + 14 * ls);
+          d.title.position.set(d.x, d.y + rv + 12 + 14 * ls);
           d.title.scale.set(ls);
         }
       }
     }
   }
 
-  /** Turret → host link. Style from the turret's cosmetic (line / dashed / lightning); team colour, × root alpha. */
-  private drawTetherLink(hd: ShipDisp, d: ShipDisp, s: ShipView, color: number, rr: number, t: number, alpha: number, look: TurretLook | null): void {
+  /** Aux node colour (Arcanist Storm nodes take the path accent; the Artificer's beacons are red). */
+  private nodeColor(s: ShipView, color: number, accent: number): number {
+    return s.shipClass === 'tech' && s.pathIdx === 0 ? accent : s.shipClass === 'engineer' ? 0xff4040 : color;
+  }
+
+  /**
+   * v0.5 hardpoint glow around a docked dome, styled by the turret cosmetic's tether (solid / dashed / crackling);
+   * replaces the v0.2 tether line (the dome now sits on the hull). Team colour, × root alpha.
+   */
+  private drawHardpointLink(d: ShipDisp, s: ShipView, color: number, t: number, alpha: number, look: TurretLook | null): void {
     const g = this.dynG;
-    const pulse = 0.5 + 0.5 * Math.sin(t * 10 + s.turretSlot);
+    const pulse = 0.5 + 0.5 * Math.sin(t * 6 + s.turretSlot * 1.3);
     const style = look ? look.p.tether : 'line';
-    const hx = hd.x, hy = hd.y, tx = d.x, ty = d.y;
-    const dx = tx - hx, dy = ty - hy, len = Math.hypot(dx, dy) || 1;
+    const R = DOME_R * d.domeK + 3.5, x = d.x, y = d.y;
+    const c = brighten(color, 0.55);
     if (style === 'dashed') {
-      const ux = dx / len, uy = dy / len, dash = 6, gap = 4, off = (t * 30) % (dash + gap);
-      for (let u = -off; u < len; u += dash + gap) {
-        const u0 = Math.max(0, u), u1 = Math.min(len, u + dash);
-        if (u1 > u0) g.moveTo(hx + ux * u0, hy + uy * u0).lineTo(hx + ux * u1, hy + uy * u1);
+      const rot = t * 2.2 + s.turretSlot;
+      for (let i = 0; i < 6; i++) {
+        const a0 = rot + (i * TAU) / 6;
+        g.moveTo(x + Math.cos(a0) * R, y + Math.sin(a0) * R).arc(x, y, R, a0, a0 + TAU / 12);
       }
-      g.stroke({ width: 1.6, color: brighten(color, 0.6), alpha: (0.6 + 0.3 * pulse) * alpha });
+      g.stroke({ width: 1.3, color: c, alpha: (0.35 + 0.3 * pulse) * alpha });
     } else if (style === 'lightning') {
-      const nx = -dy / len, ny = dx / len, n = Math.max(3, Math.round(len / 9));
-      g.moveTo(hx, hy);
-      for (let k = 1; k < n; k++) { const f = k / n, j = rand(-3.5, 3.5); g.lineTo(hx + dx * f + nx * j, hy + dy * f + ny * j); }
-      g.lineTo(tx, ty);
-      g.stroke({ width: 1.3, color: brighten(color, 0.6), alpha: (0.6 + 0.35 * pulse) * alpha });
+      const n = 12;
+      g.moveTo(x + R, y);
+      for (let k = 1; k <= n; k++) {
+        const a = (k / n) * TAU, j = k === n ? 0 : rand(-1.8, 1.8);
+        g.lineTo(x + Math.cos(a) * (R + j), y + Math.sin(a) * (R + j));
+      }
+      g.stroke({ width: 1.1, color: c, alpha: (0.3 + 0.35 * pulse) * alpha });
     } else {
-      g.moveTo(hx, hy).lineTo(tx, ty).stroke({ width: 1.2, color: brighten(color, 0.6), alpha: (0.55 + 0.3 * pulse) * alpha });
+      g.circle(x, y, R).stroke({ width: 1.1, color: c, alpha: (0.22 + 0.22 * pulse) * alpha });
     }
-    g.moveTo(hx, hy).lineTo(tx, ty).stroke({ width: 4, color, alpha: (0.12 + 0.08 * pulse) * alpha });
-    g.circle((hx + tx) / 2, (hy + ty) / 2, 2.2).fill({ color: look ? look.p.accent : 0xffffff, alpha: (0.7 + 0.3 * pulse) * alpha });
-    g.circle(tx, ty, rr + 4).stroke({ width: 1, color, alpha: 0.35 * alpha });
+    if (look) {
+      const a = t * 3 + s.turretSlot * 2.1;
+      g.circle(x + Math.cos(a) * R, y + Math.sin(a) * R, 1.4).fill({ color: look.p.accent, alpha: 0.85 * alpha });
+    }
+  }
+
+  /** v0.5: the capital transform (up: implode ring + flash + white silhouette; down: the hull folds back). */
+  private capitalTransformFx(s: ShipView, d: ShipDisp, ev: 'up' | 'down', color: number): void {
+    const x = d.x, y = d.y, base = this.shipRadius(s);
+    const A = this.atlas;
+    if (ev === 'up') {
+      const R = base * Math.max(1, d.morph.to);
+      this.ring(x, y, R * 2.6, R * 1.05, 0.3, brighten(color, 0.6), 3, s.id);
+      this.ring(x, y, R * 0.8, R * 2.1, 0.42, color, 2, s.id);
+      this.burst(x, y, 18, color, 90, 320, 0.4, 0.45);
+      this.burst(x, y, 8, 0xffffff, 60, 220, 0.3, 0.35, { tex: A.dot, flags: 0, drag: 3 });
+      this.flash(x, y, R / 34, 0xffffff, 0.18, 0.45);
+      if (d.capKey) this.spawnGhost(d.cap.context, x, y, s.angle, d.morph.to / CAP_REF, 0.3, 0.35, 0xffffff);
+      this.grid?.impulse(x, y, 170, 380);
+    } else {
+      const R = base * Math.max(1, d.morph.from);
+      this.ring(x, y, R, R * 2.2, 0.35, brighten(color, 0.4), 2.5, s.id);
+      this.burst(x, y, 14, mix(color, STEEL, 0.5), 80, 260, 0.35, 0.4);
+      this.flash(x, y, R / 30, color, 0.16, 0.6);
+      this.grid?.impulse(x, y, 130, -240);
+    }
+  }
+
+  /** v0.5 capital skill FX while active: Overcharge (Spire), Repair Bay (Foundry), Broadside gunport afterglow. */
+  private drawCapitalFx(s: ShipView, d: ShipDisp, rv: number, t: number, alpha: number): void {
+    const g = this.dynG, x = d.x, y = d.y;
+    const ca = Math.cos(s.angle), sa = Math.sin(s.angle);
+    if (s.shipClass === 'tech' && d.ocUntil > t) {
+      const k = clamp((d.ocUntil - t) / 0.4, 0, 1); // fade over the last 0.4 s
+      const rot = t * 2.6;
+      for (let i = 0; i < 6; i++) {
+        const a0 = rot + (i * TAU) / 6;
+        g.moveTo(x + Math.cos(a0) * rv * 1.22, y + Math.sin(a0) * rv * 1.22).arc(x, y, rv * 1.22, a0, a0 + 0.6);
+      }
+      g.stroke({ width: 2, color: 0xffe6a0, alpha: 0.75 * k * alpha });
+      for (let i = 0; i < 3; i++) {
+        const a0 = -rot * 1.4 + (i * TAU) / 3;
+        g.moveTo(x + Math.cos(a0) * rv * 0.62, y + Math.sin(a0) * rv * 0.62).arc(x, y, rv * 0.62, a0, a0 + 1.2);
+      }
+      g.stroke({ width: 1.4, color: 0xffffff, alpha: 0.7 * k * alpha });
+      if (Math.random() < 0.5 * this.density) {
+        const a = rand(0, TAU);
+        this.fx.spawn({ tex: this.atlas.dot, x: x + Math.cos(a) * rv * 1.2, y: y + Math.sin(a) * rv * 1.2, vx: Math.cos(a) * 40, vy: Math.sin(a) * 40 - 30,
+          life: 0.4, color: Math.random() < 0.5 ? 0xffe6a0 : 0xffffff, s0: 0.3, s1: 0, alpha: 0.9 * alpha });
+      }
+    }
+    if (s.shipClass === 'engineer' && d.bayUntil > t) {
+      const k = clamp((d.bayUntil - t) / 0.4, 0, 1);
+      const R = SHIP_CLASSES.engineer.base.skill.bayRadius ?? 420;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 5);
+      // the edge must read at gameplay zoom (the field is ~420 px): a bright rim, an inner glow band, and chevrons
+      // pointing in, so an ally can tell which side of it they are on
+      g.circle(x, y, R).fill({ color: HEAL_COLOR, alpha: 0.045 * k });
+      g.circle(x, y, R - 7).stroke({ width: 12, color: HEAL_COLOR, alpha: 0.1 * k * alpha });
+      g.circle(x, y, R).stroke({ width: 3.4, color: HEAL_COLOR, alpha: (0.5 + 0.3 * pulse) * k * alpha });
+      const sw = t * 2.2;
+      g.moveTo(x + Math.cos(sw) * R, y + Math.sin(sw) * R).arc(x, y, R, sw, sw + 0.5).stroke({ width: 6, color: 0xd8ffe4, alpha: 0.45 * k * alpha });
+      const rot = t * 0.35;
+      for (let i = 0; i < 12; i++) {
+        const a = rot + (i * TAU) / 12, c1 = Math.cos(a), s1 = Math.sin(a), px = -s1, py = c1;
+        const ox = x + c1 * (R - 8), oy = y + s1 * (R - 8), ix = x + c1 * (R - 22), iy = y + s1 * (R - 22);
+        g.moveTo(ox + px * 7, oy + py * 7).lineTo(ix, iy).lineTo(ox - px * 7, oy - py * 7);
+      }
+      g.stroke({ width: 2, color: 0xd8ffe4, alpha: (0.35 + 0.2 * pulse) * k * alpha, cap: 'round', join: 'round' });
+      // bay lights chase fore → aft in green
+      const L = CAPITAL_GEOM.engineer.lights, step = Math.floor(t * 12);
+      for (let i = 0; i < L.length; i++) {
+        if ((i + step) % 4 === 0) continue;
+        const [ux, uy] = L[i];
+        g.circle(x + (ux * ca - uy * sa) * rv, y + (ux * sa + uy * ca) * rv, 1.9);
+      }
+      g.fill({ color: HEAL_COLOR, alpha: 0.95 * k * alpha });
+      if (Math.random() < 0.6 * this.density) {
+        const a = rand(0, TAU), q = Math.sqrt(Math.random()) * R * 0.95;
+        this.fx.spawn({ tex: this.atlas.plus, x: x + Math.cos(a) * q, y: y + Math.sin(a) * q, vy: rand(-50, -25), life: 0.8,
+          color: HEAL_COLOR, s0: 0.32, s1: 0.12, alpha: 0.8 * alpha });
+      }
+    }
+    if (s.shipClass === 'brute') {
+      const age = t - d.broadT;
+      if (age >= 0 && age < 0.5) {
+        const P = CAPITAL_GEOM.brute.ports;
+        for (let i = 0; i < P.length; i++) {
+          const f = clamp(1 - (age - (i % 4) * 0.03) / 0.45, 0, 1);
+          if (f <= 0) continue;
+          const [ux, uy] = P[i];
+          const ty = uy + Math.sign(uy) * 0.07;
+          g.circle(x + (ux * ca - ty * sa) * rv, y + (ux * sa + ty * ca) * rv, 2.2 + 2 * f).fill({ color: 0xffb060, alpha: 0.8 * f * alpha });
+        }
+      }
+    }
   }
 
   private drawCharge(s: ShipView, d: ShipDisp, r: number, accent: number, t: number): void {
@@ -1097,7 +1362,8 @@ export class GameRenderer implements IGameRenderer {
     d.ghostT -= 1;
     if (d.ghostT <= 0) {
       d.ghostT = 2;
-      this.spawnGhost(d.hull.context, d.x, d.y, s.angle, d.hull.scale.x, 0.22, 0.55, c);
+      const capG = d.cap.visible && d.cap.alpha > 0.5;
+      this.spawnGhost(capG ? d.cap.context : d.hull.context, d.x, d.y, s.angle, capG ? d.cap.scale.x : d.hull.scale.x, 0.22, 0.55, c);
     }
     // speed streaks
     const n = Math.ceil(3 * this.density);
@@ -1111,20 +1377,29 @@ export class GameRenderer implements IGameRenderer {
     }
   }
 
-  private drawIronHide(d: ShipDisp, r: number, t: number, alpha: number): void {
+  /** v0.5: is this shielded ship covered by an active Repair Bay (docked on it, or an ally inside its field)? */
+  private inBay(s: ShipView, d: ShipDisp): boolean {
+    for (const b of this.bays) {
+      if (s.attachedTo === b.id) return true;
+      if (s.id !== b.id && s.team === b.team && s.team >= 0 && (d.x - b.x) ** 2 + (d.y - b.y) ** 2 <= b.r2) return true;
+    }
+    return false;
+  }
+
+  private drawIronHide(d: ShipDisp, r: number, t: number, alpha: number, color = STEEL): void {
     const g = this.dynG;
-    const rr = r + 9;
+    const rr = r + (r < 12 ? 5 : 9);
     const rot = t * 0.6;
     for (let i = 0; i < 6; i++) {
       const a0 = rot + (i * TAU) / 6 + 0.08, a1 = a0 + TAU / 6 - 0.16;
       g.moveTo(d.x + Math.cos(a0) * rr, d.y + Math.sin(a0) * rr).arc(d.x, d.y, rr, a0, a1);
     }
-    g.stroke({ width: 9, color: STEEL, alpha: 0.12 * alpha });
+    g.stroke({ width: 9, color, alpha: 0.12 * alpha });
     for (let i = 0; i < 6; i++) {
       const a0 = rot + (i * TAU) / 6 + 0.08, a1 = a0 + TAU / 6 - 0.16;
       g.moveTo(d.x + Math.cos(a0) * rr, d.y + Math.sin(a0) * rr).arc(d.x, d.y, rr, a0, a1);
     }
-    g.stroke({ width: 3.5, color: STEEL, alpha: 0.75 * alpha, cap: 'butt' });
+    g.stroke({ width: 3.5, color, alpha: 0.75 * alpha, cap: 'butt' });
     // rivets + moving glint
     for (let i = 0; i < 6; i++) {
       const a = rot + (i * TAU) / 6 + TAU / 12;
@@ -1137,8 +1412,12 @@ export class GameRenderer implements IGameRenderer {
     g.circle(d.x, d.y, rr - 4).fill({ color: SHIELD_COLOR, alpha: 0.04 });
   }
 
-  /** Laser Lance (resonance-scaled) or Hull Weld beam. `look` adds the cosmetic fringe (never the core). */
-  private drawBeam(s: ShipView, d: ShipDisp, r: number, t: number, look: TurretLook | null = null, alpha = 1): void {
+  /**
+   * Laser Lance (resonance-scaled) or Hull Weld beam. `look` adds the cosmetic fringe and the v0.5 fire preset its core
+   * overlay (never the core itself); `muzzle` = where the beam leaves the ship (a dome's barrel tip). An Overcharged
+   * host (Spire) thickens its lasers with a white-gold halo on top.
+   */
+  private drawBeam(s: ShipView, d: ShipDisp, r: number, t: number, look: TurretLook | null = null, alpha = 1, muzzle = r * 1.2): void {
     const g = this.dynG;
     if (s.beamKind === BEAM_WELD) {
       const hd = s.attachedTo ? this.ships.get(s.attachedTo) : undefined;
@@ -1171,25 +1450,29 @@ export class GameRenderer implements IGameRenderer {
     }
     if (s.beamKind !== BEAM_LASER) return;
     const res = Math.max(1, s.resonance || 1);
-    const p = Math.pow(LASER_RESONANCE, res - 1); // 1, 1.5, 2.25, 3.375 ...
+    const flick = 0.88 + Math.random() * 0.24;
+    // widths follow resonance up to LASER_VIS_RES_CAP (capital.ts); past it the extra shows as heat, not width
+    const bl = laserBeamLook(res, flick);
+    const p = bl.p; // 1, 1.5, 2.25, 3.375 (capped)
     const heat = clamp((res - 1) / 2.5, 0, 1);
     const a = s.angle, ca = Math.cos(a), sa = Math.sin(a);
-    const sx = d.x + ca * r * 1.2, sy = d.y + sa * r * 1.2;
+    const sx = d.x + ca * muzzle, sy = d.y + sa * muzzle;
     const ex = d.x + ca * s.beamLen, ey = d.y + sa * s.beamLen;
-    const flick = 0.88 + Math.random() * 0.24;
     const outerC = mix(LASER_COLD, 0xe8c8ff, heat * 0.65);
     const midC = mix(0x6ff0ff, 0xffffff, heat * 0.55);
-    const outerW = 4 * Math.pow(p, 1.15) * flick; // 4, 6.3, 10.2, 16.2 px …
-    g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: outerW * 1.7, color: outerC, alpha: 0.05 + 0.05 * heat, cap: 'round' });
-    g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: outerW, color: outerC, alpha: 0.16 + 0.1 * heat, cap: 'round' });
-    g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: 1.8 * p * flick, color: midC, alpha: 0.7 + 0.2 * heat, cap: 'round' });
-    g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: Math.max(0.8, 0.7 * Math.pow(p, 0.9)), color: 0xffffff, alpha: 0.95, cap: 'round' });
+    const outerW = bl.outerW; // 4, 6.3, 10.2, 16.2 px (capped)
+    g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: bl.glowW, color: outerC, alpha: (0.05 + 0.05 * heat) * bl.stack, cap: 'round' });
+    g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: outerW, color: outerC, alpha: (0.16 + 0.1 * heat) * bl.stack, cap: 'round' });
+    g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: bl.midW, color: midC, alpha: 0.7 + 0.2 * heat, cap: 'round' });
+    // past the cap the white core throbs (resonance 5 / 6 read as hotter, not wider)
+    const throb = bl.over > 0 ? 1 + 0.45 * bl.over * Math.abs(Math.sin(t * 26 + s.id)) : 1;
+    g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: bl.coreW * throb, color: 0xffffff, alpha: 0.95, cap: 'round' });
     // crackle filaments at high resonance
-    if (res >= 3) {
+    if (bl.strands > 0) {
       const nx = -sa, ny = ca;
-      const len = s.beamLen - r * 1.2;
+      const len = s.beamLen - muzzle;
       const segs = Math.max(4, Math.round(len / 40));
-      for (let strand = 0; strand < res - 2; strand++) {
+      for (let strand = 0; strand < bl.strands; strand++) {
         g.moveTo(sx, sy);
         for (let k = 1; k <= segs; k++) {
           const f = k / segs, j = k === segs ? 0 : rand(-1, 1) * outerW * 0.7;
@@ -1199,11 +1482,21 @@ export class GameRenderer implements IGameRenderer {
       }
     }
     // v0.3 cosmetic fringe (accent). The core strokes above keep their resonance width/alpha untouched.
-    if (look && look.p.beam !== 'std' && (d.ally || alpha >= 0.2)) this.drawBeamFringe(look, sx, sy, ca, sa, s.beamLen - r * 1.2, outerW, res, heat, t, alpha);
+    const fxOk = d.ally || alpha >= 0.2;
+    if (look && look.p.beam !== 'std' && fxOk) this.drawBeamFringe(look, sx, sy, ca, sa, s.beamLen - muzzle, outerW, res, heat, t, alpha);
+    // v0.5 fire preset core overlay (pulse beads / helix strands / sun lance) + the Overcharge halo
+    const fp = d.fire;
+    if (fp && fp.beam !== 'solid' && fxOk) this.drawBeamTex(fp, look ? look.p.accent : outerC, sx, sy, ca, sa, s.beamLen - muzzle, outerW, res, t, alpha);
+    const hd = s.attachedTo ? this.ships.get(s.attachedTo) : undefined;
+    if (hd && hd.ocUntil > this.now && fxOk) {
+      const k = clamp((hd.ocUntil - this.now) / 0.4, 0, 1);
+      g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: bl.haloW, color: 0xffe6a0, alpha: 0.13 * k * alpha * bl.stack, cap: 'round' });
+      g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: 1.2 + 1.4 * p, color: 0xfff4d8, alpha: 0.55 * k * alpha, cap: 'round' });
+    }
     // muzzle + endpoint
     this.fx.spawn({ tex: this.atlas.soft, x: sx, y: sy, life: 0.04, color: midC, s0: 0.2 * Math.pow(p, 0.7), s1: 0.15 * Math.pow(p, 0.7), alpha: 0.7 });
     this.fx.spawn({ tex: this.atlas.soft, x: ex, y: ey, life: 0.05, color: outerC, s0: 0.35 * p, s1: 0.5 * p, alpha: 0.8 });
-    const sparks = Math.ceil(res * res * 0.5 * this.density);
+    const sparks = laserSparks(res, this.density);
     for (let i = 0; i < sparks; i++) {
       const aa = a + Math.PI + rand(-1.3, 1.3), sp = rand(150, 380) * (0.8 + heat * 0.6);
       this.fx.spawn({ tex: this.atlas.streak, x: ex, y: ey, vx: Math.cos(aa) * sp, vy: Math.sin(aa) * sp, life: rand(0.1, 0.25),
@@ -1211,6 +1504,47 @@ export class GameRenderer implements IGameRenderer {
     }
     if (res >= 3 && this.grid && Math.random() < 0.2) this.grid.impulse(ex, ey, 40 * p, 16 * p);
     publishBeam(s.id, d.x, d.y, res, BEAM_LASER);
+  }
+
+  /** v0.5 laser fire presets: pulse (beads racing out), helix (two strands winding the core), lance (sun flare). */
+  private drawBeamTex(fp: FirePreset, c: number, sx: number, sy: number, ca: number, sa: number, len: number, outerW: number, res: number, t: number, alpha: number): void {
+    if (len <= 6) return;
+    const g = this.dynG, nx = -sa, ny = ca;
+    switch (fp.beam) {
+      case 'pulse': {
+        // beads well over the core's width, far apart, with a soft halo: readable at gameplay zoom
+        const gap = 64, off = (t * 900) % gap, rr = Math.max(2.6, 0.4 * outerW + 1.2);
+        for (let u = off; u < len; u += gap) g.circle(sx + ca * u, sy + sa * u, rr * 1.9);
+        g.fill({ color: c, alpha: 0.22 * alpha });
+        for (let u = off; u < len; u += gap) g.circle(sx + ca * u, sy + sa * u, rr);
+        g.fill({ color: brighten(c, 0.65), alpha: 0.95 * alpha });
+        break;
+      }
+      case 'helix': {
+        const amp = outerW * 0.55 + 3, wl = 34, ph = -t * 22, n = Math.min(90, Math.ceil(len / 9));
+        for (let strand = 0; strand < 2; strand++) {
+          const o0 = strand * Math.PI;
+          g.moveTo(sx, sy);
+          for (let k = 1; k <= n; k++) {
+            const u = (k / n) * len, w = Math.sin((u / wl) * TAU + ph + o0) * amp * Math.min(1, u / 24);
+            g.lineTo(sx + ca * u + nx * w, sy + sa * u + ny * w);
+          }
+          g.stroke({ width: 1.7, color: strand ? c : brighten(c, 0.5), alpha: 0.85 * alpha });
+        }
+        break;
+      }
+      case 'lance': {
+        g.moveTo(sx, sy).lineTo(sx + ca * len, sy + sa * len).stroke({ width: outerW * 0.6, color: 0xffffff, alpha: 0.18 * alpha, cap: 'round' });
+        const L = 7 + outerW * 0.9, rot = t * 4;
+        for (let i = 0; i < 4; i++) {
+          const a = rot + (i * Math.PI) / 2;
+          g.moveTo(sx, sy).lineTo(sx + Math.cos(a) * L, sy + Math.sin(a) * L);
+        }
+        g.stroke({ width: 1.3, color: brighten(c, 0.3), alpha: 0.7 * alpha, cap: 'round' });
+        break;
+      }
+      default: break;
+    }
   }
 
   /** Beam fringe: jagged (zig-zag) / rays (ticks) / split (`resonance` parallel filaments). */
@@ -1757,6 +2091,8 @@ export class GameRenderer implements IGameRenderer {
           const a = Math.atan2(p.vy, p.vx);
           const os = this.shipById.get(p.ownerId);
           const cls: ShipClassId | undefined = os?.shipClass;
+          // v0.5 Broadside: a capital Juggernaut's flank-gunport slugs are drawn as mass-driver slugs
+          if (os && cls === 'brute' && os.attachedTo === 0 && (os.turretCount > 0 || this.slugCls.has(p.id)) && this.isBroadsideSlug(p.id, os, a, p.x, p.y)) { this.putSlug(p.x, p.y, a, c, 1); break; }
           const wl = os && os.attachedTo === 0 ? weaponFor(this.looks.get(os.playerId), os.shipClass) : null;
           if (wl && wl.p.shape !== 'std' && cls) { this.putWeaponShot(p.x, p.y, a, c, lv, cls, wl, t + ph); break; }
           const lm = wl ? wl.len : 1;
@@ -1837,19 +2173,38 @@ export class GameRenderer implements IGameRenderer {
         case 'shrapnel': {
           const a = Math.atan2(p.vy, p.vx);
           const tl = this.turretShotLook(p.ownerId);
-          if (tl) { this.putTurretShot(p.x, p.y, a, c, tl, 0.8, t + ph); break; }
-          b.put(A.streak, p.x, p.y, a, 0.35, 0.35, brighten(c, 0.3), 1);
+          const fp = this.turretFireOf(p.ownerId);
+          const heavy = fp !== null && fp.style === 'massdriver';
+          if (fp && fp.tail > 0) this.putShotTail(p.x, p.y, a, c, fp);
+          if (tl) { this.putTurretShot(p.x, p.y, a, c, tl, heavy ? 1.1 : 0.8, t + ph); break; }
+          if (heavy) {
+            b.put(A.streak, p.x, p.y, a, 0.42, 0.62, brighten(c, 0.35), 1);
+            b.put(A.dot, p.x, p.y, 0, 0.28, 0.28, 0xfff0d0, 1);
+          } else if (fp && fp.style === 'tracer') b.put(A.dot, p.x, p.y, 0, 0.3, 0.3, 0xffffff, 1);
+          else b.put(A.streak, p.x, p.y, a, 0.35, 0.35, brighten(c, 0.3), 1);
           break;
         }
         case 'seeker': {
           const a = Math.atan2(p.vy, p.vx);
           const tl = this.turretShotLook(p.ownerId);
+          const fp = this.turretFireOf(p.ownerId);
+          const ex = fp ? fp.exhaust : 'smoke';
+          if (fp && fp.tail > 0) this.putShotTail(p.x, p.y, a, c, fp);
+          if (ex === 'ion') { // a pale ion flame, no smoke
+            b.put(A.streak, p.x - Math.cos(a) * 9, p.y - Math.sin(a) * 9, a, 0.36, 0.42, 0xd8f4ff, 0.85);
+            b.put(A.soft, p.x - Math.cos(a) * 5, p.y - Math.sin(a) * 5, 0, 0.2, 0.2, brighten(c, 0.5), 0.7);
+          }
           if (tl) this.putTurretShot(p.x, p.y, a, c, tl, 1.2, t + ph);
           else {
             b.put(A.streak, p.x, p.y, a, 0.55, 0.55, c, 1);
             b.put(A.dot, p.x + Math.cos(a) * 5, p.y + Math.sin(a) * 5, 0, 0.3, 0.3, 0xffffff, 1);
           }
-          if ((p.id + this.frameNo) % 2 === 0 && Math.random() < this.density) {
+          if (ex === 'sparks') {
+            if (Math.random() < 0.6 * this.density) {
+              this.trails.spawn({ tex: A.dot, x: p.x - Math.cos(a) * 7, y: p.y - Math.sin(a) * 7, vx: rand(-40, 40), vy: rand(-40, 40), life: 0.22,
+                color: tl ? tl.p.accent : brighten(c, 0.5), s0: 0.28, s1: 0, alpha: 0.9 });
+            }
+          } else if (ex === 'smoke' && (p.id + this.frameNo) % 2 === 0 && Math.random() < this.density) {
             this.trails.spawn({ tex: A.soft, x: p.x - Math.cos(a) * 6, y: p.y - Math.sin(a) * 6, life: 0.45, color: darken(c, 0.35), s0: 0.16, s1: 0.45, alpha: 0.45, vx: rand(-10, 10), vy: rand(-10, 10) });
           }
           break;
@@ -1899,6 +2254,64 @@ export class GameRenderer implements IGameRenderer {
     const core = wl.p.core;
     const cc = core === 'white' ? 0xffffff : core === 'dark' ? darken(c, 0.6) : wl.p.accent;
     b.put(A.dot, hx, hy, 0, coreS, coreS, cc, core === 'dark' ? 0.7 : 0.95);
+  }
+
+  /** v0.5 fire preset of a projectile owner that is docked as a turret (null otherwise). */
+  private turretFireOf(ownerId: EntityId): FirePreset | null {
+    const os = this.shipById.get(ownerId);
+    if (!os || os.attachedTo === 0) return null;
+    const d = this.ships.get(ownerId);
+    return d && d.fire ? d.fire : firePresetFor(turretFor(this.looks.get(os.playerId), os.shipClass), SHIP_CLASSES[os.shipClass].turret.id);
+  }
+
+  /** Shot tail behind a turret shot: tracer (long fading team streak + hot body), mass driver (heat tail), flak (short). */
+  private putShotTail(x: number, y: number, a: number, c: number, fp: FirePreset): void {
+    const b = this.projs, A = this.atlas, ca = Math.cos(a), sa = Math.sin(a), L = fp.tail;
+    if (fp.style === 'tracer') {
+      b.put(A.streak, x - ca * L * 0.5, y - sa * L * 0.5, a, L / 60, 0.3, c, 0.5);
+      b.put(A.streak, x - ca * L * 0.16, y - sa * L * 0.16, a, (L * 0.34) / 60, 0.24, brighten(c, 0.6), 0.95);
+      b.put(A.soft, x, y, 0, 0.2, 0.2, brighten(c, 0.4), 0.55);
+    } else if (fp.style === 'massdriver') {
+      b.put(A.soft, x, y, 0, 0.32, 0.32, mix(c, 0xff8a2b, 0.35), 0.55);
+      b.put(A.streak, x - ca * L * 0.45, y - sa * L * 0.45, a, L / 60, 0.55, mix(c, 0xffa040, 0.5), 0.6);
+    } else {
+      b.put(A.streak, x - ca * L * 0.5, y - sa * L * 0.5, a, L / 60, 0.3, c, 0.35);
+    }
+  }
+
+  /** A mass-driver slug (Broadside volleys): heavy glowing head + a long heat tail. Team colour, white-hot core. */
+  private putSlug(x: number, y: number, a: number, c: number, size: number): void {
+    const b = this.projs, A = this.atlas, ca = Math.cos(a), sa = Math.sin(a);
+    b.put(A.soft, x, y, 0, 0.5 * size, 0.5 * size, mix(c, 0xff8a2b, 0.3), 0.6);
+    b.put(A.streak, x - ca * 20 * size, y - sa * 20 * size, a, 0.7 * size, 0.7 * size, mix(c, 0xffa040, 0.45), 0.8);
+    b.put(A.orb, x, y, 0, 0.55 * size, 0.55 * size, brighten(c, 0.3), 1);
+    b.put(A.dot, x, y, 0, 0.35 * size, 0.35 * size, 0xfff4e0, 1);
+  }
+
+  /**
+   * v0.5 (no wire field): a Broadside slug is a 'bullet' of a capital Juggernaut first seen within 0.35 s of its
+   * Broadside ('fire' / 'ability' broadside) that left a flank gunport: it is well off the hull's centre line
+   * (> 0.45 hull radii; the bow guns fire from the centre line), or flying well off its heading (> 0.9 rad, a volley
+   * aimed abeam). The slugs converge on the pilot's aim point (sim/capital.ts), so most fly near the heading.
+   * Classified once, at first sight, so a later turn of the hull never re-labels a shot in flight.
+   */
+  private isBroadsideSlug(id: EntityId, os: ShipView, a: number, px: number, py: number): boolean {
+    let c = this.slugCls.get(id);
+    if (!c) {
+      const d = this.ships.get(os.id);
+      let slug = false;
+      if (d && this.now - d.broadT < 0.35 && this.now >= d.broadT) {
+        let da = a - os.angle;
+        while (da > Math.PI) da -= TAU;
+        while (da < -Math.PI) da += TAU;
+        const lateral = Math.abs((px - os.x) * -Math.sin(os.angle) + (py - os.y) * Math.cos(os.angle));
+        slug = Math.abs(da) > 0.9 || lateral > Math.max(14, 0.45 * this.visR(os, d));
+      }
+      c = { slug, seen: this.frameNo };
+      this.slugCls.set(id, c);
+    }
+    c.seen = this.frameNo;
+    return c.slug;
   }
 
   /** Turret-kit shot look for a projectile owner that is attached as a turret (null = standard shot). */
@@ -2073,9 +2486,11 @@ export class GameRenderer implements IGameRenderer {
         this.lines.push({ pts: [ev.fromX, ev.fromY, ev.x, ev.y], t: 0, life: 0.25, color: c, width: 5 });
         const d = this.ships.get(ev.shipId);
         if (s && d) {
+          const capG = d.cap.visible && d.cap.alpha > 0.5;
           for (let i = 0; i < 5; i++) {
             const f = i / 5;
-            this.spawnGhost(d.hull.context, ev.fromX + (ev.x - ev.fromX) * f, ev.fromY + (ev.y - ev.fromY) * f, s.angle, d.hull.scale.x, 0.18 + f * 0.25, 0.25 + f * 0.4, c);
+            this.spawnGhost(capG ? d.cap.context : d.hull.context, ev.fromX + (ev.x - ev.fromX) * f, ev.fromY + (ev.y - ev.fromY) * f, s.angle,
+              capG ? d.cap.scale.x : d.hull.scale.x, 0.18 + f * 0.25, 0.25 + f * 0.4, c);
           }
         }
         this.ring(ev.fromX, ev.fromY, 60, 4, 0.3, c, 3);
@@ -2212,8 +2627,11 @@ export class GameRenderer implements IGameRenderer {
     const d = this.ships.get(shipId);
     const c = this.shipColor(s);
     const x = d?.x ?? ex, y = d?.y ?? ey;
-    const sc = s.attachedTo ? 0.8 : 1;
-    const a = s.angle, r = this.shipRadius(s) * sc;
+    // v0.5 a docked turret fires from its dome's barrel tip, in its fire preset's style; a Broadside's flank FX come
+    // with its 'ability' event (the 'fire' only marks the volley for slug classification)
+    if (s.attachedTo && d) { this.turretMuzzleFx(s, d, c, x, y); return; }
+    if (skill === 'broadside') { if (d) d.broadT = this.now; return; }
+    const a = s.angle, r = this.visR(s, d);
     const mx = x + Math.cos(a) * r * 1.25, my = y + Math.sin(a) * r * 1.25;
     const A = this.atlas;
     let flashC = brighten(c, 0.4), size = 0.45, life = 0.07, sparks = 2, spark = c;
@@ -2247,6 +2665,110 @@ export class GameRenderer implements IGameRenderer {
     }
   }
 
+  /** v0.5 turret muzzle: recoil kick + the fire preset's flash (tracer / mass driver / flak burst / laser / seeker). */
+  private turretMuzzleFx(s: ShipView, d: ShipDisp, c: number, x: number, y: number): void {
+    const A = this.atlas;
+    const fp = d.fire ?? firePresetFor(turretFor(this.looks.get(s.playerId), s.shipClass), SHIP_CLASSES[s.shipClass].turret.id);
+    const a = s.angle, ca = Math.cos(a), sa = Math.sin(a);
+    const mx = x + ca * BARREL_LEN * d.domeK, my = y + sa * BARREL_LEN * d.domeK;
+    d.kick = fp.recoil; d.kickT = this.now;
+    // the team-coloured flash always plays (a turret firing must read); presets add the rest
+    this.fx.spawn({ tex: A.soft, x: mx, y: my, life: 0.07, color: brighten(c, 0.4), s0: fp.muzzle, s1: fp.muzzle * 0.3, alpha: 0.9 });
+    if (!d.ally && d.alpha < 0.2) return;
+    const tl = turretFor(this.looks.get(s.playerId), s.shipClass);
+    const acc = tl ? tl.p.accent : 0xfff0c0;
+    const vx = s.vx, vy = s.vy, dens = this.density;
+    const sparks = (n: number, col: number, spd: number, life: number, spread: number): void => {
+      if (Math.random() > dens) return;
+      for (let i = 0; i < n; i++) {
+        const aa = a + rand(-spread, spread), sp = rand(spd * 0.6, spd);
+        this.fx.spawn({ tex: A.streak, x: mx, y: my, vx: Math.cos(aa) * sp + vx, vy: Math.sin(aa) * sp + vy, life, color: col, s0: 0.3, s1: 0, flags: P_ORIENT | P_STRETCH, sy: 0.4 });
+      }
+    };
+    const puffs = (n: number, col: number, alpha: number): void => {
+      const k = Math.ceil(n * dens);
+      for (let i = 0; i < k; i++) {
+        const aa = a + rand(-0.7, 0.7), sp = rand(30, 110);
+        this.trails.spawn({ tex: A.soft, x: mx, y: my, vx: Math.cos(aa) * sp + vx * 0.6, vy: Math.sin(aa) * sp + vy * 0.6, life: rand(0.3, 0.55), color: col, s0: 0.14, s1: 0.4, alpha, drag: 2 });
+      }
+    };
+    switch (fp.style) {
+      case 'tracer':
+        this.fx.spawn({ tex: A.dot, x: mx, y: my, life: 0.05, color: 0xffffff, s0: 0.45, s1: 0.2 });
+        sparks(3, 0xfff0c0, 520, 0.09, 0.3);
+        break;
+      case 'massdriver': {
+        this.fx.spawn({ tex: A.soft, x: mx, y: my, life: 0.1, color: 0xffffff, s0: fp.muzzle * 0.55, s1: fp.muzzle * 0.2, alpha: 0.9 });
+        if (fp.shock > 0) this.ring(mx, my, 4, fp.shock, 0.25, brighten(c, 0.5), 2);
+        puffs(fp.puffs, 0x3a3040, 0.55);
+        sparks(4, 0xffd8a0, 700, 0.1, 0.35);
+        // the slug: a heavy glowing head with a heat tail, flying the flak cone's centre line for its lifetime
+        const svx = ca * FLAK_SPEED + vx, svy = sa * FLAK_SPEED + vy;
+        this.fx.spawn({ tex: A.streak, x: mx, y: my, vx: svx, vy: svy, life: FLAK_LIFE, color: mix(c, 0xffa040, 0.45), s0: 0.62, s1: 0.5, flags: P_ORIENT | P_STRETCH, sy: 0.55, alpha: 0.85 });
+        this.fx.spawn({ tex: A.orb, x: mx, y: my, vx: svx, vy: svy, life: FLAK_LIFE, color: brighten(c, 0.3), s0: fp.slug, s1: fp.slug * 0.85, alpha: 1 });
+        this.fx.spawn({ tex: A.dot, x: mx, y: my, vx: svx, vy: svy, life: FLAK_LIFE, color: 0xfff4e0, s0: fp.slug * 0.6, s1: fp.slug * 0.5, alpha: 1 });
+        this.grid?.impulse(mx, my, 70, 180);
+        if (this.localShipId !== 0 && (s.attachedTo === this.localShipId || s.id === this.localShipId)) this.addShake(0.07, mx, my);
+        break;
+      }
+      case 'flak': {
+        const spore = fp.id === 'flak.spore';
+        puffs(fp.puffs, spore ? mix(acc, 0x2a3020, 0.4) : 0x3a3040, spore ? 0.6 : 0.5);
+        sparks(3, 0xffd080, 480, 0.1, 0.45);
+        break;
+      }
+      case 'laser':
+        this.fx.spawn({ tex: A.ring, x: mx, y: my, life: 0.14, color: acc, s0: 0.1, s1: fp.beam === 'lance' ? 0.6 : 0.38, alpha: 0.85 });
+        break;
+      case 'seeker': {
+        const nx = -sa, ny = ca;
+        for (const side of [1, -1]) {
+          const px = mx + nx * DOME_R * 0.3 * side, py = my + ny * DOME_R * 0.3 * side;
+          this.fx.spawn({ tex: A.soft, x: px, y: py, life: 0.08, color: fp.exhaust === 'ion' ? 0xd8f4ff : 0xffb060, s0: 0.3, s1: 0.1, alpha: 0.9 });
+        }
+        if (fp.exhaust === 'smoke') puffs(2, 0x3a3040, 0.45);
+        else if (fp.exhaust === 'sparks') sparks(4, acc, 380, 0.14, 0.6);
+        break;
+      }
+    }
+  }
+
+  /**
+   * v0.5 Broadside: every gunport along both flanks flashes, blasts and throws a short slug streak. The slugs converge
+   * on the pilot's aim point (not on the wire), so the streaks lean toward a point BROADSIDE_FX_FOCUS px ahead.
+   */
+  private broadsideFx(s: ShipView, d: ShipDisp, c: number): void {
+    const A = this.atlas;
+    const rv = this.visR(s, d), x = d.x, y = d.y;
+    const ca = Math.cos(s.angle), sa = Math.sin(s.angle);
+    const P = CAPITAL_GEOM.brute.ports;
+    const perFlank = Math.max(1, Math.min(4, Math.round(SHIP_CLASSES.brute.base.skill.broadsideSlugs ?? 4)));
+    const sp = SHIP_CLASSES.brute.base.skill.broadsideSpeed ?? 1150;
+    for (const side of [1, -1]) {
+      const ports = P.filter(([, uy]) => Math.sign(uy) === side);
+      for (let k = 0; k < perFlank; k++) {
+        const [ux, uy] = ports[Math.min(ports.length - 1, Math.round((k * (ports.length - 1)) / Math.max(1, perFlank - 1)))];
+        const ty = uy + side * 0.07;
+        const px = x + (ux * ca - ty * sa) * rv, py = y + (ux * sa + ty * ca) * rv;
+        // toward a focus ahead: forward and inward from the gunport (starboard is (−sin, cos) for side +1)
+        const fx = x + ca * BROADSIDE_FX_FOCUS - px, fy = y + sa * BROADSIDE_FX_FOCUS - py, fl = Math.hypot(fx, fy) || 1;
+        const ox = fx / fl, oy = fy / fl;
+        this.fx.spawn({ tex: A.soft, x: px, y: py, life: 0.12, color: 0xffc070, s0: 0.75, s1: 0.2, alpha: 0.95 });
+        this.fx.spawn({ tex: A.dot, x: px, y: py, life: 0.06, color: 0xffffff, s0: 0.45, s1: 0.1 });
+        this.fx.spawn({ tex: A.streak, x: px, y: py, vx: ox * sp + s.vx, vy: oy * sp + s.vy, life: 0.1, color: mix(c, 0xffa040, 0.4), s0: 0.9, s1: 0.4, flags: P_ORIENT | P_STRETCH, sy: 0.6 });
+        if (Math.random() < this.density) {
+          for (let i = 0; i < 2; i++) {
+            const aa = Math.atan2(oy, ox) + rand(-0.5, 0.5), v = rand(40, 120);
+            this.trails.spawn({ tex: A.soft, x: px, y: py, vx: Math.cos(aa) * v + s.vx * 0.5, vy: Math.sin(aa) * v + s.vy * 0.5, life: rand(0.35, 0.6), color: 0x3a3040, s0: 0.16, s1: 0.45, alpha: 0.5, drag: 2 });
+          }
+        }
+      }
+      this.grid?.impulse(x - sa * side * rv * 1.4, y + ca * side * rv * 1.4, 140, 320);
+    }
+    this.ring(x, y, rv, rv * 2.4, 0.3, 0xffc070, 2.5, s.id);
+    this.addShake(0.14, x, y);
+  }
+
   private abilityFx(shipId: EntityId, skill: SkillId, ex: number, ey: number, talent?: string): void {
     const A = this.atlas;
     const s = this.shipById.get(shipId);
@@ -2255,9 +2777,46 @@ export class GameRenderer implements IGameRenderer {
     const { x, y } = this.shipPos(shipId, ex, ey);
     const a = s?.angle ?? 0;
     const near = this.inView(x, y, 300);
+    const d = this.ships.get(shipId);
+    // v0.5 the sim marks Overcharge's end (time up, last turret left, death): the glow fades out over 0.4 s
+    if (skill === 'overcharge' && talent === OVERCHARGE_END) {
+      if (d && d.ocUntil > this.now) {
+        d.ocUntil = Math.min(d.ocUntil, this.now + 0.4);
+        if (near && (d.ally || d.alpha >= 0.2) && s) this.ring(x, y, this.visR(s, d), this.visR(s, d) * 1.8, 0.35, 0xffe6a0, 1.5, shipId, 0.6);
+      }
+      return;
+    }
     if (talent) { this.talentFx(talent, x, y, ex, ey, accent); return; }
+    // v0.5 capital skills: their windows start even off screen (the field / glow may scroll in)
+    if (d && skill === 'overcharge') d.ocUntil = this.now + (SHIP_CLASSES.tech.base.skill.overchargeTime ?? 4);
+    if (d && skill === 'repairbay') d.bayUntil = this.now + (SHIP_CLASSES.engineer.base.skill.bayTime ?? 4);
+    if (d && skill === 'broadside') d.broadT = this.now;
     if (!near) return;
+    const hidden = !!d && !d.ally && d.alpha < 0.2; // root-alpha rule: a hidden non-ally's skill shows nothing extra
     switch (skill) {
+      case 'broadside':
+        if (s && d && !hidden) this.broadsideFx(s, d, c);
+        break;
+      case 'overcharge': {
+        if (hidden) break;
+        const R = s && d ? this.visR(s, d) : 30;
+        this.ring(x, y, R * 2.6, R * 0.9, 0.35, 0xffe6a0, 3.5, shipId);
+        this.ring(x, y, R, R * 2.4, 0.45, 0xffffff, 1.5, shipId);
+        this.flash(x, y, R / 18, 0xfff0c0, 0.25, 0.8);
+        this.burst(x, y, 22, 0xffe6a0, 80, 300, 0.45, 0.4, { tex: A.dot, flags: 0, drag: 2.5 });
+        this.grid?.impulse(x, y, 200, -300);
+        break;
+      }
+      case 'repairbay': {
+        if (hidden) break;
+        const br = SHIP_CLASSES.engineer.base.skill.bayRadius ?? 420;
+        this.ring(x, y, 20, br, 0.6, HEAL_COLOR, 4, shipId);
+        this.ring(x, y, 10, br * 0.55, 0.45, 0xd8ffe4, 1.5, shipId);
+        this.burst(x, y, 24, HEAL_COLOR, 60, 260, 0.7, 0.45, { tex: A.plus, flags: 0, drag: 2, vyBias: -30 });
+        this.flash(x, y, 1.4, HEAL_COLOR, 0.2, 0.6);
+        this.grid?.impulse(x, y, br * 0.8, 170);
+        break;
+      }
       case 'rockets': {
         for (const side of [1, -1]) {
           const px = x + Math.cos(a + side * 1.6) * 22, py = y + Math.sin(a + side * 1.6) * 22;

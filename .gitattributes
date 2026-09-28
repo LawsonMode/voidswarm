@@ -1,3 +1,5 @@
 # Deploy files run on Linux: keep LF endings
 deploy/vps/** text eol=lf
 *.sh text eol=lf
+# Windows batch files need CRLF endings (also in the GitHub "Download ZIP")
+*.bat text eol=crlf

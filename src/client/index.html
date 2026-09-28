@@ -2,11 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- viewport-fit=cover: the page runs edge to edge on notched phones; styles.css keeps the UI in env(safe-area-inset-*) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Voidswarm</title>
   <meta name="description" content="Voidswarm — neon 32-player PvPvE arena shooter." />
   <meta name="theme-color" content="#07040f" />
-  <!-- inline SVG icon: publicDir is off, so there is no /favicon.ico to serve (browsers would get a 404) -->
+  <!-- v0.5 mobile: installable fullscreen + landscape (src/client/public/). Root-absolute hrefs to public files are
+       rewritten under the build's base by Vite (/voidswarm/ on GitHub Pages); the manifest's own URLs are relative. -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Voidswarm" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <!-- inline SVG tab icon (the home-screen / manifest PNGs are rasterized from it by scripts/make-icons.mjs) -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307040f'/%3E%3Ccircle cx='32' cy='27' r='17' fill='%23ff3bd4' opacity='.35'/%3E%3Cpath d='M13 15 32 50 51 15' fill='none' stroke='%233bf2ff' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M23 15 32 32 41 15' fill='none' stroke='%23ff3bd4' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

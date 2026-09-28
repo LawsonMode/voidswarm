@@ -28,8 +28,10 @@ import { damageEnemy, damageShip, healShip } from './combat';
 import { collideCircle, generateMap, isSolidAt, lineOfSight, tileAt } from './map';
 import { stepShipMovement } from './movement';
 import { Sim } from './Sim';
-import { projectileDefaults, rebuildGrid, spawnProjectile } from './world';
-import { LASER_RESONANCE, TURRET_HOST_FLOOR_FRAC, ENEMY_TEAM } from '../constants';
+import { capitalScale, HARDPOINT_LAYOUT, projectileDefaults, rebuildGrid, spawnProjectile, turretOffset } from './world';
+import {
+  CAPITAL_ARMOR_PER_TURRET, ENEMY_TEAM, HARDPOINT_SEAT, LASER_RESONANCE, TURRET_BUBBLE_RADIUS, TURRET_HOST_FLOOR_FRAC,
+} from '../constants';
 
 const cfg = (o: Partial<SimConfig> = {}): SimConfig => ({
   mapSeed: 1234, mode: 'teams', teamCount: 2, pveIntensity: 0, matchSeconds: 600, scoreLimit: 0,
@@ -219,10 +221,19 @@ describe('sim core', () => {
     expect(host.turrets).toEqual([t.id]);
     sim.setInput(1, inp({ moveX: 1 }));
     steps(sim, 20);
-    expect(Math.hypot(t.x - host.x, t.y - host.y)).toBeCloseTo(host.stats.radius + 12, 3);
+    // v0.5: one turret sits on the bow hardpoint of the capital-scaled hull, as a bubble dome
+    const baseR = SHIP_CLASSES.engineer.base.radius;
+    expect(host.stats.radius).toBeCloseTo(baseR * capitalScale(1), 9);
+    expect(t.stats.radius).toBe(TURRET_BUBBLE_RADIUS);
+    const o = turretOffset(host.angle, 0, 1, host.stats.radius);
+    expect(t.x - host.x).toBeCloseTo(o.dx, 6);
+    expect(t.y - host.y).toBeCloseTo(o.dy, 6);
+    expect(Math.hypot(t.x - host.x, t.y - host.y)).toBeCloseTo(HARDPOINT_LAYOUT[1][0][0] * HARDPOINT_SEAT * host.stats.radius, 6);
     sim.setInput(1, inp({ detach: true }));
     sim.step();
     expect(t.attachedTo).toBe(0);
+    expect(host.stats.radius).toBe(baseR);
+    expect(t.stats.radius).toBe(SHIP_CLASSES.brute.base.radius);
     // reattach (after cooldown) then host dies
     sim.setInput(1, inp());
     sim.setInput(2, inp());
@@ -560,7 +571,10 @@ describe('turret kits', () => {
     host.invulnUntilTick = 0;
     const e0 = host.energy;
     damageShip(sim.world, host, 400, 0, 'enemy');
-    expect(e0 - host.energy).toBeCloseTo(400 * (1 - br.stats.skill.braceAbsorb), 6);
+    // v0.5: the 2-turret capital hull adds CAPITAL_ARMOR_PER_TURRET armor per turret
+    const armor = SHIP_CLASSES.tech.base.armor + 2 * CAPITAL_ARMOR_PER_TURRET;
+    expect(host.stats.armor).toBeCloseTo(armor, 9);
+    expect(e0 - host.energy).toBeCloseTo(400 * (1 - br.stats.skill.braceAbsorb) * (1 - armor), 6);
     sim.setInput(2, inp());
     host.energy = 200; host.stats.rechargePerSec = 0;
     sim.setInput(3, inp({ secondary: true }));

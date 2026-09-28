@@ -1,7 +1,8 @@
 // OWNER: PVE agent. XP, levels, upgrade offers (path fork / talents / general cards).
-import { PATH_LEVEL, TALENT_LEVELS } from '../../constants';
+import { MAX_HARDPOINTS, PATH_LEVEL, TALENT_LEVELS } from '../../constants';
 import { PATHS, SHIP_CLASSES, pathKey } from '../../data/ships';
 import type { PathDef, Ship, TalentDef, UpgradeChoice, World } from '../../types';
+import { applyHull } from '../hull';
 import { dropGems, emit } from '../world';
 import { OVERCHARGE, PATH_AFFINITY, UPGRADES, computeStats, resolvePath, type UpgradeDef } from './upgrades';
 
@@ -80,7 +81,13 @@ function generalOffer(world: World, ship: Ship): UpgradeChoice[] {
     cands.push(d);
     weights.push(w);
   }
-  const offer = weightedPick(world, cands, weights, 3).map((d) => choiceFor(d, (ship.upgrades[d.id] ?? 0) + 1));
+  // v0.5: Turret Mount does nothing at the hardpoint cap (computeStats caps maxTurrets at MAX_HARDPOINTS). It stays a
+  // candidate, so the rng draws (and so every later offer, for every ship) are unchanged; a drawn dead card is
+  // dropped and the Overcharge filler takes its place.
+  const dead = ship.stats.maxTurrets >= MAX_HARDPOINTS;
+  const offer = weightedPick(world, cands, weights, 3)
+    .filter((d) => !(dead && d.id === 'turretmount'))
+    .map((d) => choiceFor(d, (ship.upgrades[d.id] ?? 0) + 1));
   if (offer.length < 3) offer.push(choiceFor(OVERCHARGE, 1));
   return offer;
 }
@@ -136,10 +143,14 @@ export function grantXp(world: World, ship: Ship, amount: number): void {
   }
 }
 
-/** Recompute ship.stats from its class + upgrades, keeping the energy FRACTION (pve/index recomputeShipStats). */
+/**
+ * Recompute ship.stats from its class + upgrades, keeping the energy FRACTION (pve/index recomputeShipStats).
+ * v0.5: a capital host / docked turret keeps its hull (the rebuilt stats are the new base; sim/hull.ts).
+ */
 export function recomputeStats(ship: Ship): void {
   const frac = ship.stats.maxEnergy > 0 ? ship.energy / ship.stats.maxEnergy : 1;
   ship.stats = computeStats(ship.shipClass, ship.upgrades);
+  applyHull(ship);
   ship.energy = frac * ship.stats.maxEnergy;
 }
 

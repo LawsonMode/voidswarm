@@ -21,6 +21,10 @@
 //            subMode / dungeon / objective) is serialized once per MatchView object (WeakMap memo): the
 //            SnapshotBuilder shares one MatchView between every viewer of a snapshot tick.
 //            xs / xk = stat fields / skill knobs not in the known tables (forward-compat; normally absent)
+// v0.5: the layout is unchanged (VERSION 5), but the knob table below is derived from SKILL_KNOBS + TURRET_KNOBS, so
+// the capital knobs (capCooldown, capCost, broadside*, overcharge*, bay*) shift knob indices: that is what
+// PROTOCOL_VERSION 5 covers (the hello refuses mixed builds). Capital state itself is derived client-side from
+// ShipView.turretCount / turretSlot: no new ShipView fields.
 import { SHIP_CLASS_IDS, SKILL_KNOBS, TURRET_KNOBS } from '../data/ships';
 import {
   LOOT_SETS,
@@ -73,6 +77,14 @@ const KNOB_KEYS: string[] = [...new Set([
   ...Object.values(TURRET_KNOBS).flatMap((o) => Object.keys(o)),
 ])].sort().slice(0, 255);
 const knobIdx = new Map(KNOB_KEYS.map((k, i) => [k, i]));
+
+/**
+ * The binary knob table (index = wire knob id), for tests and tooling. Any change to it changes the wire: bump
+ * PROTOCOL_VERSION (v0.5 took 5 for the capital knobs).
+ */
+export function codecKnobKeys(): string[] {
+  return KNOB_KEYS.slice();
+}
 const f32 = (v: number): number => { const n = Number(v.toPrecision(7)); return Object.is(n, -0) ? 0 : n; };
 
 const TWO_PI = Math.PI * 2;

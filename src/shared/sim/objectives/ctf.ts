@@ -8,6 +8,7 @@
 import { NO_TEAM } from '../../constants';
 import type { FlagObjective, GameEvent, ObjectiveState, Ship, World } from '../../types';
 import { SHIPFLAG_CARRIER, SHIPFLAG_CLOAKED, SHIPFLAG_INVULN } from '../../types';
+import { syncHull } from '../hull';
 import { rollLoot } from '../loot';
 import { emit, secToTicks } from '../world';
 import {
@@ -82,7 +83,7 @@ const SHAKE_PUSH = 160;
 
 /**
  * Detach `t` from `host` exactly as sim/turrets.ts detachTurret does (laser bank dropped, host velocity plus an
- * outward push, 'detach' event). Not imported from turrets.ts: turrets.ts imports objectives/index, and that
+ * outward push, v0.5 hull re-size (sim/hull.ts, no cycle), 'detach' event). Not imported from turrets.ts: turrets.ts imports objectives/index, and that
  * cycle would make SIM's vi.mock seam (objhooks.test.ts) hand turrets.ts the real hooks.
  */
 function shakeOff(world: World, host: Ship, t: Ship): void {
@@ -96,6 +97,9 @@ function shakeOff(world: World, host: Ship, t: Ship): void {
   if (d > 1e-6) { ax = dx / d; ay = dy / d; }
   t.vx = host.vx + ax * SHAKE_PUSH;
   t.vy = host.vy + ay * SHAKE_PUSH;
+  // v0.5 (as detachTurret): the turret's bubble hull and the carrier's capital hull re-size, mounts re-flow.
+  syncHull(world, t);
+  syncHull(world, host);
   emit(world, { t: 'detach', turretShipId: t.id, hostShipId: host.id });
 }
 

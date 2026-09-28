@@ -6,7 +6,7 @@ import { riftOnDeath } from './dungeon';
 import { rollLoot, spillCarried } from './loot';
 import { dropShipXp, onEnemyKilled } from './pve/index';
 import { side } from './state';
-import { has } from './targeting';
+import { crewSafe, has } from './targeting';
 import { detachAll } from './turrets';
 import {
   canDamageEnemy, canDamageShip, emit, forEachEnemyNear, forEachShipNear, sameTeam, secToTicks,
@@ -45,12 +45,16 @@ export function ironHideActive(world: World, ship: Ship): boolean {
   return ship.shipClass === 'brute' && world.tick < ship.utilityActiveUntilTick && (ship.skillState.hide ?? 0) > 0;
 }
 
-/** Fraction absorbed by any active shield on this ship (own Iron Hide or Fortress-granted), 0 if none. */
+/**
+ * Fraction absorbed by any active shield on this ship (own Iron Hide, Fortress-granted, or v0.5 Repair Bay
+ * coverage), 0 if none. Shields don't stack: the strongest applies.
+ */
 export function shieldAbsorb(world: World, ship: Ship): number {
   let a = 0;
   if (ironHideActive(world, ship)) a = ship.stats.skill.hideAbsorb ?? 0.6;
   const ss = ship.skillState;
   if ((ss.extShieldUntil ?? 0) > world.tick) a = Math.max(a, ss.extShieldAbsorb ?? 0);
+  if ((ss.bayShieldUntil ?? 0) > world.tick) a = Math.max(a, ss.bayShieldAbsorb ?? 0);
   return a < 0 ? 0 : a > 0.95 ? 0.95 : a;
 }
 
@@ -63,8 +67,8 @@ let reflectDepth = 0;
  * sourceShipId = attacking ship (0 when cause is 'enemy' or 'self').
  *
  * v0.2 modifiers, in order: invuln → Ram Charge (Unstoppable = immune, else × chargeDamageTaken) →
- * Entropy (+30%) → shield absorb (Iron Hide / Fortress; Reflector bounces 40% of absorbed) →
- * turret Brace (× 1 − braceAbsorb) → armor.
+ * Entropy (+30%) → shield absorb (Iron Hide / Fortress / v0.5 Repair Bay; Reflector bounces 40% of absorbed) →
+ * turret Brace (× 1 − braceAbsorb) → armor (v0.5: a capital host's armor includes its per-turret bonus, hull.ts).
  */
 export function damageShip(
   world: World, ship: Ship, amount: number, sourceShipId: EntityId, cause: 'player' | 'enemy' | 'self',
@@ -209,7 +213,7 @@ function falloff(dx: number, dy: number, bodyR: number): number {
   return 1 - 0.6 * t;
 }
 function splashShip(s: Ship): void {
-  if (!canDamageShip(sW, sTeam, sOwner, s.team, s.id)) return;
+  if (!canDamageShip(sW, sTeam, sOwner, s.team, s.id) || crewSafe(sW, sTeam, sOwner, s)) return;
   const f = falloff(s.x - sX, s.y - sY, s.stats.radius);
   const enemy = sTeam === ENEMY_TEAM;
   damageShip(sW, s, sAmt * f, enemy ? 0 : sOwner, enemy ? 'enemy' : 'player');

@@ -10,6 +10,8 @@ export interface SlotSpec {
   hold?: boolean;
   /** Small caption under the name, e.g. "host energy". */
   note?: string;
+  /** v0.5: the capital skill (replaces the mobility slot while you carry turrets): gold frame + a small CAP tag. */
+  capital?: boolean;
 }
 
 export interface SlotState {
@@ -37,13 +39,14 @@ export class SkillBar {
     this.root.textContent = '';
     this.els = specs.map((s) => {
       const cdNum = h('span', { class: 'sk-cd' });
-      const root = h('div', { class: 'skill', title: s.name },
+      const root = h('div', { class: `skill${s.capital ? ' capital' : ''}`, title: s.name },
         h('div', { class: 'sk-face' },
           h('span', { class: 'sk-icon' }, s.icon),
           h('span', { class: 'sk-sweep' }),
           cdNum,
           h('span', { class: 'sk-key' }, glyph(s.keys[0], s.keys[1])),
-          s.hold ? h('span', { class: 'sk-hold' }, 'HOLD') : null),
+          s.hold ? h('span', { class: 'sk-hold' }, 'HOLD') : null,
+          s.capital ? h('span', { class: 'sk-hold sk-cap' }, 'CAP') : null),
         h('div', { class: 'sk-name' }, s.name),
         s.note ? h('div', { class: 'sk-note' }, s.note) : null);
       this.root.appendChild(root);

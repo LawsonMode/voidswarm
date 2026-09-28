@@ -13,7 +13,7 @@
 // M3 integration: "capping" means working the armed point alone — incl. rolling back another side's partial
 // progress first (capTeam is still theirs then) and, in FFA, holding it (an FFA owner scores only while on it);
 // FFA converges 5 of 10 ranks (7 in teams) and a lone FFA worker damps off-pad fights ×0.4.
-import { TICK_RATE } from '../constants';
+import { MAX_HARDPOINTS, TICK_RATE } from '../constants';
 import { CTF_CAPTURE_RADIUS, CTF_CARRIER_MAX_TURRETS, HOT_WARN_SEC } from '../sim/objectives/rules';
 import { objMaxTurrets } from '../sim/objectives/index';
 import { sameTeam } from '../sim/world';
@@ -96,9 +96,12 @@ export function carriedFlagOf(world: World, ship: Ship): FlagObjective | null {
   return null;
 }
 
-/** Turret seats this host really offers (a carrier keeps only the gunner seat). */
+/**
+ * Turret seats this host really offers (a carrier keeps only the gunner seat). v0.5: never more than the
+ * MAX_HARDPOINTS mounts a capital hull has, whatever maxTurrets stacking says.
+ */
 export function hostSeats(world: World, host: Ship): number {
-  let n = objMaxTurrets(world, host);
+  let n = Math.min(objMaxTurrets(world, host), MAX_HARDPOINTS);
   if (carriedFlagOf(world, host)) n = Math.min(n, CTF_CARRIER_MAX_TURRETS);
   return n;
 }

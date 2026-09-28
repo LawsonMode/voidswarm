@@ -14,10 +14,12 @@ import {
   BEAM_NONE, emptyInput, SHIPFLAG_AFTERBURNER, SHIPFLAG_BOT, SHIPFLAG_CHARGING, SHIPFLAG_INVULN, SHIPFLAG_SHIELD,
   SHIPFLAG_THRUSTING,
 } from '../types';
+import { endCapitalEffects, stepCapital } from './capital';
 import { computeBounty, isCharging, shieldAbsorb } from './combat';
 import { killDeployable, stepDeployables } from './deployables';
 import { createRiftState, endRift, resetRiftFloor, riftEntrancePoint, riftSpawnPoint, stepRift } from './dungeon';
 import { riftTier } from './floorgen';
+import { syncHull } from './hull';
 import { releaseLootFor, spillCarried, stepLoot } from './loot';
 import { collideCircle } from './map';
 import { buildMatchMap } from './mapgen';
@@ -291,16 +293,21 @@ export class Sim {
     ship.invulnUntilTick = w.tick + secToTicks(SPAWN_INVULN_SEC);
     ship.attachedTo = 0;
     ship.turrets.length = 0;
+    syncHull(w, ship); // v0.5: back to the plain hull (no capital form, no bubble)
     ship.lastDamagedBy = 0;
     ship.gunReadyTick = w.tick;
     this.clearTransient(ship);
     emit(w, { t: 'shipSpawn', shipId: ship.id, playerId: ship.playerId, x, y });
   }
 
-  /** Drop timed skill effects and transient skill state (spawn, in-place class swap). */
+  /**
+   * Drop timed skill effects and transient skill state (spawn, in-place class swap). v0.5: capital effects end
+   * too (a running Resonance Overcharge emits its end event).
+   */
   private clearTransient(ship: Ship): void {
     ship.utilityActiveUntilTick = 0;
     ship.mobilityActiveUntilTick = 0;
+    endCapitalEffects(this.world, ship);
     for (const k of TRANSIENT_KEYS) delete ship.skillState[k];
     side(this.world).ramHits.delete(ship.id);
   }
@@ -503,8 +510,9 @@ export class Sim {
 
   /**
    * Advance exactly one tick (DT seconds). Canonical v0.3 order (proposal §9):
-   * tick++ → rebuildGrid → consumeInputs → fieldRevive → pass 1 (respawn: rift / objective / default spawn
-   * point; movement × objSpeedMult) → pass 2 (turrets) → pass 3 (energy × objRechargeMult, skills, flags) →
+   * tick++ → rebuildGrid → consumeInputs → hull sync (v0.5) → fieldRevive → pass 1 (respawn: rift / objective / default
+   * spawn point; movement × objSpeedMult) → pass 2 (turrets) → pass 3 (energy × objRechargeMult, skills, v0.5 capital
+   * effects, flags) →
    * pveStep → stepDeployables → stepProjectiles → stepObjectives → stepRift → stepLoot → bounty →
    * enterFloor (if pendingFloor) → stepMatch (objective sub-modes: mirror teamPoints + objectiveEndCheck)
    * → prevInput copy.
@@ -512,6 +520,9 @@ export class Sim {
    * rift hooks (stepRift, riftSpawnPoint, riftOnDeath, enterFloor) do nothing without world.dungeon, and loot
    * (M2) never touches world.rng and does nothing at lootMult 0, so a lootMult-0 deathmatch tick is v0.2's
    * tick exactly.
+   * v0.5 hardpoints: attach / detach / death re-size hulls where they happen (turrets.ts, hull.ts); the sync after
+   * consumeInputs is a safety net for any other change of ship.turrets / attachedTo / stats (a no-op otherwise, and
+   * always for a ship that never hosts nor docks, so a no-turret match is untouched).
    */
   step(): void {
     const w = this.world;
@@ -520,6 +531,7 @@ export class Sim {
     const tick = w.tick;
 
     this.consumeInputs();
+    for (const ship of w.ships.values()) syncHull(w, ship);
     this.fieldRevive();
 
     // Pass 1: respawn, edges, attach logic, movement of free ships
@@ -569,7 +581,7 @@ export class Sim {
 
     // Pass 3: energy, skills / turret kit, talents, flags
     for (const ship of w.ships.values()) {
-      if (!ship.alive) { ship.flags = ship.isBot ? SHIPFLAG_BOT : 0; continue; }
+      if (!ship.alive) { stepCapital(w, ship); ship.flags = ship.isBot ? SHIPFLAG_BOT : 0; continue; }
       const inp = ship.input;
       const ab = this.abOn.has(ship.id);
       if (!ab) {
@@ -584,6 +596,7 @@ export class Sim {
       }
       if (ship.attachedTo) stepTurretKit(w, ship);
       else stepClassSkills(w, ship);
+      stepCapital(w, ship); // v0.5: Overcharge timer / end, Repair Bay heal + shield (dead: ends them)
       if (ship.alive) stepTalents(w, ship);
 
       let f = 0;

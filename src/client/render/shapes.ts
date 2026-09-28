@@ -3,11 +3,15 @@
 // v0.3 M2: cosmetic hull shape modifiers (spiked / swept / crest) + patterns (stripes / hex / rune) and
 // turret mount glyphs (jaw / crown / hive / lens). The ship caches are mark-and-swept in setMap.
 // v0.3 M4: the Hive Matriarch body + animation layers (halo, wings, brood), replacing the M1 placeholder.
+// v0.5: capital hull variants (Dreadnought / Spire / Foundry) with hardpoint sockets, capital aux layers, and the
+// bubble-turret dome (fixed base + a kit barrel that rotates to the turret's aim).
 import { GraphicsContext } from 'pixi.js';
-import type { DeployableKind, EnemyKind, ShipClassId } from '../../shared/types';
+import type { DeployableKind, EnemyKind, ShipClassId, TurretKitId } from '../../shared/types';
 import type { HullParams, HullPattern, HullShape, TurretMount } from '../../shared/data/cosmetics';
+import { HARDPOINT_SEAT } from '../../shared/constants';
 import { ENEMY_COLORS, MATRIARCH_GOLD, MATRIARCH_WING, brighten, darken } from './palette';
 import { READABILITY, type HullLook, type TurretLook } from './cosmeticLook';
+import { DOME_R, HARDPOINT_SOCKETS } from './capital';
 
 export type Poly = number[]; // flat unit-space points (facing +x)
 
@@ -421,6 +425,291 @@ export function shipHull(
   }
   // cockpit spark
   if (!(cls === 'tech' && pathIdx === 1)) ctx.circle(r * (cls === 'brute' ? 0.2 : 0.4), 0, Math.max(1.5, r * 0.09)).fill({ color: 0xffffff, alpha: 0.95 });
+  shipCache.set(key, ctx);
+  return ctx;
+}
+
+// ---------------------------------------------------------------------------------------------
+// v0.5 capital hull variants (unit radius, facing +x). Every HARDPOINT_SOCKETS mount (× HARDPOINT_SEAT) lies inside
+// the hull polys (tested), so docked domes sit on the hull. Team colour stays the outline; path trim is accent.
+// ---------------------------------------------------------------------------------------------
+
+/** Top half (y ≥ 0, bow → stern) mirrored into a closed outline. */
+function sym(top: Poly): Poly {
+  const out = top.slice();
+  for (let i = top.length - 2; i >= 0; i -= 2) if (Math.abs(top[i + 1]) > 1e-9) out.push(top[i], -top[i + 1]);
+  return out;
+}
+
+export interface CapitalGeom {
+  /** Outline polys (main hull first). */
+  polys: Poly[];
+  plates: Poly[];
+  lines: Poly[];
+  /** Dreadnought: gunport stubs [x, y] (both flanks, unit), fore → aft; broadside flashes at their tips. */
+  ports: [number, number][];
+  /** Foundry: bay lights [x, y] (unit); Repair Bay turns them green. */
+  lights: [number, number][];
+  /** Spire: focusing lens centre + radius (unit); ring radius around the ship origin. */
+  lens: [number, number, number] | null;
+  ring: number;
+}
+
+const DREAD_MAIN = sym([1.28, 0, 1.0, 0.2, 0.78, 0.36, 0.62, 0.72, 0.52, 0.86, -0.5, 0.86, -0.7, 0.72, -1.06, 0.58, -1.06, 0]);
+const SPIRE_MAIN = sym([1.62, 0, 0.9, 0.2, 0.3, 0.3, -0.5, 0.3, -1.05, 0.14, -1.2, 0]);
+const SPIRE_FIN_F: Poly = [0.44, 0.22, 0.62, 0.6, 0.34, 0.9, 0.08, 0.28];
+const SPIRE_FIN_A: Poly = [-0.26, 0.26, -0.34, 0.62, -0.72, 0.8, -0.66, 0.26];
+const FOUNDRY_KEEL = sym([1.0, 0, 1.0, 0.2, 0.62, 0.3, -0.86, 0.3, -1.0, 0.16, -1.0, 0]);
+const FOUNDRY_BEAM = rect(0.86, 0.7, -0.86, 0.9);
+const FOUNDRY_GANTRIES: Poly[] = [rect(0.46, 0.3, 0.2, 0.7), rect(-0.36, 0.3, -0.62, 0.7)].flatMap((p) => [p, mirrorY(p)]);
+
+export const CAPITAL_GEOM: Readonly<Record<ShipClassId, CapitalGeom>> = {
+  // Dreadnought: armored gun-deck, heavy prow, broadside gunports along both flanks, triple engine block.
+  brute: {
+    polys: [DREAD_MAIN, rect(-1.06, 0.5, -1.2, 0.3), rect(-1.06, 0.12, -1.22, -0.12), rect(-1.06, -0.3, -1.2, -0.5)],
+    plates: [
+      [1.28, 0, 0.96, 0.25, 0.7, 0.2, 0.6, 0, 0.7, -0.2, 0.96, -0.25], // heavy prow
+      [0.46, 0.64, -0.46, 0.66, -0.46, 0.8, 0.46, 0.8], [0.46, -0.64, -0.46, -0.66, -0.46, -0.8, 0.46, -0.8], // side armour
+      rect(0.2, 0.2, -0.34, -0.2), // bridge superstructure
+    ],
+    lines: [[0.6, 0, -0.95, 0], [0.62, 0.72, 0.3, 0.3], [0.62, -0.72, 0.3, -0.3], [-0.34, 0.2, -0.7, 0.5], [-0.34, -0.2, -0.7, -0.5]],
+    ports: [[0.4, 0.9], [0.15, 0.9], [-0.1, 0.9], [-0.35, 0.9], [0.4, -0.9], [0.15, -0.9], [-0.1, -0.9], [-0.35, -0.9]],
+    lights: [],
+    lens: null,
+    ring: 0,
+  },
+  // Spire: a tall crystal spire with outrigger crystals, a focusing ring through every mount and a lens at the bow.
+  tech: {
+    polys: [SPIRE_MAIN, SPIRE_FIN_F, mirrorY(SPIRE_FIN_F), SPIRE_FIN_A, mirrorY(SPIRE_FIN_A)],
+    plates: [[1.62, 0, 1.12, 0.12, 0.9, 0, 1.12, -0.12]],
+    lines: [[1.62, 0, -1.2, 0], [0.9, 0.2, 0.3, 0], [0.3, 0, 0.9, -0.2], [-0.5, 0.3, -0.1, 0], [-0.1, 0, -0.5, -0.3],
+      [0.3, 0.3, 0.44, 0.22], [0.3, -0.3, 0.44, -0.22], [0.34, 0.9, 0.62, 0.6], [0.34, -0.9, 0.62, -0.6]],
+    ports: [],
+    lights: [],
+    lens: [1.3, 0, 0.15],
+    ring: 0.72,
+  },
+  // Foundry: a wide shipyard frame: central keel, two gantry beams, open bays with cranes and bay lights.
+  engineer: {
+    // keel, two gantry beams, and four cross-gantries across the bays that carry the flank mounts
+    polys: [FOUNDRY_KEEL, FOUNDRY_BEAM, mirrorY(FOUNDRY_BEAM), ...FOUNDRY_GANTRIES],
+    plates: [rect(0.8, 0.32, -0.8, 0.7), rect(0.8, -0.32, -0.8, -0.7), rect(0.3, 0.16, -0.3, -0.16)],
+    lines: [
+      [-0.02, 0.3, -0.02, 0.7], [-0.02, -0.3, -0.02, -0.7],
+      [0.7, 0.9, 0.7, 0.46, 0.56, 0.46], [-0.2, 0.9, -0.2, 0.5, -0.3, 0.5], [0.7, -0.9, 0.7, -0.46, 0.56, -0.46], [-0.2, -0.9, -0.2, -0.5, -0.3, -0.5],
+    ],
+    ports: [],
+    lights: [[0.76, 0.64], [0.1, 0.64], [-0.13, 0.64], [-0.78, 0.64], [0.76, -0.64], [0.1, -0.64], [-0.13, -0.64], [-0.78, -0.64]],
+    lens: null,
+    ring: 0,
+  },
+};
+
+/** Socket centres (unit radius): every HARDPOINT_SOCKETS mount × HARDPOINT_SEAT. */
+export const SOCKET_UNIT: readonly [number, number][] = HARDPOINT_SOCKETS.map(([a, s]) => [a * HARDPOINT_SEAT, s * HARDPOINT_SEAT]);
+
+const capModCache = new Map<string, Poly[]>();
+/** Capital outline with a cosmetic shape modifier (same bounds as modHullPolys, relative to the capital hull). Pure. */
+export function modCapitalPolys(cls: ShipClassId, shape: HullShape, amount: number): Poly[] {
+  const a = Math.max(0, Math.min(1, Number.isFinite(amount) ? amount : 0));
+  const key = `${cls}|${shape}|${a}`;
+  const hit = capModCache.get(key);
+  if (hit) return hit;
+  const base = CAPITAL_GEOM[cls].polys;
+  const limit = polyExtent(base) * READABILITY.silhouetteMax;
+  let d = READABILITY.hullDisplaceMax * a;
+  let polys = base.map((p) => shapePoly(p, shape, d));
+  for (let k = 0; k < 16 && polyExtent(polys) > limit; k++) { d *= 0.85; polys = base.map((p) => shapePoly(p, shape, d)); }
+  if (polyExtent(polys) > limit) polys = base.map((p) => p.slice());
+  capModCache.set(key, polys);
+  return polys;
+}
+
+/** Capital path trim (accent), per class and path: the base trims re-seated on the bigger hulls. */
+function drawCapitalTrim(ctx: GraphicsContext, cls: ShipClassId, pathIdx: number, r: number, accent: number): void {
+  const S = (p: Poly) => scaled(p, r);
+  if (cls === 'brute') {
+    if (pathIdx === 0) { // Ram: prow spikes on the heavy prow
+      neonPolys(ctx, [[1.26, 0.09, 1.72, 0, 1.26, -0.09], [0.98, 0.25, 1.36, 0.4, 0.9, 0.36], [0.98, -0.25, 1.36, -0.4, 0.9, -0.36]].map(S), accent, brighten(accent, 0.2), 0.7, 1.6);
+    } else if (pathIdx === 1) { // Barrage: stern rocket pods
+      neonPolys(ctx, [rect(-0.56, 0.86, -1.02, 1.06), rect(-0.56, -0.86, -1.02, -1.06)].map(S), accent, darken(accent, 0.6), 0.8, 1.6);
+      for (const sy of [1, -1]) for (const x of [-0.66, -0.82]) ctx.circle(x * r, 0.96 * sy * r, 0.05 * r);
+      ctx.fill({ color: brighten(accent, 0.6), alpha: 1 });
+    } else if (pathIdx === 2) { // Bulwark: armour plating, inside the hull (the team outline stays outermost)
+      ctx.poly(S(scaled(DREAD_MAIN, 0.84)), true).stroke({ width: 2, color: accent, alpha: 0.85, join: 'round' });
+      ctx.poly(S(scaled(DREAD_MAIN, 0.84)), true).stroke({ width: 5, color: accent, alpha: 0.13, join: 'round' });
+    }
+  } else if (cls === 'tech') {
+    if (pathIdx === 0) { // Storm: conduits from the spine to the outriggers
+      segs(ctx, [[0.3, 0.3, 0.38, 0.44, 0.3, 0.54, 0.4, 0.62], [0.3, -0.3, 0.38, -0.44, 0.3, -0.54, 0.4, -0.62],
+        [-0.4, 0.3, -0.36, 0.44, -0.46, 0.52], [-0.4, -0.3, -0.36, -0.44, -0.46, -0.52]].map(S), accent, 1.3, 0.9);
+    } else if (pathIdx === 1) { // Void: dark core
+      ctx.circle(0.1 * r, 0, 0.24 * r).fill({ color: 0x000000, alpha: 1 });
+      ctx.circle(0.1 * r, 0, 0.24 * r).stroke({ width: 1.8, color: accent, alpha: 1 });
+      ctx.circle(0.1 * r, 0, 0.36 * r).stroke({ width: 4, color: accent, alpha: 0.2 });
+    } else if (pathIdx === 2) { // Lance: spine past the lens with a tip diamond
+      segs(ctx, [[1.62, 0, 2.2, 0], [1.8, 0.14, 1.8, -0.14]].map(S), accent, 2, 1);
+      neonPolys(ctx, [S(diamond(2.25, 0, 0.13))], accent, brighten(accent, 0.3), 0.8, 1.4);
+    }
+  } else {
+    if (pathIdx === 0) { // Summoner: forward drone bay with a docked drone
+      ctx.poly(S(rect(0.52, 0.2, 0.08, -0.2)), true).stroke({ width: 1.8, color: accent, alpha: 1 });
+      neonPolys(ctx, [S([0.44, 0, 0.2, 0.12, 0.27, 0, 0.2, -0.12])], accent, darken(accent, 0.4), 0.8, 1.2);
+    } else if (pathIdx === 1) { // Medic: cross emblem on the keel
+      ctx.poly(S([0.16, 0.07, 0.44, 0.07, 0.44, -0.07, 0.16, -0.07]), true).poly(S([0.23, 0.2, 0.37, 0.2, 0.37, -0.2, 0.23, -0.2]), true)
+        .fill({ color: accent, alpha: 1 });
+      ctx.circle(0.3 * r, 0, 0.28 * r).stroke({ width: 3.5, color: accent, alpha: 0.22 });
+    } else if (pathIdx === 2) { // Architect: scaffold over the yard, inside the hull (the team outline stays outermost)
+      const k = 0.8;
+      ctx.poly(S(scaled(rect(1.08, 1.02, -1.0, -1.02), k)), true).stroke({ width: 1.3, color: accent, alpha: 0.85 });
+      segs(ctx, [[1.08, 1.02, 0.86, 0.9], [1.08, -1.02, 0.86, -0.9], [-1.0, 1.02, -0.86, 0.9], [-1.0, -1.02, -0.86, -0.9], [1.08, 1.02, 1.08, -1.02, 1.0, 0]]
+        .map((p) => S(scaled(p, k))), accent, 1, 0.7);
+    }
+  }
+}
+
+/**
+ * v0.5 capital hull at radius px (the renderer draws it at base × CAP_REF and scales by vis / CAP_REF). Sockets are
+ * drawn dim at every HARDPOINT_SOCKETS mount; docked domes cover (and light) the occupied ones. Cached in the ship
+ * cache (swept by sweepShipCaches).
+ */
+export function capitalHull(cls: ShipClassId, color: number, radius: number, pathIdx: number, accent: number, hull: HullLook | null = null): GraphicsContext {
+  const r = Math.round(radius * 100) / 100;
+  const key = `cap|${cls}|${color}|${r}|${pathIdx}|${hull ? hull.id : ''}`;
+  let ctx = shipCache.get(key);
+  if (ctx) return ctx;
+  ctx = new GraphicsContext();
+  const G = CAPITAL_GEOM[cls];
+  const unit = hull && hull.p.shape !== 'std' ? modCapitalPolys(cls, hull.p.shape, hull.p.amount) : G.polys;
+  // Spire focusing ring (under the crystals)
+  if (G.ring > 0) {
+    ctx.circle(0, 0, G.ring * r).stroke({ width: 5, color, alpha: 0.14 });
+    ctx.circle(0, 0, G.ring * r).stroke({ width: 1.4, color: brighten(color, 0.45), alpha: 0.8 });
+  }
+  // Dreadnought gunport stubs (outside the flank edge, under the outline)
+  if (G.ports.length) {
+    for (const [x, y] of G.ports) ctx.poly(scaled(rect(x + 0.055, y - Math.sign(y) * 0.07, x - 0.055, y + Math.sign(y) * 0.07), r), true);
+    ctx.fill({ color: darken(color, 0.5), alpha: 0.95 });
+    for (const [x, y] of G.ports) ctx.poly(scaled(rect(x + 0.055, y - Math.sign(y) * 0.07, x - 0.055, y + Math.sign(y) * 0.07), r), true);
+    ctx.stroke({ width: 1.2, color: brighten(color, 0.35), alpha: 1 });
+  }
+  const polys = unit.map((p) => scaled(p, r));
+  neonPolys(ctx, polys, color, darken(color, 0.74), 0.8, 2.6);
+  for (const p of G.plates) ctx.poly(scaled(p, r), true).fill({ color: darken(color, 0.45), alpha: cls === 'engineer' ? 0.35 : 0.85 });
+  for (const p of G.plates) ctx.poly(scaled(p, r), true);
+  ctx.stroke({ width: 1.3, color: brighten(color, 0.35), alpha: 0.9, join: 'round' });
+  segs(ctx, G.lines.map((l) => scaled(l, r)), brighten(color, 0.4), 1.3);
+  if (G.ports.length) { // gun muzzles
+    for (const [x, y] of G.ports) ctx.circle(x * r, (y + Math.sign(y) * 0.06) * r, Math.max(1, 0.035 * r));
+    ctx.fill({ color: 0xffffff, alpha: 0.8 });
+  }
+  if (G.lens) {
+    const [lx, ly, lr] = G.lens;
+    ctx.circle(lx * r, ly * r, lr * r).fill({ color: 0xffffff, alpha: 0.9 }).stroke({ width: 1.6, color: brighten(color, 0.5), alpha: 1 });
+    ctx.circle(lx * r, ly * r, lr * 1.7 * r).stroke({ width: 1.1, color: brighten(color, 0.3), alpha: 0.75 });
+  }
+  if (G.lights.length) {
+    for (const [x, y] of G.lights) ctx.circle(x * r, y * r, Math.max(1.1, 0.04 * r));
+    ctx.fill({ color: brighten(color, 0.3), alpha: 0.7 });
+  }
+  if (hull && hull.p.pattern !== 'none') drawPattern(ctx, unit[0], hull.p, r);
+  if (pathIdx >= 0) drawCapitalTrim(ctx, cls, pathIdx, r, accent);
+  // hardpoint sockets (dim): a dark pad, a team ring and a cross-hair; domes cover the occupied ones
+  const sr = DOME_R * 0.78;
+  for (const [x, y] of SOCKET_UNIT) ctx.circle(x * r, y * r, sr);
+  ctx.fill({ color: 0x000000, alpha: 0.45 });
+  for (const [x, y] of SOCKET_UNIT) ctx.circle(x * r, y * r, sr);
+  ctx.stroke({ width: 1.1, color, alpha: 0.55 });
+  for (const [x, y] of SOCKET_UNIT) {
+    ctx.moveTo(x * r - sr * 0.45, y * r).lineTo(x * r + sr * 0.45, y * r).moveTo(x * r, y * r - sr * 0.45).lineTo(x * r, y * r + sr * 0.45);
+  }
+  ctx.stroke({ width: 0.8, color: brighten(color, 0.3), alpha: 0.4 });
+  // bridge spark
+  if (!(cls === 'tech' && pathIdx === 1)) ctx.circle(r * (cls === 'brute' ? -0.07 : cls === 'tech' ? 0.55 : 0.0), 0, Math.max(1.6, r * 0.075)).fill({ color: 0xffffff, alpha: 0.95 });
+  shipCache.set(key, ctx);
+  return ctx;
+}
+
+/** Spire outrigger shards (pulsing, like the Arcanist's nodes) / Foundry crane beacons (blinking). Null for the Dreadnought. */
+export function capitalAux(cls: ShipClassId, color: number, radius: number, nodeColor: number): GraphicsContext | null {
+  if (cls === 'brute') return null;
+  const r = Math.round(radius * 100) / 100;
+  const key = `cap|${cls}|${color}|${r}|${nodeColor}`;
+  let ctx = auxCache.get(key);
+  if (ctx) return ctx;
+  ctx = new GraphicsContext();
+  if (cls === 'tech') {
+    const shards = [diamond(0.22, 1.02, 0.12), diamond(0.22, -1.02, 0.12), diamond(-0.86, 0.9, 0.1), diamond(-0.86, -0.9, 0.1), diamond(1.9, 0, 0.1)];
+    neonPolys(ctx, shards.map((p) => scaled(p, r)), nodeColor, brighten(nodeColor, 0.4), 0.7, 1.3);
+  } else {
+    for (const [x, y] of [[0.56, 0.46], [-0.34, 0.5], [0.56, -0.46], [-0.34, -0.5]]) ctx.circle(x * r, y * r, Math.max(1.4, 0.05 * r));
+    ctx.fill({ color: nodeColor, alpha: 1 });
+  }
+  auxCache.set(key, ctx);
+  return ctx;
+}
+
+// ---------------------------------------------------------------------------------------------
+// v0.5 bubble-turret domes (px, DOME_R). The base never rotates (glass highlight from the top-left); the barrel
+// context rotates to the turret's own aim (+x). Team ring on every dome; accent only in ≤ 35% fills / thin strokes.
+// ---------------------------------------------------------------------------------------------
+
+/** Fixed dome base: occupied-socket glow, team ring, glass + highlight, bolts. `accent` (cosmetic) adds an inner ring. */
+export function domeBase(color: number, accent: number | null = null): GraphicsContext {
+  const key = `dome|${color}|${accent ?? ''}`;
+  let ctx = shipCache.get(key);
+  if (ctx) return ctx;
+  ctx = new GraphicsContext();
+  const R = DOME_R;
+  ctx.circle(0, 0, R + 2.5).stroke({ width: 5, color, alpha: 0.2 }); // the occupied socket glows
+  ctx.circle(0, 0, R).fill({ color: darken(color, 0.72), alpha: 0.42 }); // glassy: the hull and its outline show through
+  ctx.circle(0, 0, R * 0.74).fill({ color, alpha: 0.16 });
+  ctx.circle(0, 0, R).stroke({ width: 1.9, color, alpha: 1 });
+  ctx.circle(0, 0, R).stroke({ width: 0.7, color: brighten(color, 0.75), alpha: 0.9 });
+  if (accent !== null) ctx.circle(0, 0, R * 0.62).stroke({ width: 1, color: accent, alpha: 0.6 });
+  for (let i = 0; i < 4; i++) {
+    const a = Math.PI / 4 + (i * Math.PI) / 2;
+    ctx.circle(Math.cos(a) * R * 0.84, Math.sin(a) * R * 0.84, 0.9);
+  }
+  ctx.fill({ color: brighten(color, 0.5), alpha: 0.9 });
+  ctx.moveTo(Math.cos(-2.5) * R * 0.62, Math.sin(-2.5) * R * 0.62).arc(0, 0, R * 0.62, -2.5, -1.35)
+    .stroke({ width: 1.5, color: 0xffffff, alpha: 0.35, cap: 'round' });
+  shipCache.set(key, ctx);
+  return ctx;
+}
+
+/** Rotating dome barrel by kit (flak twin barrels / laser emitter lens / seeker pod with tubes), or the cosmetic mount. */
+export function domeBarrel(kit: TurretKitId, color: number, look: TurretLook | null = null): GraphicsContext {
+  const mount = look && look.p.mount !== 'std' ? look.p.mount : 'std';
+  const key = `barrel|${kit}|${color}|${mount}|${mount !== 'std' && look ? look.p.accent : ''}`;
+  let ctx = shipCache.get(key);
+  if (ctx) return ctx;
+  ctx = new GraphicsContext();
+  const R = DOME_R, c = brighten(color, 0.6), body = darken(color, 0.4);
+  if (mount !== 'std' && look) {
+    drawMount(ctx, mount, R * 0.95, color, look.p.accent);
+  } else if (kit === 'flak') { // twin short barrels on a breech block
+    for (const sy of [1, -1]) {
+      ctx.poly([R * 0.2, sy * R * 0.16, R * 1.3, sy * R * 0.16, R * 1.3, sy * R * 0.4, R * 0.2, sy * R * 0.4], true)
+        .fill({ color: body, alpha: 0.95 }).stroke({ width: 1.3, color: c, alpha: 1, join: 'round' });
+      ctx.poly([R * 1.22, sy * R * 0.1, R * 1.5, sy * R * 0.1, R * 1.5, sy * R * 0.46, R * 1.22, sy * R * 0.46], true)
+        .stroke({ width: 1.2, color: c, alpha: 1, join: 'round' });
+    }
+    ctx.poly([R * -0.1, R * 0.5, R * 0.55, R * 0.5, R * 0.55, R * -0.5, R * -0.1, R * -0.5], true)
+      .fill({ color: body, alpha: 0.9 }).stroke({ width: 1.3, color: c, alpha: 1 });
+  } else if (kit === 'laser') { // emitter prongs + lens
+    ctx.moveTo(R * 0.25, R * 0.36).lineTo(R * 1.35, R * 0.14).moveTo(R * 0.25, -R * 0.36).lineTo(R * 1.35, -R * 0.14)
+      .stroke({ width: 1.8, color: c, alpha: 1, cap: 'round' });
+    ctx.circle(R * 1.02, 0, R * 0.3).fill({ color: body, alpha: 0.9 }).stroke({ width: 1.3, color: c, alpha: 1 });
+    ctx.circle(R * 1.02, 0, R * 0.17).fill({ color: 0xffffff, alpha: 0.95 });
+  } else { // seeker pod with four tubes
+    ctx.roundRect(R * 0.02, -R * 0.52, R * 1.3, R * 1.04, R * 0.22).fill({ color: body, alpha: 0.95 }).stroke({ width: 1.3, color: c, alpha: 1 });
+    for (const [x, y] of [[1.08, 0.24], [1.08, -0.24], [0.72, 0.24], [0.72, -0.24]]) ctx.circle(x * R, y * R, R * 0.12);
+    ctx.fill({ color: 0xffffff, alpha: 0.95 });
+  }
+  // hub + gunner spark
+  ctx.circle(0, 0, R * 0.36).fill({ color: brighten(color, 0.2), alpha: 0.9 }).stroke({ width: 1, color: c, alpha: 1 });
+  ctx.circle(R * 0.08, 0, R * 0.14).fill({ color: 0xffffff, alpha: 0.95 });
   shipCache.set(key, ctx);
   return ctx;
 }

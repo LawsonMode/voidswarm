@@ -8,12 +8,17 @@
 // v0.3 M4: rift SFX — arming klaxon / seal slam / clear chime / regroup reset, chest open, portal open, departing,
 // descend (floorStart), extract, boss intro roar / phase roar, telegraph warn, spawn rumble, life lost, out of lives,
 // party wiped, instability, run end — plus a looping portal hum for the nearest open portal (render/beamBus).
+// v0.5: capital ships — transform whoosh + clank (and the fold-back) from the renderer's beamBus cues, the Broadside
+// volley, the Resonance Overcharge hum swell, the Repair Bay chime, and the mass-driver thump for turrets whose fire
+// preset is the mass driver (beamBus.turretFire).
 import type { IAudioFx } from '../contracts';
 import { NO_TEAM } from '../../shared/constants';
 import {
   BEAM_LASER, BEAM_WELD, type DeployableKind, type EntityId, type GameEvent, type PlayerId, type Rarity, type SkillId, type TeamId,
 } from '../../shared/types';
-import { beamBus } from '../render/beamBus';
+import { CUE_CAP_DOWN, CUE_CAP_UP, CUE_RING, beamBus } from '../render/beamBus';
+import { FIRE_CODE } from '../render/capital';
+import { OVERCHARGE_END } from '../../shared/sim/capital';
 
 const HEAR_DIST = 1600;
 const MAX_VOICES = 24;
@@ -28,7 +33,8 @@ type Kind =
   | 'hotWarn' | 'hotMoved' | 'hotArmed' | 'overtime'
   | 'roomArming' | 'roomSeal' | 'roomClear' | 'roomReset' | 'chestOpen' | 'portalOpen' | 'departing' | 'descend'
   | 'extract' | 'bossIntro' | 'bossPhase' | 'telegraph' | 'spawnWarn' | 'lifeLost' | 'outOfLives' | 'partyWiped'
-  | 'instability' | 'riftEnd';
+  | 'instability' | 'riftEnd'
+  | 'capUp' | 'capDown' | 'broadside' | 'overcharge' | 'repairbay' | 'massdriver';
 
 /** Minimum seconds between two sounds of the same kind. */
 const RATE: Record<Kind, number> = {
@@ -42,7 +48,11 @@ const RATE: Record<Kind, number> = {
   roomArming: 0.5, roomSeal: 0.5, roomClear: 0.6, roomReset: 0.6, chestOpen: 0.12, portalOpen: 0.5, departing: 1,
   descend: 1.5, extract: 0.3, bossIntro: 2, bossPhase: 1, telegraph: 0.2, spawnWarn: 0.25, lifeLost: 0.3,
   outOfLives: 0.5, partyWiped: 2, instability: 3, riftEnd: 2,
+  capUp: 0.12, capDown: 0.12, broadside: 0.25, overcharge: 0.5, repairbay: 0.5, massdriver: 0.06,
 };
+
+/** v0.5: a renderer cue older than this (ms) is stale (a tab in the background) and never plays. */
+export const CUE_FRESH_MS = 500;
 
 /** The rift events AudioFx voices (all but none: every RiftGameEvent type). */
 export type RiftSfxEvent = Extract<GameEvent['t'],
@@ -101,6 +111,8 @@ export class AudioFx implements IAudioFx {
   private portalHum: Hum | null = null;
   /** Test / debug: a portal hum is playing. */
   get portalHumOn(): boolean { return this.portalHum !== null; }
+  /** v0.5: newest beamBus cue already handled (-1 = not synced yet: cues from before unlock never play). */
+  private cueSeen = -1;
 
   unlock(): void {
     if (!this.ctx) {
@@ -144,12 +156,14 @@ export class AudioFx implements IAudioFx {
       this.hotArmSeen = beamBus.hotArmSeq;
       if (fresh) this.hotArmed();
     }
+    this.playCues(lx, ly);
     let pops = 0;
     for (const ev of events) {
       switch (ev.t) {
         case 'fire': {
           const sp = this.spatial(ev.x, ev.y, lx, ly); if (!sp) break;
-          this.primary(ev.skill, sp, ev.shipId === localShipId);
+          if (beamBus.turretFire.get(ev.shipId) === FIRE_CODE.massdriver) this.massDriver(sp, ev.shipId === localShipId);
+          else this.primary(ev.skill, sp, ev.shipId === localShipId);
           break;
         }
         case 'ability': {
@@ -496,6 +510,7 @@ export class AudioFx implements IAudioFx {
   private primary(skill: SkillId, sp: Sp, mine: boolean): void {
     const m = mine ? 1.5 : 1;
     switch (skill) {
+      case 'broadside': return; // v0.5: its 'ability' event plays the volley
       case 'autocannon':
         if (!this.gate('autocannon')) return;
         this.sweep(sp, 'sine', 170, 55, 0.12, 0.28 * m);
@@ -565,12 +580,114 @@ export class AudioFx implements IAudioFx {
         this.sweep(sp, 'triangle', 220, 660, 0.4, 0.14);
         this.tone(sp, 'sine', 880, 0.3, 0.06, 0.35);
         break;
+      // ---- v0.5 capital skills
+      case 'broadside': { // a rolling volley from both flanks: four heavy thumps a side, panned out
+        if (!this.gate('broadside')) return;
+        for (let i = 0; i < 4; i++) {
+          for (const side of [-1, 1]) {
+            const f = { g: sp.g, p: Math.max(-1, Math.min(1, sp.p + side * 0.35)) };
+            const dl = i * 0.045 + (side > 0 ? 0.02 : 0);
+            this.sweep(f, 'sine', 150, 38, 0.26, 0.2, dl);
+            this.noise(f, 0.16, 'lowpass', 1100, 0.14, 200, dl);
+          }
+        }
+        this.noise(sp, 0.05, 'highpass', 3800, 0.16);
+        this.noise(sp, 0.6, 'lowpass', 500, 0.1, 120, 0.12);
+        break;
+      }
+      case 'overcharge': // the spire's lasers swell: a rising detuned hum under a bright shimmer
+        if (!this.gate('overcharge')) return;
+        this.swell(sp, 'sawtooth', 98, 196, 1.3, 0.07, 0.55);
+        this.swell(sp, 'sawtooth', 98.9, 197.8, 1.3, 0.05, 0.55);
+        this.swell(sp, 'sine', 392, 784, 1.1, 0.06, 0.5);
+        this.noise(sp, 0.8, 'highpass', 5000, 0.04, undefined, 0.3);
+        break;
+      case 'repairbay': // bay doors chime open: a bell over a soft rising arpeggio
+        if (!this.gate('repairbay')) return;
+        for (const [f, gn] of [[1318.5, 0.12], [1975.5, 0.06], [2637, 0.035]] as const) this.tone(sp, 'sine', f, 0.9, gn);
+        [659.25, 783.99, 987.77, 1318.5].forEach((f, i) => this.tone(sp, 'triangle', f, 0.3, 0.09, 0.05 + i * 0.07));
+        this.noise(sp, 0.5, 'highpass', 7000, 0.035, undefined, 0.1);
+        break;
       default:
         break;
     }
   }
 
+  /** v0.5 mass-driver turret shot: a deep thump + a hard crack (replaces the class primary sound). */
+  private massDriver(sp: Sp, mine: boolean): void {
+    if (!this.gate('massdriver')) return;
+    const m = mine ? 1.4 : 1;
+    this.sweep(sp, 'sine', 120, 36, 0.24, 0.36 * m);
+    this.sweep(sp, 'square', 95, 48, 0.07, 0.07 * m);
+    this.noise(sp, 0.12, 'lowpass', 1600, 0.2 * m, 220);
+    this.noise(sp, 0.03, 'highpass', 4200, 0.1 * m);
+  }
+
+  /** v0.5 renderer cues (beamBus ring): the capital transform whoosh + clank / fold-back. Fresh cues only. */
+  private playCues(lx: number, ly: number): void {
+    const seq = beamBus.cueSeq;
+    if (this.cueSeen < 0) { this.cueSeen = seq; return; }
+    if (seq === this.cueSeen) return;
+    const now = performance.now();
+    const from = Math.max(this.cueSeen + 1, seq - CUE_RING + 1);
+    this.cueSeen = seq;
+    for (let q = from; q <= seq; q++) {
+      const c = beamBus.cues[q % CUE_RING];
+      if (!c || c.seq !== q || now - c.at > CUE_FRESH_MS) continue;
+      const sp = this.spatial(c.x, c.y, lx, ly);
+      if (!sp) continue;
+      if (c.kind === CUE_CAP_UP) this.capitalUp(sp);
+      else if (c.kind === CUE_CAP_DOWN) this.capitalDown(sp);
+    }
+  }
+
+  /** Transform: a rising whoosh as the hull swells, then armour plates clanking home. */
+  private capitalUp(sp: Sp): void {
+    if (!this.gate('capUp')) return;
+    this.noise(sp, 0.32, 'bandpass', 380, 0.22, 2600);
+    this.sweep(sp, 'sine', 170, 560, 0.3, 0.12);
+    this.tone(sp, 'square', 196, 0.07, 0.1, 0.27);
+    this.tone(sp, 'triangle', 740, 0.12, 0.08, 0.28);
+    this.tone(sp, 'triangle', 1108, 0.1, 0.05, 0.3);
+    this.noise(sp, 0.05, 'highpass', 3200, 0.16, undefined, 0.27);
+  }
+
+  /** Fold-back: a falling whoosh and a soft clunk. */
+  private capitalDown(sp: Sp): void {
+    if (!this.gate('capDown')) return;
+    this.noise(sp, 0.3, 'bandpass', 2200, 0.16, 380);
+    this.sweep(sp, 'sine', 480, 150, 0.28, 0.1);
+    this.tone(sp, 'triangle', 176, 0.1, 0.1, 0.24);
+  }
+
+  /** A slow swell (attack `attack` s, then an exponential tail), gliding f0 → f1 over `dur`. */
+  private swell(sp: Sp, type: OscillatorType, f0: number, f1: number, dur: number, gain: number, attack: number): void {
+    const ctx = this.ctx!;
+    if (this.voices >= MAX_VOICES) return;
+    const g = ctx.createGain();
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = sp.p;
+    g.connect(pan).connect(this.comp);
+    this.voices++;
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(gain * sp.g, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + attack);
+    o.connect(g); o.start(t); o.stop(t + dur + 0.02);
+    setTimeout(() => { this.voices--; try { pan.disconnect(); } catch { /* */ } }, (dur + 0.1) * 1000);
+  }
+
   private talent(talent: string, sp: Sp): void {
+    if (talent === OVERCHARGE_END) { // v0.5 the spire powers down: a short falling hum
+      if (!this.gate('overcharge')) return;
+      this.sweep(sp, 'sawtooth', 196, 70, 0.45, 0.05);
+      this.sweep(sp, 'sine', 392, 150, 0.4, 0.05);
+      return;
+    }
     if (!this.gate('talent')) return;
     switch (talent) {
       case 'ram_quake': this.boom(sp, 1.2, 'explode'); break;

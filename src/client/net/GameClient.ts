@@ -14,11 +14,11 @@ import { COSMETIC_SLOTS } from '../../shared/data/cosmetics';
 import { applyRoomSeals } from '../../shared/sim/floorgen';
 import { buildMatchMap, type MatchMapParams } from '../../shared/sim/mapgen';
 import { stepShipMovement } from '../../shared/sim/movement';
-import { turretOffset } from '../../shared/sim/world';
+import { capitalScale, turretOffset } from '../../shared/sim/world';
 import {
   GLOBAL_EVENT_TYPES, SHIPFLAG_CARRIER,
   type CosmeticId, type CosmeticSlot, type EntityId, type GameMap, type GameMode, type GameType, type InputState,
-  type PlayerId, type RiftView, type ShipClassId, type ShipView, type Snapshot, type SubMode, type YouState,
+  type PlayerId, type RiftView, type ShipClassId, type ShipStats, type ShipView, type Snapshot, type SubMode, type YouState,
 } from '../../shared/types';
 import { DeviceProfile } from '../profile/deviceProfile';
 import { LocalProfileStore } from '../profile/LocalProfileStore';
@@ -31,7 +31,7 @@ import {
   RenderClock,
 } from './interp';
 import { LocalTransport } from './LocalTransport';
-import { moveSkillsFor, predictRechargeMult, predictSpeedMult, Predictor, type PredictCtx } from './prediction';
+import { moveSkillsFor, predictRechargeMult, predictSpeedMult, predictStats, Predictor, type PredictCtx } from './prediction';
 import type { Transport } from './transport';
 import { UpgradePickGuard } from './upgradePick';
 import { WsTransport } from './WsTransport';
@@ -186,6 +186,8 @@ export class GameClient {
   private buffer: Snapshot[] = [];
   private clock = new RenderClock(SNAPSHOT_EVERY_ONLINE, 6, 15);
   private predictor = new Predictor(stepShipMovement, DT);
+  /** v0.5 own stats with the capital hull radius (ownStats), per snapshot stats object. */
+  private ownStatsMemo: { src: ShipStats; cls: ShipClassId; n: number; out: ShipStats } | null = null;
   /** CTF: tick the own ShipView first showed SHIPFLAG_CARRIER this carry (-1 = not carrying); see trackCarry. */
   private carrySinceTick = -1;
   private events = new EventQueue();
@@ -803,11 +805,25 @@ export class GameClient {
     this.predictor.reconcile(view, s.ackSeq, this.predictCtx(you, view, this.map), teleported);
   }
 
+  /**
+   * Own stats for prediction and own-host turret placement: v0.5 capital hull radius while hosting (predictStats).
+   * Memoized per snapshot stats object, so the 60 Hz input tick doesn't copy stats.
+   */
+  private ownStats(you: YouState, view: ShipView | undefined): ShipStats {
+    const cls: ShipClassId = view?.shipClass ?? this.me?.shipClass ?? 'brute';
+    const n = you.attachedTo ? 0 : you.turrets.length;
+    const m = this.ownStatsMemo;
+    if (m && m.src === you.stats && m.n === n && m.cls === cls) return m.out;
+    const out = predictStats(you, cls);
+    this.ownStatsMemo = { src: you.stats, cls, n, out };
+    return out;
+  }
+
   /** Everything the predictor needs from a snapshot: stats, map, energy, host / carrier slow-down, movement skills. */
   private predictCtx(you: YouState, view: ShipView | undefined, map: GameMap): PredictCtx {
     const tick = this.latest?.tick ?? 0;
     return {
-      stats: you.stats, map, energy: you.energy,
+      stats: this.ownStats(you, view), map, energy: you.energy,
       speedMult: predictSpeedMult(you.turrets.length, view?.flags ?? 0),
       rechargeMult: predictRechargeMult(this.carrySinceTick >= 0 ? (tick - this.carrySinceTick) / TICK_RATE : -1),
       skills: moveSkillsFor(you, view),
@@ -922,14 +938,16 @@ export class GameClient {
       }
     }
 
-    // Turrets ride their (interpolated or predicted) host, at the host's real radius (talents included).
+    // Turrets ride their (interpolated or predicted) host's hardpoints, at the host's real radius (talents and the v0.5
+    // capital scale included): read off the server's placement, else the class hull × capitalScale(turrets).
     const radii = hostRadii(br.b.ships);
     for (const s of ships) {
       if (!s.attachedTo) continue;
       const host = byId.get(s.attachedTo);
       if (!host) continue;
       const r = host.id === localShipId && you
-        ? you.stats.radius : radii.get(host.id) ?? SHIP_CLASSES[host.shipClass]?.base.radius ?? 16;
+        ? this.ownStats(you, host).radius
+        : radii.get(host.id) ?? (SHIP_CLASSES[host.shipClass]?.base.radius ?? 16) * capitalScale(Math.max(1, s.turretCount));
       const off = turretOffset(host.angle, Math.max(0, s.turretSlot), Math.max(1, s.turretCount), r);
       s.x = host.x + off.dx;
       s.y = host.y + off.dy;

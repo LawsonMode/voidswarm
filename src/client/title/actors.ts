@@ -5,7 +5,8 @@
 import { brighten, ENEMY_COLORS, mix } from '../render/palette';
 import { SHIP_CLASSES } from '../../shared/data/ships';
 import { TEAM_COLORS } from '../../shared/data/teams';
-import { turretOffset } from '../../shared/sim/world';
+import { TURRET_BUBBLE_RADIUS } from '../../shared/constants';
+import { capitalScale, turretOffset } from '../../shared/sim/world';
 import type { ShipClassId } from '../../shared/types';
 import { clamp, lerp, pick, range, type Rand } from './sceneMath';
 import { rgba, type Sprite, type SpriteCache } from './sprites';
@@ -602,10 +603,12 @@ export class Cast {
   /**
    * The set-piece: a Juggernaut with three Arcanist laser turrets (in-game turretOffset slots). Each laser
    * that joins multiplies the lance ×1.5 (LASER_RESONANCE), so the merged beam widens and heats to gold.
+   * v0.5: as in the game, the host flies its capital size (capitalScale(3)) and the turrets ride ON the hull at
+   * bubble size, on the 3-turret hardpoints (fore port / fore starboard / center aft).
    */
   spawnSetpiece(forceDir = 0): void {
     const { W, rand, S } = this.host;
-    const hostR = SHIP_CLASSES.brute.base.radius;
+    const hostR = SHIP_CLASSES.brute.base.radius * capitalScale(3);
     // Fly the stack in a clear band above or below the title column; shrink it (down to ×0.6) to fit the room.
     const unit = (hostR + 12 + 20) * 2.1; // formation height per unit of scale
     // Prefer the band over the grid floor: in the top band the white-gold lance crosses the sun, gold on gold.
@@ -621,7 +624,7 @@ export class Cast {
     // one scale k for hull radii AND turret offsets, so the stack matches the in-game geometry
     const host = this.craft('brute', color, 1, hostR * k);
     host.flame = 1.5;
-    const turrets = [0, 1, 2].map(() => this.craft('tech', color, 0.99, SHIP_CLASSES.tech.base.radius * k));
+    const turrets = [0, 1, 2].map(() => this.craft('tech', color, 0.99, TURRET_BUBBLE_RADIUS * 1.15 * k));
     const dir = forceDir || (rand() < 0.5 ? 1 : -1);
     const span = (hostR + 12 + 20) * k;
     const m = span + 420 * S;
@@ -693,20 +696,20 @@ export class Cast {
         if (t >= path.dur) { this.drop(host); for (const tr of turrets) this.drop(tr); return false; }
         return true;
       },
-      drawUnder: (ctx) => {
-        // tethers: host ↔ turret
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = rgba(color, 0.45);
-        ctx.lineWidth = 1.4 * S;
-        ctx.setLineDash([5 * S, 4 * S]);
-        ctx.beginPath();
-        for (const tr of turrets) { ctx.moveTo(host.x, host.y); ctx.lineTo(tr.x, tr.y); }
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.globalCompositeOperation = 'source-over';
+      drawUnder: () => {
+        // v0.5: no tethers (the turrets sit on the hull); their hardpoint rings are drawn in drawOver
       },
       drawOver: (ctx) => {
         const dpr = this.host.dpr, h = sprite.half;
+        // hardpoint rings: each bubble turret glows on its mount (the in-game dome ring)
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = rgba(brighten(color, 0.4), 0.55);
+        ctx.lineWidth = 1.3 * S;
+        ctx.beginPath();
+        for (const tr of turrets) { ctx.moveTo(tr.x + tr.r + 3 * S, tr.y); ctx.arc(tr.x, tr.y, tr.r + 3 * S, 0, Math.PI * 2); }
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
         for (const d of targets) {
           if (!d.alive) continue;
           const a = d.spin, c = Math.cos(a), s = Math.sin(a);

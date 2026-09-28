@@ -65,6 +65,8 @@ powershell -ExecutionPolicy Bypass -File scripts\host-online.ps1 -TunnelUrl http
 
 ## LAN only (classroom / home)
 
+On Windows the easiest way is a double-click on `scripts\host-local.bat`: it installs, builds, starts the server and prints the address friends open. The step-by-step guide is [LOCAL-HOSTING.md](LOCAL-HOSTING.md). By hand:
+
 ```powershell
 npm run build
 npm start          # serves the game + server on port 7777
