@@ -1,0 +1,17 @@
+Arcade Artificer Phaser + E-hold Ray @170/s (30 s): net2 -22/s | first brownout none | duty 0%
+   Ray alone @170/s: net2 225/s | first brownout none | duty 0%
+Arcade Artificer Phaser + E-hold Ray @200/s (30 s): net2 -59/s | first brownout 13.8 s | duty 12%
+   Ray alone @200/s: net2 195/s | first brownout none | duty 0%
+Arcade Artificer Phaser + E-hold Ray @210/s (30 s): net2 -72/s | first brownout 11.7 s | duty 15%
+   Ray alone @210/s: net2 185/s | first brownout none | duty 0%
+Arcade Artificer Phaser + E-hold Ray @230/s (30 s): net2 -97/s | first brownout 9.1 s | duty 22%
+   Ray alone @230/s: net2 165/s | first brownout none | duty 0%
+Arcade Polarize sustain @200/s alone (60 s): net2 180/s | first brownout none | duty 0%
+   + under fire 300 dps on shield: net2 90/s | first brownout 23.5 s | duty 3%
+   + MD held: net2 2/s | first brownout 5.8 s | duty 30%
+Arcade Polarize sustain @240/s alone (60 s): net2 180/s | first brownout none | duty 0%
+   + under fire 300 dps on shield: net2 90/s | first brownout 14.8 s | duty 3%
+   + MD held: net2 2/s | first brownout 5.6 s | duty 30%
+Arcade Polarize sustain @260/s alone (60 s): net2 180/s | first brownout 52.8 s | duty 2%
+   + under fire 300 dps on shield: net2 90/s | first brownout 12.9 s | duty 3%
+   + MD held: net2 2/s | first brownout 5.5 s | duty 30%

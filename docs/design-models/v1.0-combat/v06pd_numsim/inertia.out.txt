@@ -1,0 +1,37 @@
+=== Inertia (spec §6.1 model, 60 Hz) ===
+  v0.5 reference (MOVE_DRAG 1.2, no brake) from 470: to < 20 px/s in 2.62 s, 368 px (never exactly 0)
+  class | stop from max (t / px) | from AB | 0→90% max | 0→max | reversal: v=0 at / 90% back at / overshoot | 90° strafe: heading ≥80° at / 90% speed at / drift px | turn 180°
+  Jugg  | 2.68 s / 435 px      | 2.82 s / 505 | 0.63 s   | 0.70 s | 0.67 s / 1.30 s / 138 px            | 1.60 s / 0.98 s / 395 px                   | 0.31 s
+  Arca  | 0.23 s /  46 px      | 0.28 s /  84 | 0.42 s   | 0.47 s | 0.15 s / 0.57 s /  31 px            | 0.20 s / 0.42 s /  46 px                   | 0.20 s
+  Arti  | 0.88 s / 166 px      | 0.98 s / 226 | 0.48 s   | 0.53 s | 0.40 s / 0.88 s /  86 px            | 0.85 s / 0.58 s / 234 px                   | 0.24 s
+  strain / brownout: effective top speed ×STRAIN_SPEED[L] × 0.7 in brownout (L3 + brownout = ×0.525):
+   Jugg: L0 430, L2 387, L3 323, brownout 301, L3+brownout 226 px/s (drone 175 → 254 at H5; splitling 265 → 384; weaver 215 → 312)
+   Arca: L0 500, L2 450, L3 375, brownout 350, L3+brownout 263 px/s (drone 175 → 254 at H5; splitling 265 → 384; weaver 215 → 312)
+   Arti: L0 470, L2 423, L3 353, brownout 329, L3+brownout 247 px/s (drone 175 → 254 at H5; splitling 265 → 384; weaver 215 → 312)
+
+  capitals (host penalty max(0.5, 1−0.07n) on thrust & top speed; mass 1 + 0.25n divides thrust, drag, brake, knockback)
+   Jugg → Dreadnought:
+      n1: stop 3.23 s/493 px, 0→max 0.88 s, reverse 1.62 s (overshoot 161 px)
+      n2: stop 3.72 s/531 px, 0→max 1.05 s, reverse 1.93 s (overshoot 179 px)
+      n3: stop 4.13 s/550 px, 0→max 1.22 s, reverse 2.25 s (overshoot 192 px)
+      n4: stop 4.48 s/551 px, 0→max 1.40 s, reverse 2.58 s (overshoot 200 px)
+      n5: stop 4.75 s/535 px, 0→max 1.57 s, reverse 2.90 s (overshoot 203 px)
+   Arca → Spire:
+      n1: stop 0.27 s/52 px, 0→max 0.58 s, reverse 0.70 s (overshoot 35 px)
+      n2: stop 0.30 s/55 px, 0→max 0.68 s, reverse 0.83 s (overshoot 38 px)
+      n3: stop 0.32 s/55 px, 0→max 0.80 s, reverse 0.95 s (overshoot 39 px)
+      n4: stop 0.35 s/54 px, 0→max 0.92 s, reverse 1.08 s (overshoot 39 px)
+      n5: stop 0.35 s/50 px, 0→max 1.03 s, reverse 1.20 s (overshoot 38 px)
+   Arti → Foundry:
+      n1: stop 1.05 s/187 px, 0→max 0.67 s, reverse 1.08 s (overshoot 100 px)
+      n2: stop 1.20 s/200 px, 0→max 0.78 s, reverse 1.30 s (overshoot 110 px)
+      n3: stop 1.33 s/205 px, 0→max 0.92 s, reverse 1.50 s (overshoot 117 px)
+      n4: stop 1.43 s/204 px, 0→max 1.05 s, reverse 1.70 s (overshoot 120 px)
+      n5: stop 1.50 s/195 px, 0→max 1.18 s, reverse 1.90 s (overshoot 120 px)
+
+  knockback slide (impulse × knockTaken / mass, then coasting):
+   brute contact   520: Jugg 260 px/s → 212 px in 2.02 s | Arca 520 px/s → 50 px in 0.23 s | Arti 416 px/s → 138 px in 0.82 s | Dreadnought n5 135 px
+   splitter        220: Jugg 110 px/s → 55 px in 1.13 s | Arca 220 px/s → 10 px in 0.12 s | Arti 176 px/s → 34 px in 0.45 s | Dreadnought n5 30 px
+   Polarize shell  350: Jugg 175 px/s → 116 px in 1.57 s | Arca 350 px/s → 24 px in 0.17 s | Arti 280 px/s → 74 px in 0.63 s | Dreadnought n5 69 px
+   Hive/Matriarch  700: Jugg 350 px/s → 326 px in 2.40 s | Arca 700 px/s → 74 px in 0.28 s | Arti 560 px/s → 190 px in 0.93 s | Dreadnought n5 219 px
+  v0.5 comparison: brute contact knockback 520 px/s with MOVE_DRAG 1.2 slid ≈ 433 px (asymptotic).

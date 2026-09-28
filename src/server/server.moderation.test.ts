@@ -9,6 +9,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
+import { clearCustomTerms, setCustomTerms } from '../shared/moderation/filter';
 import { TERM_GROUPS, rot13 } from '../shared/moderation/lists';
 import { MSG_BLOCKED } from '../shared/room/moderation';
 import type { ClientMsg, ServerMsg } from '../shared/protocol';
@@ -315,4 +316,42 @@ describe('moderation on the real server', () => {
     expect((await fetch(`${base}/admin/..%2f..%2findex.ts`)).status).toBe(404);
     expect((await fetch(`${base}/admin`, { method: 'POST' })).status).toBe(405);
   }, 30_000);
+
+  it("host custom terms apply online: 'flag' lines / names are shown as typed and logged for review (API + CLI filter)", async () => {
+    // made-up neutral tokens; the host would load its list from the admin console
+    const r = setCustomTerms([
+      { term: 'zorblax', action: 'flag', category: 'crew', id: 'c1' },
+      { term: 'quenth', action: 'mask', category: 'crew' },
+    ]);
+    expect(r.ok).toBe(true);
+    try {
+      const scout = await connect('Zorblax_Scout');
+      expect((scout.msgs.find((m) => m.type === 'welcome') as Extract<ServerMsg, { type: 'welcome' }>).name).toBe('Zorblax_Scout');
+      await sleep(1100);
+      say(scout, 'meet at zorblax');
+      await teach.wait((m) => m.type === 'chat' && m.line.text === 'meet at zorblax');
+      say(scout, 'quenth and zorblax'); // masked 'q*****', then display taming cuts the star run to 3
+      await teach.wait((m) => m.type === 'chat' && m.line.text === 'q*** and zorblax');
+      expect(scout.system().some((t) => /blocked|muted/i.test(t))).toBe(false);
+      await sleep(1300); // the chat log is flushed every second
+      const log = await admin('log', tokens.Teach!, { player: 'Zorblax_Scout', action: 'flag' });
+      expect(log.status).toBe(200);
+      const lines = log.json.lines as { action: string; channel: string; hits: string[]; shown: string }[];
+      expect(lines.map((l) => [l.channel, l.action, l.shown])).toEqual([
+        ['all', 'mask', 'q*** and zorblax'], ['all', 'flag', 'meet at zorblax'], ['name', 'flag', 'Zorblax_Scout'],
+      ]);
+      expect(lines[0]!.hits).toEqual(['custom:crew:quenth', 'flag:crew:zorblax']);
+      // no strike for review-only hits: no automatic warning / mute
+      expect(scout.system().some((t) => /Warning|muted/.test(t))).toBe(false);
+      const out: string[] = [];
+      expect(await runCli(['log', '--review', '--player', 'Zorblax_Scout'], { out: (x) => out.push(x), err: () => {}, env: { DB_PATH: dbPath } })).toBe(0);
+      const text = out.join('');
+      expect(text).toContain('meet at zorblax  [for review: flag:crew:zorblax]');
+      expect(text).toContain('[masked → "q*** and zorblax"]  [for review: flag:crew:zorblax]');
+      expect(text).toContain('callsign attempt  Zorblax_Scout (guest) @127.0.0.1: Zorblax_Scout  [for review: flag:crew:zorblax]');
+      expect((await admin('log', tokens.Teach!, { action: 'nope' })).json.error).toMatch(/pass, flag, mask/);
+    } finally {
+      clearCustomTerms();
+    }
+  }, 20_000);
 });

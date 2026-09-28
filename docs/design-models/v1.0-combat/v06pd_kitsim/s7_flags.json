@@ -1,0 +1,44 @@
+[
+ {
+  "kit": "hero",
+  "sev": "MED",
+  "what": "Artificer LMB+RMB never browns out",
+  "detail": "Hero Kits Artificer (420/s reactor) holds Phaser + Repair Ray (held) indefinitely (net 3/s over the first 2 s)."
+ },
+ {
+  "kit": "arcade",
+  "sev": "MED",
+  "what": "Artificer LMB+RMB never browns out",
+  "detail": "Arcade Kit Artificer (420/s reactor) holds Phaser + Deploy Sentry indefinitely (net 66/s over the first 2 s)."
+ },
+ {
+  "kit": "sortie",
+  "sev": "MED",
+  "what": "Artificer LMB+RMB never browns out",
+  "detail": "Sortie Loadout Artificer (420/s reactor) holds Phaser + Deploy Sentry indefinitely (net 66/s over the first 2 s)."
+ },
+ {
+  "kit": "hero",
+  "sev": "MED",
+  "what": "Artificer heals forever while shooting",
+  "detail": "Hero puts the Repair Ray on RMB: Phaser + Ray is L2 and never browns out (the judge's \"builds that never brown out go away\" fix is undone for the healer). Move the Ray to an E stance (+1 load, as Arcade/Sortie) or charge it 170/s."
+ },
+ {
+  "kit": "arcade",
+  "sev": "MED",
+  "what": "Artificer Phaser + Ray sustainable",
+  "detail": "Phaser + E-hold Ray (L2, 170/s) never browns out in 30 s (net -22/s): the 420/s reactor still funds endless heal-while-shooting."
+ },
+ {
+  "kit": "sortie",
+  "sev": "MED",
+  "what": "Artificer Phaser + Ray sustainable",
+  "detail": "Phaser + E1-hold Ray (L2, 170/s) never browns out in 30 s (net -22/s)."
+ },
+ {
+  "kit": "sortie",
+  "sev": "MED",
+  "what": "Polarize + Event Horizon (the \"intended combo\") browns out mid-ult",
+  "detail": "MD + Polarize sustain + EH 60/s is L3 (x1.6, regen x0.6): first brownout at 4.3 s and brownout ENDS Event Horizon. The advertised combo lasts ~4.3 s of a 5 s ult; drop EH's power draw (the other kits make ults free) or exclude it from load."
+ }
+]

@@ -8,6 +8,13 @@ The operator guide (setup, privacy, ban scopes) is [`docs/MODERATION.md`](../../
   names and new account usernames.
   - `mask`: the line is shown with the words starred.
   - `block`: the line is withheld. The sender sees "Message blocked (language)." and gets a strike.
+  - `flag` (host custom terms only, see `docs/MODERATION.md` "Custom terms"): the line / name is allowed and shown as
+    typed, and logged with action `flag` and a `flag:<category>:<term>` hit for review — never a strike.
+    `log --review` / the dashboard's "For review" filter / API `log` `action: 'flag'` list them (a refused name that
+    also carries a `flag:` hit too: a refused name logs one label per hit). An **account** username that the current
+    lists match (a review-only term, or a custom term added after registration) is logged as `flag` on the `name`
+    channel on every join: the account keeps its name, no strike. `--flagged` / "Flagged" and the whois
+    `flagged24h` count only the lines the filter acted on (mask, block, spam, muted), never `flag` lines.
   - A refused guest callsign is replaced with a generated `Pilot1234`. A refused name is a strike only when it has
     a block-tier hit (slur, hate, sexual, threat); a profanity-only refusal is logged, not punished.
   - Repeating the same line floods out: the 3rd copy within 10 s is dropped.
@@ -71,7 +78,7 @@ online moderators.
 npm run mod -- promote <user> | demote <user> | admins
 npm run mod -- ban <name> <dur> <reason> | ipban <name|address> <dur> <reason> [--guests-only] | mute <name> <dur> [reason]
 npm run mod -- unban <name|#id|address> | unmute <name|#id> | bans [--all] [--mutes|--bans]
-npm run mod -- log [--player X] [--since 2h] [--grep text] [--flagged] [--limit n]
+npm run mod -- log [--player X] [--since 2h] [--grep text] [--flagged|--review] [--limit n]
 npm run -s mod -- export-log --since 7d > chat.csv        (or: export-log --since 7d --out chat.csv)
 npm run mod -- reports [--open] | review <id> [reviewed|dismiss|open] [note] | prune
 npm run mod -- purge-log --before 30d [--player X] | purge-log --all --yes

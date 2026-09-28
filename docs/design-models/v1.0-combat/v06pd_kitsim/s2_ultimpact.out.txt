@@ -1,0 +1,199 @@
+
+==============================================================================================================
+== S2-A. PvP burst per ultimate (remaining shield/integrity, or DOWN). "down" = target starts with 0 shield (broken), full integrity
+==============================================================================================================
+Pipeline: CR §7 (kinetic 0.8/1.2, energy 1/1, phase 2.5/0.9, ion 1.5/0.5, crush armor x0.5, emp shield-only), armor on integrity: Jugg 0.40, Arti 0.10.
+Arcanist integrity: Hero Kits 420 (as its checks quote), Arcade/Sortie 500 (judge fix). No hardening unless stated.
+kit    | ult            | case                                             | Jugg full | Jugg shields down | Arca full | Arca down | Arti full | Arti down
+-------|----------------|--------------------------------------------------|-----------|-------------------|-----------|-----------|-----------|----------
+Hero   | Wrecking Run   | 1 hit + shockwave (spec check)                   | 0/810     | 0/360             | 0/90      | DOWN      | 0/398     | DOWN     
+Hero   | Wrecking Run   | 2 hits + shockwave (loop re-hit)                 | 0/558     | 0/108             | DOWN      | DOWN      | 0/20      | DOWN     
+Hero   | Wrecking Run   | 3 hits + shockwave (max in 3 s)                  | 0/306     | DOWN              | DOWN      | DOWN      | DOWN      | DOWN     
+Hero   | Wrecking Run   | 2 hits + shock, ram_momentum x1.5                | 0/306     | DOWN              | DOWN      | DOWN      | DOWN      | DOWN     
+Hero   | Carpet Bomb    | parked on the lane (641 raw)                     | 0/888     | 0/438             | 0/221     | DOWN      | 0/515     | DOWN     
+Hero   | Carpet Bomb    | 80 px off the lane (450 raw)                     | 140/900   | 0/576             | 20/420    | DOWN      | 90/600    | 0/114    
+Hero   | Carpet Bomb    | parked + the Big One (450)                       | 0/564     | 0/114             | DOWN      | DOWN      | 0/29      | DOWN     
+Hero   | EMP Pulse      | 600 emp (shield only) + 2 s offline              | 0/900     | 0/900             | 0/420     | 0/420     | 0/600     | 0/600    
+Hero   | Ion Storm      | stationary full 6 s (24 arcs x 50 ion)           | 0/640     | 0/540             | DOWN      | DOWN      | 0/195     | 0/60     
+Hero   | Ion Storm      | reacts: 7 arcs (tell 0.5 s + 0.25 s + ~1 s out)  | 0/895     | 0/795             | 0/372     | 0/245     | 0/578     | 0/443    
+Hero   | Event Horizon  | crush only, 5 s inside the horizon (180 crush/s) | 0/580     | 0/180             | DOWN      | DOWN      | 0/172     | DOWN     
+Hero   | Hyperlance     | 1 rail (650 energy)                              | 0/810     | 0/510             | 0/150     | DOWN      | 0/420     | 0/15     
+Hero   | Hyperlance     | 2 rails                                          | 0/420     | 0/120             | DOWN      | DOWN      | DOWN      | DOWN     
+Hero   | Hyperlance     | 3 rails                                          | 0/30      | DOWN              | DOWN      | DOWN      | DOWN      | DOWN     
+Hero   | Drone Carrier  | 6 drones 1 s (6 x 150/s x0.6 = 540 kinetic/s)    | 68/900    | 0/511             | 0/342     | DOWN      | 18/600    | 0/17     
+Hero   | Drone Carrier  | 6 drones 2 s                                     | 0/572     | 0/122             | DOWN      | DOWN      | 0/41      | DOWN     
+Arcade | Event Horizon  | crush only, 4 s (Arena) inside the horizon       | 0/724     | 0/324             | 0/160     | DOWN      | 0/343     | DOWN     
+Arcade | Ion Storm      | stationary full 6 s (24 arcs x 45 ion)           | 0/676     | 0/576             | 0/87      | DOWN      | 0/249     | 0/114    
+Arcade | Ion Storm      | reacts: 6 arcs                                   | 95/900    | 0/819             | 0/492     | 0/365     | 45/600    | 0/479    
+Arcade | Overload Pulse | 600 emp + 1.5 s offline                          | 0/900     | 0/900             | 0/500     | 0/500     | 0/600     | 0/600    
+Arcade | Overload Pulse | + 2 bombs (2 x 300 kinetic) (spec check)         | 0/468     | 0/468             | DOWN      | DOWN      | DOWN      | DOWN     
+Sortie | Carpet Bomb    | per-target cap: 3 x 200 kinetic                  | 20/900    | 0/468             | 0/350     | DOWN      | 0/560     | DOWN     
+Sortie | Rampage        | 3 contacts (160 each, 1 per 0.5 s)               | 116/900   | 0/554             | 0/494     | DOWN      | 66/600    | 0/82     
+Sortie | Rampage        | 10 contacts (max 1 per 0.5 s for 5 s)            | 0/198     | DOWN              | DOWN      | DOWN      | DOWN      | DOWN     
+Sortie | Ion Storm      | stationary full 6 s (24 arcs x 40 ion)           | 0/712     | 0/612             | 0/147     | 0/20      | 0/303     | 0/168    
+Sortie | Hyperlance     | 1 beam 650 energy                                | 0/810     | 0/510             | 0/230     | DOWN      | 0/420     | 0/15     
+Sortie | Hyperlance     | +1 bomb (the spec's intended lethal combo)       | 0/594     | 0/294             | DOWN      | DOWN      | 0/96      | DOWN     
+Sortie | Black Star     | core 3 s (150/s) + collapse 400                  | 0/690     | 0/390             | 0/30      | DOWN      | 0/240     | DOWN     
+Sortie | Event Horizon  | crush only, 4 s PvP (180/s)                      | 0/724     | 0/324             | 0/160     | DOWN      | 0/343     | DOWN     
+Sortie | EMP Pulse      | 600 emp + 1.5 s offline + suppress               | 0/900     | 0/900             | 0/500     | 0/500     | 0/600     | 0/600    
+Sortie | Drone Carrier  | 6 drones 2 s (6 x 120/s x0.6 = 432 kinetic/s)    | 0/728     | 0/278             | 0/33      | DOWN      | 0/274     | DOWN     
+
+Two-ult team chains (EMP-type first, then one burst ult; full target):
+kit            | chain                               | Jugg  | Arca  | Arti 
+---------------|-------------------------------------|-------|-------|------
+Hero Kits      | EMP -> 1 Hyperlance rail            | 0/510 | DOWN  | 0/15 
+Hero Kits      | EMP -> 2 Hyperlance rails           | 0/120 | DOWN  | DOWN 
+Hero Kits      | EMP -> Wrecking Run (1 hit + shock) | 0/360 | DOWN  | DOWN 
+Hero Kits      | EMP -> Carpet Bomb (parked)         | 0/438 | DOWN  | DOWN 
+Hero Kits      | EMP -> Drone Carrier 1 s            | 0/511 | DOWN  | 0/17 
+Arcade Kit     | Overload -> Ion Storm 2 s (8 arcs)  | 0/792 | 0/320 | 0/438
+Arcade Kit     | Overload -> EH crush 2 s            | 0/612 | 0/140 | 0/258
+Sortie Loadout | EMP -> Hyperlance                   | 0/510 | DOWN  | 0/15 
+Sortie Loadout | EMP -> Carpet Bomb cap (3x200)      | 0/468 | DOWN  | DOWN 
+Sortie Loadout | EMP -> Black Star collapse (400)    | 0/660 | 0/100 | 0/240
+
+Judge burst rule (non-ult tools must not one-shot a full Arcanist):
+kit            | Ram + Salvo raw | Ram+Salvo -> full Arca | 2 bombs -> full Arca | Ram+Salvo+bomb
+---------------|-----------------|------------------------|----------------------|---------------
+Hero Kits      | 400 + 3x180     | DOWN                   | 0/270                | DOWN          
+Arcade Kit     | 400 + 3x180     | DOWN                   | 0/350                | DOWN          
+Sortie Loadout | 313 + 3x180     | 0/47                   | 0/350                | DOWN          
+
+EMP-type ults: seconds for a follow-up weapon to finish each class (target shield stripped by the EMP vs untouched):
+ult                | follow-up      | vs Jugg: after (without) | vs Arca       | vs Arti      
+-------------------|----------------|--------------------------|---------------|--------------
+EMP Pulse (Hero)   | Jugg MD @150px | 2.45 s (3.62)            | 0.58 s (1.52) | 1.05 s (2.10)
+EMP Pulse (Hero)   | Arca LZ @600px | 5.95 s (7.93)            | 1.67 s (3.17) | 2.63 s (4.42)
+EMP Pulse (Hero)   | Arti PH @400px | 7.53 s (8.43)            | 1.63 s (2.33) | 2.80 s (3.63)
+Overload (Arcade)  | Jugg MD @150px | 2.45 s (3.62)            | 0.82 s (1.75) | 1.05 s (2.10)
+Overload (Arcade)  | Arca LZ @600px | 5.95 s (7.93)            | 1.98 s (3.48) | 2.63 s (4.42)
+Overload (Arcade)  | Arti PH @400px | 7.53 s (8.43)            | 2.10 s (2.57) | 2.80 s (3.63)
+EMP Pulse (Sortie) | Jugg MD @150px | 2.45 s (3.62)            | 0.82 s (1.75) | 1.05 s (2.10)
+EMP Pulse (Sortie) | Arca LZ @600px | 5.95 s (7.93)            | 1.98 s (3.48) | 2.63 s (4.42)
+EMP Pulse (Sortie) | Arti PH @400px | 7.53 s (8.43)            | 2.10 s (2.57) | 2.80 s (3.63)
+
+Hyperlance dodge: lateral move needed = hull radius + 12 px (half of the 24 px rail); from rest, with a 0.25 s human reaction:
+class | lateral need | thrust time | reaction + move | dodge Hero 0.45 s spool (aim locked) | dodge Sortie 1.0 s charge (aim locked)
+------|--------------|-------------|-----------------|--------------------------------------|---------------------------------------
+Jugg  | 34 px        | 0.33 s      | 0.58 s          | NO                                   | yes                                   
+Arca  | 28 px        | 0.23 s      | 0.48 s          | NO                                   | yes                                   
+Arti  | 30 px        | 0.26 s      | 0.51 s          | NO                                   | yes                                   
+If the shooter may keep aiming during the spool/charge (Hero: "line along your aim"; Sortie: turn x0.5 = 5-8 rad/s), a moving target at 500 px needs only ~1 rad/s of tracking: NOT dodgeable except by LOS / walls / Warp / i-frames.
+
+Drone Carrier vs its counter ("shoot the drones"): time for a point-blank weapon to clear all drones vs time the drones need to finish you:
+kit            | you (shooting drones) | clear all drones | you while clearing          | TTK if you ignore them
+---------------|-----------------------|------------------|-----------------------------|-----------------------
+Hero Kits      | Jugg MD               | 4.0 s            | survives (59% of EHP taken) | 3.5 s                 
+Hero Kits      | Arca LZ               | 7.2 s            | DOWN at 1.8 s               | 1.5 s                 
+Hero Kits      | Arti PH               | 6.7 s            | DOWN at 2.6 s               | 2.1 s                 
+Sortie Loadout | Jugg MD               | 2.9 s            | survives (35% of EHP taken) | 4.3 s                 
+Sortie Loadout | Arca LZ               | 4.8 s            | DOWN at 3.0 s               | 2.1 s                 
+Sortie Loadout | Arti PH               | 4.5 s            | survives (90% of EHP taken) | 2.6 s                 
+
+Hero Lifeline vs focus fire (600 energy dps on an Arcanist / 900 on a Juggernaut): time to take down without / with Lifeline (heal 180/s capped 200, shield 120/s, 25% hardening, Last Breath once):
+target | focus dps | without | with Lifeline
+-------|-----------|---------|--------------
+Arca   | 600       | 1.32 s  | 3.22 s       
+Arti   | 700       | 1.58 s  | 3.67 s       
+Jugg   | 900       | 2.22 s  | 5.40 s       
+
+==============================================================================================================
+== S2-B. Swarm clear %: ult alone vs a floor-3 sealed-room pulse (6-pilot party at the centre, ~60 drone-equivalents incl. brutes/elites, heat speed x1.18)
+==============================================================================================================
+Damage is x hpScale in every kit, so the % is floor-invariant (except Sortie's pveScale cap of 4, table below). Kamikazes that reach a hull die there (not counted as ult clears).
+Parry weapons are OFF: this is the ult's own share. Clear % = ult-killed DE / (pulse DE + splitlings spawned). 6 seeds.
+ult                                      | window | clear % (DE) | bodies killed | kamikazes on hulls | on the caster | note                                     
+-----------------------------------------|--------|--------------|---------------|--------------------|---------------|------------------------------------------
+Hero Wrecking Run                        | 3.4 s  | 41%          | 24.7          | 43.3               | 4.2           |                                          
+Hero Carpet Bomb                         | 3.9 s  | 67%          | 47.0          | 25.0               | 11.8          |                                          
+Hero EMP Pulse                           | 2.4 s  | 0%           | 0.0           | 18.7               | 0.0           |                                          
+Hero Ion Storm                           | 6.5 s  | 49%          | 31.2          | 26.7               | 1.5           |                                          
+Hero Event Horizon                       | 5.3 s  | 27%          | 14.0          | 58.0               | 11.0          | caster = Arcanist                        
+Hero Event Horizon (parked 260 px out)   | 5.3 s  | 54%          | 39.3          | 32.7               | 21.0          | owner fantasy: alone on the event horizon
+Hero Hyperlance                          | 1.5 s  | 65%          | 41.5          | 17.5               | 0.0           |                                          
+Hero Drone Carrier                       | 10.3 s | 25%          | 10.7          | 61.7               | 6.5           |                                          
+Arcade Event Horizon                     | 5.3 s  | 26%          | 13.3          | 58.7               | 1.2           |                                          
+Arcade Event Horizon (parked 260 px out) | 5.3 s  | 46%          | 30.8          | 38.7               | 24.3          | owner fantasy: alone on the event horizon
+Arcade Ion Storm                         | 6.0 s  | 20%          | 11.3          | 36.7               | 0.0           |                                          
+Arcade Ion Storm Supercell               | 6.0 s  | 36%          | 22.7          | 47.8               | 2.5           |                                          
+Arcade Overload Pulse                    | 1.9 s  | 5%           | 3.0           | 20.8               | 0.0           |                                          
+Sortie Event Horizon                     | 5.0 s  | 27%          | 14.0          | 58.0               | 4.2           |                                          
+Sortie Event Horizon (parked 260 px out) | 5.0 s  | 54%          | 39.2          | 32.8               | 21.2          | owner fantasy: alone on the event horizon
+Sortie Carpet Bomb                       | 4.7 s  | 44%          | 29.8          | 31.5               | 10.2          |                                          
+Sortie Rampage                           | 5.0 s  | 35%          | 21.3          | 32.0               | 3.8           |                                          
+Sortie Ion Storm                         | 6.0 s  | 38%          | 22.5          | 40.5               | 1.5           |                                          
+Sortie Hyperlance                        | 1.2 s  | 32%          | 17.2          | 14.2               | 0.0           |                                          
+Sortie Black Star                        | 5.8 s  | 65%          | 46.2          | 22.5               | 0.0           |                                          
+Sortie EMP Pulse                         | 1.9 s  | 5%           | 3.0           | 20.7               | 0.0           |                                          
+Sortie Drone Carrier                     | 12.0 s | 26%          | 11.3          | 61.0               | 7.2           |                                          
+Utility-only ults (Lifeline, Citadel, Nanite Surge) clear 0% by design; EMP-type ults are CC (stun) rather than clear.
+Hero Event Horizon parked forward, floor 3: ~21.0 kamikaze contacts on the owner x 56 = 1186 contact damage vs owner EHP ~800 (148%).
+Hero Event Horizon parked forward, floor 6: ~21.0 kamikaze contacts on the owner x 72 = 1513 contact damage vs owner EHP ~800 (189%).
+Sortie Event Horizon parked forward, floor 3: ~21.2 kamikaze contacts on the owner x 30 = 637 contact damage vs owner EHP ~2000 (32%).
+Sortie Event Horizon parked forward, floor 6: ~21.2 kamikaze contacts on the owner x 38 = 813 contact damage vs owner EHP ~2000 (41%).
+
+Sortie pveScale cap 4 (min(4, maxHp/baseHp)): hpScale = tierHp x partyHp x heat hp (variant C ramp), n=6; share of full ult damage that survives the cap:
+difficulty | floor | hpScale (n6, mid-floor) | Sortie ult damage kept
+-----------|-------|-------------------------|-----------------------
+Veteran    | f1    | 2.05                    | 100%                  
+Veteran    | f3    | 2.81                    | 100%                  
+Veteran    | f6    | 4.04                    | 99%                   
+Veteran    | f9    | 5.38                    | 74%                   
+Nightmare  | f1    | 2.87                    | 100%                  
+Nightmare  | f3    | 3.93                    | 100%                  
+Nightmare  | f6    | 5.65                    | 71%                   
+Nightmare  | f9    | 7.54                    | 53%                   
+
+==============================================================================================================
+== S2-C. Event Horizon vs ships (CR movement, reaction 0.25 s, then full thrust outward; boost if the kit allows and power > 0)
+==============================================================================================================
+Target starts at rest at d0 from the anchored owner. "guns" adds the owner's LMB (Hero: Arcanist Laser 1265 px; Arcade/Sortie: Juggernaut MD 468 px, falloff) with 100% hits.
+kit            | target         | from 60 px (in the horizon)             | from 250 px                          | from 450 px                         
+---------------|----------------|-----------------------------------------|--------------------------------------|-------------------------------------
+Hero Kits      | Jugg           | out 1.63 s; 380/900 | guns 0/715        | out 1.33 s; 500/900 | guns 0/832     | out 0.95 s; 500/900 | guns 0/882    
+Hero Kits      | Arca           | out 1.18 s; 299/420 | guns 0/186        | out 0.93 s; 380/420 | guns 0/330     | out 0.65 s; 380/420 | guns 0/397    
+Hero Kits      | Arti           | out 1.30 s; 366/600 | guns 0/408        | out 1.03 s; 450/600 | guns 0/544     | out 0.70 s; 450/600 | guns 13/600   
+Hero Kits      | Dreadnought n1 | out 2.02 s; 350/900 | guns 0/640        | out 1.67 s; 500/900 | guns 0/773     | out 1.18 s; 500/900 | guns 0/831    
+Hero Kits      | Dreadnought n3 | out 3.70 s; 203/900 | guns 0/340        | out 3.10 s; 500/900 | guns 0/551     | out 2.23 s; 500/900 | guns 0/656    
+Hero Kits      | Dreadnought n5 | NOT OUT in 5 s; 8/900 | guns 0/259      | NOT OUT in 5 s; 227/900 | guns 0/360 | NOT OUT in 5 s; 275/900 | guns 0/395
+Hero Kits      | Spire n5       | out 2.63 s; 236/420 | guns DOWN@2.9     | out 2.12 s; 380/420 | guns DOWN@3.5  | out 1.37 s; 380/420 | guns 0/104    
+Hero Kits      | Foundry n5     | out 3.85 s; 201/600 | guns DOWN@3.9     | out 3.15 s; 450/600 | guns 0/24      | out 2.12 s; 450/600 | guns 0/194    
+Arcade Kit     | Jugg           | out 2.08 s; 341/900 | guns 0/487        | out 1.47 s; 500/900 | guns 81/900    | out 0.82 s; 500/900 | guns 401/900  
+Arcade Kit     | Arca           | out 1.47 s; 284/500 | guns 0/119        | out 1.07 s; 380/500 | guns 84/500    | out 0.63 s; 380/500 | guns 302/500  
+Arcade Kit     | Arti           | out 1.60 s; 348/600 | guns 0/278        | out 1.17 s; 450/600 | guns 129/600   | out 0.68 s; 450/600 | guns 369/600  
+Arcade Kit     | Dreadnought n1 | out 2.37 s; 323/900 | guns 0/392        | out 1.67 s; 500/900 | guns 26/900    | out 0.92 s; 500/900 | guns 392/900  
+Arcade Kit     | Dreadnought n3 | out 3.12 s; 272/900 | guns 0/176        | out 2.15 s; 500/900 | guns 0/818     | out 1.12 s; 500/900 | guns 375/900  
+Arcade Kit     | Dreadnought n5 | NOT OUT in 4 s; 176/900 | guns DOWN@3.3 | out 2.82 s; 500/900 | guns 0/704     | out 1.38 s; 500/900 | guns 349/900  
+Arcade Kit     | Spire n5       | out 2.47 s; 233/500 | guns DOWN@1.4     | out 1.78 s; 380/500 | guns 0/362     | out 0.98 s; 380/500 | guns 273/500  
+Arcade Kit     | Foundry n5     | out 2.82 s; 282/600 | guns DOWN@1.8     | out 2.00 s; 450/600 | guns 0/486     | out 1.08 s; 450/600 | guns 334/600  
+Sortie Loadout | Jugg           | out 1.52 s; 383/900 | guns 0/713        | out 1.22 s; 500/900 | guns 145/900   | out 0.80 s; 500/900 | guns 396/900  
+Sortie Loadout | Arca           | out 1.13 s; 296/500 | guns 0/298        | out 0.88 s; 380/500 | guns 127/500   | out 0.57 s; 380/500 | guns 307/500  
+Sortie Loadout | Arti           | out 1.23 s; 360/600 | guns 0/457        | out 0.95 s; 450/600 | guns 177/600   | out 0.62 s; 450/600 | guns 374/600  
+Sortie Loadout | Dreadnought n1 | out 1.83 s; 356/900 | guns 0/589        | out 1.50 s; 500/900 | guns 67/900    | out 0.97 s; 500/900 | guns 372/900  
+Sortie Loadout | Dreadnought n3 | out 3.00 s; 260/900 | guns 0/192        | out 2.45 s; 500/900 | guns 0/734     | out 1.60 s; 500/900 | guns 279/900  
+Sortie Loadout | Dreadnought n5 | NOT OUT in 4 s; 0/825 | guns DOWN@2.6   | NOT OUT in 4 s; 500/900 | guns 0/125 | NOT OUT in 4 s; 500/900 | guns 0/587
+Sortie Loadout | Spire n5       | out 2.32 s; 236/500 | guns DOWN@1.4     | out 1.83 s; 380/500 | guns 0/345     | out 1.05 s; 380/500 | guns 267/500  
+Sortie Loadout | Foundry n5     | out 3.08 s; 240/600 | guns DOWN@1.7     | out 2.47 s; 450/600 | guns 0/330     | out 1.48 s; 450/600 | guns 273/600  
+Cells: time to leave the pull radius; S/I after the ult (crush only); "guns" = same with the owner's weapon firing the whole time.
+
+Gravity Well (the Arcanist E, not an ult) on ships: live stepWell() pulls hostile ships at the full 900 px/s^2 (Deep Well x1.5 = 1350), uniform inside r;
+none of the kits changes that, only Sortie caps total hostile pull at SHIP_PULL_CAP 600. From 100 px (inside the 112 px damage core), reaction 0.25 s, boost allowed:
+kit            | target         | base well (900, r280, 3 s)         | Void + Deep Well (1350, r364, 5 s)
+---------------|----------------|------------------------------------|-----------------------------------
+Hero Kits      | Jugg           | out 2.13 s (1.3 s in the core)     | NOT OUT in 5 s                    
+Hero Kits      | Arca           | out 0.95 s (0.4 s in the core)     | out 1.58 s                        
+Hero Kits      | Arti           | out 1.42 s (0.9 s in the core)     | out 3.77 s                        
+Hero Kits      | Dreadnought n3 | NOT OUT in 3 s (3.0 s in the core) | NOT OUT in 5 s                    
+Arcade Kit     | Jugg           | out 2.13 s (1.3 s in the core)     | NOT OUT in 5 s                    
+Arcade Kit     | Arca           | out 0.95 s (0.4 s in the core)     | out 1.58 s                        
+Arcade Kit     | Arti           | out 1.42 s (0.9 s in the core)     | out 3.77 s                        
+Arcade Kit     | Dreadnought n3 | NOT OUT in 3 s (3.0 s in the core) | NOT OUT in 5 s                    
+Sortie Loadout | Jugg           | out 1.75 s (1.2 s in the core)     | out 1.97 s                        
+Sortie Loadout | Arca           | out 0.83 s (0.4 s in the core)     | out 0.97 s                        
+Sortie Loadout | Arti           | out 1.03 s (0.6 s in the core)     | out 1.17 s                        
+Sortie Loadout | Dreadnought n3 | NOT OUT in 3 s (2.1 s in the core) | NOT OUT in 5 s                    
+
+Event Horizon on the swarm (from S2-B, same pulse): see the "Hero/Arcade/Sortie Event Horizon" rows. Kamikaze crossing check:
+Hero: drone crosses the 51 px crush band in ~0.08 s at ~607 px/s, dies in 0.11 s -> REACHES THE HULL (contact x0.5); elite drone (480 hp) 0.32 s.
+Arcade: drone crosses the 57 px crush band in ~0.13 s at ~450 px/s, dies in 0.18 s -> REACHES THE HULL (contact x0.5); elite drone (480 hp) 0.53 s.
+Sortie: drone crosses the 57 px crush band in ~0.09 s at ~607 px/s, dies in 0.11 s -> REACHES THE HULL (contact x0.5); elite drone (480 hp) 0.32 s.

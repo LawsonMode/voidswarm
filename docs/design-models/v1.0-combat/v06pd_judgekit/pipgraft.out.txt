@@ -1,0 +1,5 @@
+sortie-dynamics pve 320 / arena 240: 100:0.30s/56deg  150:0.50s/119deg  200:0.63s/132deg  250:0.75s/129deg | flyby PvE 631 px (2.65x)  Arena 465 (1.95x)  MagnetL5 1251 (1.98x base)  Tractor 1547
+sortie-dynamics pve 260 / arena 200: 100:0.30s/54deg  150:0.50s/111deg  200:0.65s/116deg  250:0.85s/79deg | flyby PvE 502 px (2.11x)  Arena 400 (1.68x)  MagnetL5 1033 (2.06x base)  Tractor 1269
+sortie-dynamics pve 240 / arena 190: 100:0.30s/53deg  150:0.52s/118deg  200:0.67s/108deg  250:no | flyby PvE 465 px (1.95x)  Arena 380 (1.60x)  MagnetL5 976 (2.10x base)  Tractor 1164
+sortie-dynamics pve 220 / arena 180: 100:0.30s/52deg  150:0.52s/110deg  200:0.70s/93deg  250:no | flyby PvE 431 px (1.81x)  Arena 344 (1.44x)  MagnetL5 878 (2.04x base)  Tractor 1091
+hero flyby 509, arcade 471, current 238

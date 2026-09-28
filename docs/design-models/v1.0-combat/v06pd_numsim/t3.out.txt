@@ -1,0 +1,9 @@
+
+=== T3. Swarm survival: one endless sealed arena (pulses never stop, k capped at 8), heat ramps with minutes, NO lives; time to first death per class (s), 3 seeds (median) ===
+  cfg        | tier 1           tier 2           tier 3           tier 4           tier 5           tier 6           tier 7           tier 8           tier 9           tier 10          
+  solo Jugg  | J251             J153             J105             J59              J31              J46              J30              J25              J15              J46              
+  solo Arca  | A284             A138             A76              A45              A46              A23              A18              A10              A19              A18              
+  solo Arti  | R220             R120             R83              R65              R64              R27              R11              R23              R9               R7               
+  n4         | J144 A188 R179   J107 A63 R71     J62 A86 R64      J71 A62 R56      J60 A49 R40      J29 A39 R26      J17 A20 R18      J15 A13 R12      J10 A17 R19      J12 A25 R7       
+  n6         | J135 A119 R136   J140 A144 R112   J80 A80 R69      J43 A49 R45      J27 A30 R24      J27 A20 R23      J21 A29 R16      J13 A17 R17      J15 A21 R13      J14 A16 R18      
+  (J = Juggernaut, A = Arcanist, R = Artificer; median seconds until that class first dies)

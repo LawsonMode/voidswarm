@@ -1,22 +1,34 @@
 // OWNER: FILTER agent. Public API of the shared chat / name filter.
 //
-//   filterChat(text, opts?)  → { text, action: 'pass' | 'mask' | 'block', hits }
-//   checkName(name, opts?)   → { ok, reason?, hits? }       (callsigns, account usernames, room names, bot names)
+//   filterChat(text, opts?)  → { text, action: 'pass' | 'flag' | 'mask' | 'block', hits }
+//   checkName(name, opts?)   → { ok, action?: 'flag', reason?, hits? }   (callsigns, account usernames, room names, bot names)
 //   isSpam(recent, text, now) → boolean                      (repeat flood; see spam.ts)
 //   tameText(text)           → text with shouting lowercased and character floods collapsed (display only)
+//   setCustomTerms(entries) / clearCustomTerms() / compileCustomTerms(entries)   (host-managed terms; see custom.ts)
 //
 // Default strictness is 'strict' (classroom): profanity AND mild words (damn, hell, crap, ...) are starred out;
 // 'standard' lets the mild tier through. Slurs, hate, sexual terms, threats and self-harm statements always block
 // the whole line. Pure and deterministic, no DOM / Node APIs: the Node server and the browser's offline Zone run
-// exactly the same code. Word lists live in lists.ts (ROT13); the matcher in engine.ts.
-import { buildStream, compiled, scanStream, streamText, type RawHit, type ScanOptions, type Stream } from './engine';
-import { NUMERIC_TERMS, rot5, type Category, type Tier } from './lists';
+// exactly the same code. Word lists live in lists.ts (ROT13); the matcher in engine.ts; the host's runtime custom
+// terms in custom.ts (scanned on their own, so they only ever add hits).
+import { activeCustomTerms, scanCustom, type CustomTermSet } from './custom';
+import {
+  buildStream, builtinCodes, compiled, digitRuns, forEachNumber, scanStream, streamText,
+  type AllowCache, type DigitRun, type RawHit, type ScanOptions, type Stream,
+} from './engine';
+import type { Category, Tier } from './lists';
 
 export { isSpam, tameText, collapseFlood, isShouting, spamKey, type RecentLine } from './spam';
 export {
   SPAM_REPEAT_COUNT, SPAM_REPEAT_MS, CAPS_MIN_LEN, CAPS_RATIO, FLOOD_KEEP,
 } from './spam';
 export type { Category, MatchMode, Tier } from './lists';
+export {
+  CUSTOM_LIMITS, CustomTermSet, activeCustomTerms, clearCustomTerms, compileCustomTerms, setCustomTerms,
+  type CustomAction, type CustomCompileOptions, type CustomCompileResult, type CustomField, type CustomMatch,
+  type CustomScope, type CustomTermEntry, type CustomTermError, type CustomTermInput, type CustomTermStats,
+} from './custom';
+export { builtinDiagnostics, type CompileDiagnostic } from './engine';
 
 export type Strictness = 'strict' | 'standard';
 export const DEFAULT_STRICTNESS: Strictness = 'strict';
@@ -32,33 +44,60 @@ export function parseStrictness(v: unknown): Strictness {
 export interface FilterOptions {
   /** 'strict' (default, classroom) also masks the mild tier; 'standard' lets it through. */
   strictness?: Strictness;
+  /**
+   * Custom terms for this call: omitted = the host's installed set (setCustomTerms), null = built-in lists only,
+   * or a set from compileCustomTerms.
+   */
+  custom?: CustomTermSet | null;
 }
 
-export type FilterAction = 'pass' | 'mask' | 'block';
+/**
+ * 'pass' = nothing matched; 'flag' = only review-only custom hits (shown unchanged, logged for review, no strike);
+ * 'mask' = starred words; 'block' = withheld.
+ */
+export type FilterAction = 'pass' | 'flag' | 'mask' | 'block';
+/** A hit's tier: 'block' withholds, 'mask' stars the word, 'flag' only reports it (custom terms). */
+export type HitTier = 'mask' | 'block' | 'flag';
+export type HitSource = 'builtin' | 'custom';
 
 /**
  * One matched term. `term` is the canonical spelling (for the moderator log — never show it back in chat);
- * `tier` 'block' withholds the line, 'mask' stars the word (a mild word in strict mode is a 'mask' hit).
+ * `tier` 'block' withholds the line, 'mask' stars the word (a mild word in strict mode is a 'mask' hit), 'flag'
+ * (custom terms only) leaves the line as typed and only reports the hit. `category` is a lists.ts Category for
+ * built-in hits and the host's label for custom ones; `source` says which; `id` is the custom entry's id.
  * String(hit) is the term, so `hits.map(String)` gives a log-friendly list.
  */
 export class FilterHit {
-  constructor(readonly term: string, readonly tier: 'mask' | 'block', readonly category: Category) {}
+  constructor(
+    readonly term: string,
+    readonly tier: HitTier,
+    readonly category: string,
+    readonly source: HitSource = 'builtin',
+    readonly id: string | null = null,
+  ) {}
   toString(): string { return this.term; }
-  toJSON(): { term: string; tier: 'mask' | 'block'; category: Category } {
-    return { term: this.term, tier: this.tier, category: this.category };
+  toJSON(): { term: string; tier: HitTier; category: string; source?: 'custom'; id?: string } {
+    const o: { term: string; tier: HitTier; category: string; source?: 'custom'; id?: string } = { term: this.term, tier: this.tier, category: this.category };
+    if (this.source === 'custom') {
+      o.source = 'custom';
+      if (this.id) o.id = this.id;
+    }
+    return o;
   }
 }
 
 export interface FilterResult {
-  /** What to show: the input for 'pass'; offending words starred ("f***") for 'mask' AND 'block' (never shown). */
+  /** What to show: the input for 'pass' / 'flag'; offending words starred ("f***") for 'mask' AND 'block' (never shown). */
   text: string;
   action: FilterAction;
-  /** Distinct matched terms, most severe first (at most one entry per term). */
+  /** Distinct matched terms, most severe first (block, mask, flag; at most one entry per term and source). */
   hits: FilterHit[];
 }
 
 export interface NameCheck {
   ok: boolean;
+  /** 'flag': the name is allowed, but review-only custom terms matched (`hits`, tier 'flag') — log it, no strike. */
+  action?: 'flag';
   /** Log-friendly reason when refused ("offensive name (profanity)"); never contains the matched term. */
   reason?: string;
   /** The matched terms (for the moderator log). */
@@ -71,34 +110,110 @@ export const FILTER_MAX_INPUT = 4000;
 /** Stars after the kept first letter: one per hidden letter, at least 1, at most MAX_STARS. */
 const MAX_STARS = 8;
 
-const TIER_ORDER: Readonly<Record<Tier, number>> = { block: 0, mask: 1, mild: 2 };
+const TIER_ORDER: Readonly<Record<Tier | 'flag', number>> = { block: 0, mask: 1, mild: 2, flag: 3 };
+const HIT_ORDER: Readonly<Record<HitTier, number>> = { block: 0, mask: 1, flag: 2 };
 
-function scan(text: string, strict: boolean, name: boolean): { st: Stream; hits: RawHit[] } {
-  const opt: ScanOptions = { strict, name };
-  const st = buildStream(text);
-  return { st, hits: scanStream(st, opt) };
+/** A number-code hit: the span to star (unless tier 'flag') and the reported hit. */
+interface NumHit { span: MaskSpan; hit: FilterHit }
+
+interface Scan {
+  st: Stream;
+  /** built-in word hits (after the allowlist) */
+  builtin: RawHit[];
+  /** custom word hits (after the allowlist and the anchor gate) */
+  custom: RawHit[];
+  /** number codes: built-in and custom */
+  nums: NumHit[];
 }
 
+const NO_RUNS: readonly DigitRun[] = [];
+
+/** Does the text contain a digit (ASCII fast path; any non-ASCII character is checked by digitRuns itself)? */
+function mayHaveDigits(text: string): boolean {
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if ((c >= 48 && c <= 57) || c >= 128) return true;
+  }
+  return false;
+}
+
+function resolveCustom(opts: FilterOptions | undefined): CustomTermSet | null {
+  const c = opts?.custom === undefined ? activeCustomTerms() : opts.custom;
+  return c && c.size ? c : null;
+}
+
+/** One pass over `text`: built-in words, number codes, then the custom terms (with their anchor gate). */
+function scan(text: string, strict: boolean, name: boolean, custom: CustomTermSet | null): Scan {
+  const opt: ScanOptions = { strict, name };
+  const st = buildStream(text);
+  const cache: AllowCache = { spans: null };
+  const builtin = scanStream(st, opt, cache);
+  const runs = mayHaveDigits(text) ? digitRuns(text) : NO_RUNS;
+  const nums: NumHit[] = [];
+  if (runs.length) {
+    const codes = builtinCodes();
+    // the whole run, or one group of it standing on its own ("wave 3 <code>", "Ace_<code>_2")
+    const check = (r: DigitRun): void => {
+      const category = r.digits ? codes.get(r.digits) : undefined;
+      // chat: starred and logged — mask tier, so an innocent number costs no strike; names: refused
+      if (category) nums.push({ span: runSpan(r), hit: new FilterHit(r.digits, name ? 'block' : 'mask', category) });
+    };
+    for (const r of runs) forEachNumber(r, check);
+  }
+  let customHits: RawHit[] = [];
+  if (custom) {
+    const r = scanCustom(custom, st, runs, opt, cache);
+    customHits = r.hits;
+    for (const x of r.codes) {
+      nums.push({ span: runSpan(x.run), hit: new FilterHit(x.info.term, x.info.tier as HitTier, x.info.category, 'custom', x.info.id) });
+    }
+  }
+  return { st, builtin, custom: customHits, nums };
+}
+
+const runSpan = (r: DigitRun): MaskSpan => ({ o0: r.o0, o1: r.o1, hidden: Math.max(1, r.digits.length - 1) });
+
+const hitTierOf = (t: RawHit['term']['tier']): HitTier => (t === 'block' ? 'block' : t === 'flag' ? 'flag' : 'mask');
+
 /**
- * Distinct terms, most severe first. A hit lying inside an already-kept hit of the same or a higher tier is
- * dropped ("motherf...er" reports one term, not also its 4-letter core; "f**k" reports one reading, not every
- * term its wildcards could spell).
+ * Distinct terms of ONE source, most severe first. A hit lying inside an already-kept hit of the same or a higher
+ * tier is dropped ("motherf...er" reports one term, not also its 4-letter core; "f**k" reports one reading, not
+ * every term its wildcards could spell).
  */
 function reportHits(raw: readonly RawHit[]): FilterHit[] {
+  if (!raw.length) return [];
   const sorted = [...raw].sort((a, b) => TIER_ORDER[a.term.tier] - TIER_ORDER[b.term.tier]
     || (b.e - b.s) - (a.e - a.s) || (b.te - b.s) - (a.te - a.s) || a.term.rank - b.term.rank);
   const kept: RawHit[] = [];
-  for (const h of sorted) {
-    if (!kept.some((k) => k.s <= h.s && k.e >= h.e)) kept.push(h);
+  outer: for (let i = 0; i < sorted.length; i++) {
+    const h = sorted[i];
+    for (let j = 0; j < kept.length; j++) if (kept[j].s <= h.s && kept[j].e >= h.e) continue outer;
+    kept.push(h);
   }
   const seen = new Set<string>();
   const out: FilterHit[] = [];
   for (const h of kept) {
     if (seen.has(h.term.key)) continue;
     seen.add(h.term.key);
-    out.push(new FilterHit(h.term.term, h.term.tier === 'block' ? 'block' : 'mask', h.term.category));
+    const t = h.term;
+    out.push(t.source === 'custom'
+      ? new FilterHit(t.term, hitTierOf(t.tier), t.category, 'custom', t.id)
+      : new FilterHit(t.term, hitTierOf(t.tier), t.category));
   }
   return out;
+}
+
+/**
+ * Every hit of a scan: built-in words, custom words, then number codes; at most one entry per term and source;
+ * most severe first (a stable sort, so built-in hits keep their order within a tier). Built-in and custom hits are
+ * reported side by side — a custom entry spelled like a built-in term shows up with its own label.
+ */
+function reportAll(sc: Scan): FilterHit[] {
+  const out = [...reportHits(sc.builtin), ...reportHits(sc.custom)];
+  for (const x of sc.nums) {
+    if (!out.some((h) => h.source === x.hit.source && h.term === x.hit.term)) out.push(x.hit);
+  }
+  return out.sort((a, b) => HIT_ORDER[a.tier] - HIT_ORDER[b.tier]);
 }
 
 /** A span of the ORIGINAL text to star out: [o0, o1) UTF-16 offsets; `hidden` = how many stars it stands for. */
@@ -128,107 +243,56 @@ function maskText(text: string, st: Stream, raw: readonly RawHit[], extra: reado
   return out + text.slice(at);
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Number codes (lists.ts NUMERIC_TERMS): digits are not letters to the word matcher, so they get their own scan.
-// ---------------------------------------------------------------------------------------------------------------
-
-let NUMERIC: { code: string; category: Category }[] | null = null;
-const numericTerms = (): { code: string; category: Category }[] =>
-  (NUMERIC ??= NUMERIC_TERMS.map((t) => ({ code: rot5(t.code), category: t.category })));
-
-/** Separators allowed (one at a time) between the digits of one code ("14 88", "14.88", "14/88"). */
-const DIGIT_SEP = new Set([' ', '.', '-', '_', '|', '/', ':', '\u00B7']);
-const RE_FORMAT = /^\p{Cf}$/u;
-
-/** Decimal value of one character: ASCII, fullwidth, mathematical or other compatibility digits; else -1. */
-function digitOf(ch: string): number {
-  const c = ch.charCodeAt(0);
-  if (c < 128) return c >= 48 && c <= 57 ? c - 48 : -1;
-  const k = ch.normalize('NFKC');
-  if (k.length === 1) {
-    const d = k.charCodeAt(0);
-    if (d >= 48 && d <= 57) return d - 48;
-  }
-  return -1;
-}
-
-/** Digit runs of `text` that spell a listed code exactly (a longer number such as "21488" does not). */
-function numericSpans(text: string): { span: MaskSpan; hit: FilterHit }[] {
-  const codes = numericTerms();
-  const out: { span: MaskSpan; hit: FilterHit }[] = [];
-  const at = (i: number): [string, number] => {
-    const cp = text.codePointAt(i) ?? 0;
-    const w = cp > 0xFFFF ? 2 : 1;
-    return [text.slice(i, i + w), w];
-  };
-  for (let i = 0; i < text.length;) {
-    const [ch, w] = at(i);
-    if (digitOf(ch) < 0) { i += w; continue; }
-    let digits = '';
-    let end = i;
-    let j = i;
-    while (j < text.length && digits.length <= 16) {
-      const [c2, w2] = at(j);
-      if (digitOf(c2) >= 0) { digits += String(digitOf(c2)); j += w2; end = j; continue; }
-      if (RE_FORMAT.test(c2)) { j += w2; continue; } // zero-width characters between digits
-      if (j === end && DIGIT_SEP.has(c2) && j + w2 < text.length && digitOf(at(j + w2)[0]) >= 0) { j += w2; continue; }
-      break;
-    }
-    const code = codes.find((x) => x.code === digits);
-    if (code) out.push({ span: { o0: i, o1: end, hidden: digits.length - 1 }, hit: new FilterHit(code.code, 'mask', code.category) });
-    i = Math.max(end, i + w);
-  }
-  return out;
-}
-
-/** Codes hidden anywhere in a name's digits ("Pilot1488", "14Ace88"). */
-function numericInName(name: string): FilterHit[] {
-  let digits = '';
-  for (const ch of name) { const d = digitOf(ch); if (d >= 0) digits += String(d); }
-  if (digits.length < 2) return [];
-  return numericTerms().filter((x) => digits.includes(x.code)).map((x) => new FilterHit(x.code, 'block', x.category));
-}
-
 /**
- * Filter one chat line. 'block' when any block-tier term matches (slur, hate, sexual, threat, self-harm);
- * otherwise 'mask' when profanity (or, in strict mode, a mild word) matches; otherwise 'pass'.
- * Matching sees through case, leetspeak, look-alike letters, zero-width characters, repeated letters, spacing /
- * punctuation between letters and common suffixes, while boundary rules + an allowlist keep ordinary words
- * ("class", "Scunthorpe", "cocktail") clean.
+ * Filter one chat line. 'block' when any block-tier term matches (slur, hate, sexual, threat, self-harm, or a
+ * custom 'block' entry); otherwise 'mask' when profanity (or, in strict mode, a mild word, or a custom 'mask' entry)
+ * matches; otherwise 'flag' when only review-only custom entries matched (the line is shown as typed); otherwise
+ * 'pass'. Matching sees through case, leetspeak, look-alike letters, zero-width characters, repeated letters,
+ * spacing / punctuation between letters and common suffixes, while boundary rules + an allowlist keep ordinary words
+ * ("class", "Scunthorpe", "cocktail") clean. Number codes match whole digit runs only.
  */
 export function filterChat(text: unknown, opts?: FilterOptions): FilterResult {
   let input = typeof text === 'string' ? text : '';
   if (input.length > FILTER_MAX_INPUT) input = input.slice(0, FILTER_MAX_INPUT);
   if (!input) return { text: input, action: 'pass', hits: [] };
   const strict = (opts?.strictness ?? DEFAULT_STRICTNESS) !== 'standard';
-  const { st, hits } = scan(input, strict, false);
-  const nums = numericSpans(input);
-  if (!hits.length && !nums.length) return { text: input, action: 'pass', hits: [] };
-  const report = reportHits(hits);
-  for (const x of nums) if (!report.some((h) => h.term === x.hit.term)) report.push(x.hit);
-  const action: FilterAction = report.some((h) => h.tier === 'block') ? 'block' : 'mask';
-  return { text: maskText(input, st, hits, nums.map((x) => x.span)), action, hits: report };
+  const sc = scan(input, strict, false, resolveCustom(opts));
+  if (!sc.builtin.length && !sc.custom.length && !sc.nums.length) return { text: input, action: 'pass', hits: [] };
+  const report = reportAll(sc);
+  const action: FilterAction = report.some((h) => h.tier === 'block') ? 'block' : report.some((h) => h.tier === 'mask') ? 'mask' : 'flag';
+  if (action === 'flag') return { text: input, action, hits: report };
+  const words = sc.custom.length ? [...sc.builtin, ...sc.custom.filter((h) => h.term.tier !== 'flag')] : sc.builtin;
+  const spans = sc.nums.filter((x) => x.hit.tier !== 'flag').map((x) => x.span);
+  return { text: maskText(input, sc.st, words, spans), action, hits: report };
 }
 
 const CATEGORY_LABEL: Readonly<Record<Category, string>> = {
   slur: 'slur', hate: 'hate', sexual: 'sexual', threat: 'threat', selfharm: 'self-harm', profanity: 'profanity', mild: 'profanity',
 };
 
+const labelOf = (h: FilterHit): string =>
+  (h.source === 'custom' ? `custom: ${h.category}` : CATEGORY_LABEL[h.category as Category] ?? h.category);
+
 /**
- * May `name` be used as a callsign / account username / room name / bot name? Any hit refuses it — including
- * the mild tier in strict mode, the name-only list (hate figures), and longer terms hidden inside a word
- * ("xxBadWordxx"). Empty / non-string input is ok (the caller's sanitizer supplies a fallback).
+ * May `name` be used as a callsign / account username / room name / bot name? Any block / mask hit refuses it —
+ * including the mild tier in strict mode, the name-only list (hate figures), longer terms hidden inside a word
+ * ("xxBadWordxx") and number codes as a whole digit run or a group of one ("Pilot<code>", "Ace_<co>_<de>",
+ * "Ace_<code>_2", but not "<co>Ace<de>"). A callsign's number is a number, not leet completing a term inside the
+ * name ("Juliana1" is fine).
+ * Only review-only custom hits → ok, with action 'flag' and the hits (log it, no strike). Empty / non-string input
+ * is ok (the caller's sanitizer supplies a fallback).
  */
 export function checkName(name: unknown, opts?: FilterOptions): NameCheck {
   let input = typeof name === 'string' ? name : '';
   if (input.length > FILTER_MAX_INPUT) input = input.slice(0, FILTER_MAX_INPUT);
   if (!input) return { ok: true };
   const strict = (opts?.strictness ?? DEFAULT_STRICTNESS) !== 'standard';
-  const { hits } = scan(input, strict, true);
-  const nums = numericInName(input);
-  if (!hits.length && !nums.length) return { ok: true };
-  const report = [...reportHits(hits), ...nums];
-  return { ok: false, reason: `offensive name (${CATEGORY_LABEL[report[0].category]})`, hits: report };
+  const sc = scan(input, strict, true, resolveCustom(opts));
+  if (!sc.builtin.length && !sc.custom.length && !sc.nums.length) return { ok: true };
+  const report = reportAll(sc);
+  const refusing = report.find((h) => h.tier !== 'flag');
+  if (!refusing) return { ok: true, action: 'flag', hits: report };
+  return { ok: false, reason: `offensive name (${labelOf(refusing)})`, hits: report };
 }
 
 /**
@@ -247,7 +311,7 @@ export function listStats(): { block: number; mask: number; mild: number; nameOn
   const out = { block: 0, mask: 0, mild: 0, nameOnly: 0, allow: c.allowPhrase.length };
   for (const t of c.terms) {
     if (t.nameOnly) out.nameOnly++;
-    else out[t.tier]++;
+    else if (t.tier !== 'flag') out[t.tier]++;
   }
   return out;
 }

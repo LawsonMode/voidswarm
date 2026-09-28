@@ -92,7 +92,8 @@ describe('formatting', () => {
 
 describe('chat actions', () => {
   it('knows every contract action; blocked / spam / muted are "not shown"', () => {
-    expect(Object.keys(CHAT_ACTIONS).sort()).toEqual(['block', 'mask', 'muted', 'pass', 'spam']);
+    expect(Object.keys(CHAT_ACTIONS).sort()).toEqual(['block', 'flag', 'mask', 'muted', 'pass', 'spam']);
+    expect(chatActionInfo('flag')).toMatchObject({ id: 'flag', label: 'For review', hidden: false });
     expect(chatActionInfo('block')).toMatchObject({ id: 'block', hidden: true });
     expect(chatActionInfo('spam').hidden).toBe(true);
     expect(chatActionInfo('muted').hidden).toBe(true);
@@ -107,6 +108,7 @@ describe('chat actions', () => {
     expect(chatRowClass('mask')).toBe('row-mask');
     expect(chatRowClass('spam')).toBe('row-spam');
     expect(chatRowClass('muted')).toBe('row-spam');
+    expect(chatRowClass('flag')).toBe('row-flag');
     expect(chatRowClass('pass')).toBe('');
   });
 });
@@ -120,6 +122,7 @@ describe('buildLogQuery', () => {
   it('maps a quick range to a duration and the cursor to before', () => {
     const r = buildLogQuery({ grep: 'hello', action: 'flagged', range: '1d', roomId: 'r7' }, 1234, 25);
     expect(r.query).toEqual({ grep: 'hello', action: 'flagged', since: '1d', roomId: 'r7', limit: 25, before: 1234 });
+    expect(buildLogQuery({ action: 'flag' }, null).query).toEqual({ action: 'flag', limit: 50 });
   });
 
   it('custom range → since / until in ms; validates order and format', () => {

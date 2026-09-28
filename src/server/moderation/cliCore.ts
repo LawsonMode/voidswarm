@@ -32,8 +32,10 @@ Bans and mutes (durations: 10m 2h 1d 7d perm)
   bans [--all] [--mutes|--bans]      list active bans / mutes (--all: include lifted and expired)
 
 Chat log and reports
-  log [--player X] [--since 2h] [--grep text] [--flagged] [--limit n]
-  export-log [--since 7d] [--player X] [--flagged] [--out file.csv]
+  log [--player X] [--since 2h] [--grep text] [--flagged|--review] [--limit n]
+                                     --flagged: every line the filter acted on (masked, blocked, spam, muted);
+                                     --review: lines a review-only custom term flagged (shown, never a strike)
+  export-log [--since 7d] [--player X] [--flagged|--review] [--out file.csv]
                                      CSV to stdout (use "npm run -s mod -- export-log ... > file.csv") or --out
   reports [--open]                   list reports (newest first)
   review <id> [reviewed|dismiss|open] [note...]
@@ -84,11 +86,18 @@ function openService(dbPath: string, now: () => number, err: (s: string) => void
   });
 }
 
+/** " [for review: ...]" for a masked line that also carries review-only hits ("flag:..." labels). */
+const reviewHits = (r: ChatLogRow): string => {
+  const flags = r.hits.filter((h) => h.startsWith('flag:'));
+  return flags.length ? `  [for review: ${flags.join(', ')}]` : '';
+};
+
 function logRow(r: ChatLogRow): string {
   const who = `${r.name}${r.accountId ? '' : ' (guest)'}`;
   const where = r.channel === 'name' ? 'callsign attempt' : r.channel === 'room' ? 'room name attempt' : `${r.roomName}${r.channel === 'team' ? ' / team' : ''}`;
   let tag = '';
-  if (r.action === 'mask') tag = `  [masked → "${r.shown}"]`;
+  if (r.action === 'mask') tag = `  [masked → "${r.shown}"]${reviewHits(r)}`;
+  else if (r.action === 'flag') tag = `  [for review: ${r.hits.join(', ')}]`;
   else if (r.action !== 'pass') tag = `  [${r.action}${r.hits.length ? `: ${r.hits.join(', ')}` : ''}]`;
   return `${stamp(r.ts)}  ${where}  ${who}${r.address ? ` @${r.address}` : ''}: ${r.original}${tag}`;
 }
@@ -221,7 +230,8 @@ async function run(svc: ModerationService, cmd: string, f: Flags, io: CliIO, now
     }
     case 'log': case 'export-log': {
       const q: LogQuery = { player: flagStr(f, 'player'), grep: flagStr(f, 'grep') };
-      if (f.opt.has('flagged')) q.action = 'flagged';
+      if (f.opt.has('review')) q.action = 'flag';
+      else if (f.opt.has('flagged')) q.action = 'flagged';
       const since = flagStr(f, 'since');
       if (since !== undefined) {
         q.since = parseSince(since, now());

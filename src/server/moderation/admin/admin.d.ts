@@ -18,7 +18,7 @@ export const DEFAULT_DURATION: { readonly ban: DurationId; readonly mute: Durati
 export function isDurationPreset(id: unknown): boolean;
 export function durationLabel(id: unknown): string;
 
-export type ChatAction = 'pass' | 'mask' | 'block' | 'spam' | 'muted';
+export type ChatAction = 'pass' | 'flag' | 'mask' | 'block' | 'spam' | 'muted';
 export const CHAT_ACTIONS: Readonly<Record<ChatAction, { readonly label: string; readonly hidden: boolean }>>;
 export function chatActionInfo(action: unknown): { id: string; label: string; hidden: boolean };
 export function chatRowClass(action: unknown): string;

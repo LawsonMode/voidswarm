@@ -1,0 +1,393 @@
+=== A. Weapon DPS vs distance (raw, before layer mults; accuracy 100%) ===
+  class/weapon         0   100   200   300   400   500   600   700   900  1100  1265   range  power/s  dmg/power
+  Jugg MD            652   577   502   389   277     -     -     -     -     -     -     468     180  2.79 (PB 3.62)
+  Jugg LZ            276   276   276   276   276   276   276   276   276     -     -     990     165  1.67 (PB -)
+  Jugg PH            293   293   293   293   293   293   293     -     -     -     -     630     112  2.61 (PB -)
+  Arca MD            624   552   480   408   335   263     -     -     -     -     -     598     180  2.67 (PB 3.47)
+  Arca LZ            252   252   252   252   252   252   252   252   252   252   252    1265     150  1.68 (PB -)
+  Arca PH            280   280   280   280   280   280   280   280     -     -     -     805     112  2.50 (PB -)
+  Arti MD            610   539   469   381   293   205     -     -     -     -     -     520     176  2.67 (PB 3.47)
+  Arti LZ            216   216   216   216   216   216   216   216   216   216     -    1100     128  1.69 (PB -)
+  Arti PH            274   274   274   274   274   274   274   274     -     -     -     700     109  2.50 (PB -)
+  effective vs each defender layer (dps at the weapon's best band: MD 100 px, LZ any, PH any):
+   Jugg MD: Jugg shield  462/s integ  416/s | Arca shield  462/s integ  693/s | Arti shield  462/s integ  623/s
+   Jugg LZ: Jugg shield  276/s integ  166/s | Arca shield  276/s integ  276/s | Arti shield  276/s integ  248/s
+   Jugg PH: Jugg shield  732/s integ  123/s | Arca shield  732/s integ  205/s | Arti shield  732/s integ  184/s
+   Arca MD: Jugg shield  442/s integ  397/s | Arca shield  442/s integ  662/s | Arti shield  442/s integ  596/s
+   Arca LZ: Jugg shield  252/s integ  151/s | Arca shield  252/s integ  252/s | Arti shield  252/s integ  227/s
+   Arca PH: Jugg shield  700/s integ  118/s | Arca shield  700/s integ  196/s | Arti shield  700/s integ  176/s
+   Arti MD: Jugg shield  431/s integ  388/s | Arca shield  431/s integ  647/s | Arti shield  431/s integ  582/s
+   Arti LZ: Jugg shield  216/s integ  130/s | Arca shield  216/s integ  216/s | Arti shield  216/s integ  194/s
+   Arti PH: Jugg shield  684/s integ  115/s | Arca shield  684/s integ  191/s | Arti shield  684/s integ  172/s
+
+=== B. Heat: hold LMB forever from cold, full meters, no thrust, no incoming damage (30 s) ===
+  class wpn | t_hot  t_over | first vent  vents  shield lost by overheat | dmg out 0-5s  5-30s dps | brownouts | power min
+  Jugg MD  |  2.80   5.72 |     13.07     3    1152                  |   475       400     |   1       | 0
+  Jugg LZ  |  2.50   4.15 |     11.28     3    1341                  |   276       243     |   0       | 910
+  Jugg PH  |  2.55   4.25 |     never     0       0                  |   274       148     |   0       | 954
+  Arca MD  |  1.80   3.60 |      8.40     4    1504                  |   480       411     |   0       | 486
+  Arca LZ  |  1.82   3.02 |      8.43     3    1490                  |   252       222     |   0       | 1266
+  Arca PH  |  1.50   2.75 |     never     0       0                  |   224       140     |   0       | 1258
+  Arti MD  |  1.90   3.90 |      9.60     3    1585                  |   408       364     |   0       | 962
+  Arti LZ  |  1.98   3.32 |      9.73     3    1451                  |   216       190     |   0       | 995
+  Arti PH  |  1.63   2.80 |     never     0       0                  |   214       131     |   0       | 964
+  overheat shield drain while firing at 100 heat: MD 8/slug ×rate; Laser 70/s.
+   Jugg: MD 73 shield/s → empties 500 in 6.9 s (if power sustains 360/s hot cost); Laser 70/s → 7.1 s (hot draw 248/s)
+   Arca: MD 80 shield/s → empties 380 in 4.8 s (if power sustains 360/s hot cost); Laser 70/s → 5.4 s (hot draw 225/s)
+   Arti: MD 92 shield/s → empties 450 in 4.9 s (if power sustains 352/s hot cost); Laser 70/s → 6.4 s (hot draw 191/s)
+
+=== C. Load / brownout: held combos for 30 s, thrusting the whole time ===
+  Shield broken at t=0 (so shield regen competes for power) unless noted. Space: Jugg=Ram on cd, Arca=Blink on cd, Arti=Repair Ray 170/s.
+  "shield/s" = average shield regenerated; free L0 regen for reference Jugg 272, Arca 384, Arti 320.
+  class wpn keys | L | 1st brownout  #  %time | avg speed | shield/s | recovery s | raw dmg/s | overheat% vent%
+  Jugg MD L     | 1 |  11.45 s   4   14% |   96%     |    34    |  1.05      |    364    |  64   7
+  Jugg MD LR    | 2 |   4.80 s  13   43% |   78%     |    11    |  1.05      |    439    |  41  10
+  Jugg MD LRS   | 3 |   3.82 s   9   30% |   68%     |     6    |  1.05      |    321    |  14  10
+  Jugg MD LS    | 2 |   6.57 s   9   31% |   82%     |    18    |  1.05      |    346    |  43  10
+  Jugg MD RS    | 2 |    inf s   0    0% |   90%     |    17    |   NaN      |    463    |   0   0
+  Jugg LZ L     | 1 |    inf s   0    0% |  100%     |    48    |   NaN      |    239    |  60  13
+  Jugg LZ LR    | 2 |   6.17 s  14   49% |   77%     |    14    |  1.05      |    471    |  40  10
+  Jugg LZ LRS   | 3 |   3.77 s  10   32% |   68%     |     7    |  1.05      |    307    |  17  20
+  Jugg LZ LS    | 2 |  21.13 s   2    7% |   88%     |    29    |  1.05      |    275    |  41  18
+  Jugg LZ RS    | 2 |    inf s   0    0% |   90%     |    17    |   NaN      |    463    |   0   0
+  Jugg PH L     | 1 |    inf s   0    0% |  100%     |    17    |   NaN      |    169    |  86   0
+  Jugg PH LR    | 2 |  22.00 s   1    4% |   89%     |    17    |  1.05      |    542    |  86   0
+  Jugg PH LRS   | 3 |  12.45 s   3   11% |   73%     |    12    |  1.05      |    415    |  86   0
+  Jugg PH LS    | 2 |    inf s   0    0% |   90%     |    17    |   NaN      |    236    |  86   0
+  Jugg PH RS    | 2 |    inf s   0    0% |   90%     |    17    |   NaN      |    463    |   0   0
+  Arca MD L     | 1 |    inf s   0    0% |  100%     |    55    |   NaN      |    422    |  63  13
+  Arca MD LR    | 2 |   5.37 s   7   23% |   84%     |    25    |  1.07      |    376    |  49  16
+  Arca MD LRS   | 3 |   3.78 s   7   25% |   69%     |     9    |  1.07      |    282    |  19  20
+  Arca MD LS    | 2 |  10.45 s   5   18% |   85%     |    32    |  1.07      |    333    |  45  20
+  Arca MD RS    | 2 |    inf s   0    0% |   90%     |    13    |   NaN      |    205    |   0   0
+  Arca LZ L     | 1 |    inf s   0    0% |  100%     |    55    |   NaN      |    218    |  65  13
+  Arca LZ LR    | 2 |  12.37 s   1    4% |   89%     |    33    |  1.07      |    331    |  46  23
+  Arca LZ LRS   | 3 |  13.55 s   3   11% |   73%     |    12    |  1.07      |    233    |  17  34
+  Arca LZ LS    | 2 |    inf s   0    0% |   90%     |    41    |   NaN      |    209    |  58  17
+  Arca LZ RS    | 2 |    inf s   0    0% |   90%     |    13    |   NaN      |    205    |   0   0
+  Arca PH L     | 1 |    inf s   0    0% |  100%     |    13    |   NaN      |    154    |  91   0
+  Arca PH LR    | 2 |    inf s   0    0% |   90%     |    13    |   NaN      |    359    |  91   0
+  Arca PH LRS   | 3 |   6.65 s   5   18% |   71%     |    13    |  1.07      |    292    |  91   0
+  Arca PH LS    | 2 |    inf s   0    0% |   90%     |    13    |   NaN      |    154    |  91   0
+  Arca PH RS    | 2 |    inf s   0    0% |   90%     |    13    |   NaN      |    205    |   0   0
+  Arti MD L     | 1 |    inf s   0    0% |  100%     |    60    |   NaN      |    359    |  60  13
+  Arti MD LR    | 2 |    inf s   0    0% |   90%     |    43    |   NaN      |    335    |  47  20
+  Arti MD LRS   | 3 |   3.27 s  14   30% |   68%     |     9    |  0.63      |    192    |  25  22
+  Arti MD LS    | 2 |   7.62 s  10   21% |   84%     |    27    |  0.63      |    269    |  51  16
+  Arti MD RS    | 2 |    inf s   0    0% |   90%     |    15    |   NaN      |      0    |   0   0
+  Arti LZ L     | 1 |    inf s   0    0% |  100%     |    56    |   NaN      |    187    |  63  13
+  Arti LZ LR    | 2 |    inf s   0    0% |   90%     |    41    |   NaN      |    174    |  50  20
+  Arti LZ LRS   | 3 |   3.02 s  11   23% |   70%     |    13    |  0.63      |    111    |  31  26
+  Arti LZ LS    | 2 |    inf s   0    0% |   90%     |    38    |   NaN      |    174    |  50  20
+  Arti LZ RS    | 2 |    inf s   0    0% |   90%     |    15    |   NaN      |      0    |   0   0
+  Arti PH L     | 1 |    inf s   0    0% |  100%     |    15    |   NaN      |    145    |  91   0
+  Arti PH LR    | 2 |    inf s   0    0% |   90%     |    15    |   NaN      |    145    |  91   0
+  Arti PH LRS   | 3 |   9.33 s   2    4% |   74%     |    14    |  0.63      |    145    |  91   0
+  Arti PH LS    | 2 |    inf s   0    0% |   90%     |    15    |   NaN      |    145    |  91   0
+  Arti PH RS    | 2 |    inf s   0    0% |   90%     |    15    |   NaN      |      0    |   0   0
+  Same with the shield FULL (no shield draw): first brownout / count / %time
+   Jugg MD: L: 15.37 s ×3 11% | LR: 5.40 s ×10 35% | LRS: 4.05 s ×10 33%
+   Jugg LZ: L: inf s ×0 0% | LR: 5.83 s ×13 44% | LRS: 3.78 s ×11 38%
+   Jugg PH: L: inf s ×0 0% | LR: inf s ×0 0% | LRS: 7.72 s ×2 7%
+   Arca MD: L: inf s ×0 0% | LR: 8.03 s ×7 21% | LRS: 3.73 s ×6 20%
+   Arca LZ: L: inf s ×0 0% | LR: 15.47 s ×3 11% | LRS: 6.58 s ×4 14%
+   Arca PH: L: inf s ×0 0% | LR: inf s ×0 0% | LRS: 15.12 s ×4 12%
+   Arti MD: L: inf s ×0 0% | LR: inf s ×0 0% | LRS: 3.23 s ×17 35%
+   Arti LZ: L: inf s ×0 0% | LR: inf s ×0 0% | LRS: 3.03 s ×11 23%
+   Arti PH: L: inf s ×0 0% | LR: inf s ×0 0% | LRS: 23.73 s ×1 2%
+  Afterburner + LMB (regen halted), shield full:
+   Jugg MD LMB+AB: first brownout 2.33 s, 11 brownouts in 20 s, 58% of time
+   Jugg LZ LMB+AB: first brownout 2.23 s, 12 brownouts in 20 s, 60% of time
+   Jugg PH LMB+AB: first brownout 2.75 s, 11 brownouts in 20 s, 54% of time
+   Arca MD LMB+AB: first brownout 3.13 s, 10 brownouts in 20 s, 52% of time
+   Arca LZ LMB+AB: first brownout 3.25 s, 9 brownouts in 20 s, 48% of time
+   Arca PH LMB+AB: first brownout 3.75 s, 7 brownouts in 20 s, 37% of time
+   Arti MD LMB+AB: first brownout 3.17 s, 15 brownouts in 20 s, 48% of time
+   Arti LZ LMB+AB: first brownout 2.72 s, 14 brownouts in 20 s, 42% of time
+   Arti PH LMB+AB: first brownout 3.08 s, 11 brownouts in 20 s, 35% of time
+  Recovery time from a brownout (0 → 25%), thrusting vs coasting, per reactor tier:
+   Jugg: tier 0: 0.89 s coasting / 1.04 s thrusting · tier 3: 0.93 s coasting / 1.13 s thrusting · tier 5: 0.96 s coasting / 1.23 s thrusting
+   Arca: tier 0: 1.02 s coasting / 1.07 s thrusting · tier 3: 1.05 s coasting / 1.12 s thrusting · tier 5: 1.09 s coasting / 1.18 s thrusting
+   Arti: tier 0: 0.60 s coasting / 0.63 s thrusting · tier 3: 0.62 s coasting / 0.67 s thrusting · tier 5: 0.64 s coasting / 0.71 s thrusting
+
+  Jugg MD LR : base=51 reactor×3=46 reactor×5=30 efficiency×3=43 eff×3+reac×3=9 lan_coils=18 coils+eff×3+reac×3=NEVER
+  Jugg MD LS : base=39 reactor×3=18 reactor×5=NEVER efficiency×3=12 eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Jugg MD LRS: base=39 reactor×3=49 reactor×5=19 efficiency×3=37 eff×3+reac×3=9 lan_coils=22 coils+eff×3+reac×3=NEVER
+  Jugg LZ LR : base=32 reactor×3=11 reactor×5=1 efficiency×3=15 eff×3+reac×3=NEVER lan_coils=14 coils+eff×3+reac×3=NEVER
+  Jugg LZ LS : base=14 reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Jugg LZ LRS: base=44 reactor×3=39 reactor×5=9 efficiency×3=30 eff×3+reac×3=5 lan_coils=12 coils+eff×3+reac×3=NEVER
+  Jugg PH LR : base=6 reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Jugg PH LS : base=NEVER reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Jugg PH LRS: base=11 reactor×3=6 reactor×5=NEVER efficiency×3=7 eff×3+reac×3=NEVER lan_coils=13 coils+eff×3+reac×3=NEVER
+  Arca MD LR : base=30 reactor×3=25 reactor×5=6 efficiency×3=15 eff×3+reac×3=NEVER lan_coils=15 coils+eff×3+reac×3=NEVER
+  Arca MD LS : base=24 reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arca MD LRS: base=33 reactor×3=36 reactor×5=17 efficiency×3=29 eff×3+reac×3=12 lan_coils=8 coils+eff×3+reac×3=NEVER
+  Arca LZ LR : base=9 reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arca LZ LS : base=NEVER reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arca LZ LRS: base=22 reactor×3=11 reactor×5=NEVER efficiency×3=15 eff×3+reac×3=NEVER lan_coils=11 coils+eff×3+reac×3=NEVER
+  Arca PH LR : base=NEVER reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arca PH LS : base=NEVER reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arca PH LRS: base=22 reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arti MD LR : base=NEVER reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arti MD LS : base=46 reactor×3=NEVER reactor×5=NEVER efficiency×3=23 eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arti MD LRS: base=60 reactor×3=73 reactor×5=35 efficiency×3=49 eff×3+reac×3=23 lan_coils=58 coils+eff×3+reac×3=NEVER
+  Arti LZ LR : base=NEVER reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arti LZ LS : base=5 reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arti LZ LRS: base=49 reactor×3=15 reactor×5=NEVER efficiency×3=24 eff×3+reac×3=NEVER lan_coils=33 coils+eff×3+reac×3=NEVER
+  Arti PH LR : base=NEVER reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arti PH LS : base=NEVER reactor×3=NEVER reactor×5=NEVER efficiency×3=NEVER eff×3+reac×3=NEVER lan_coils=NEVER coils+eff×3+reac×3=NEVER
+  Arti PH LRS: base=4 reactor×3=NEVER reactor×5=NEVER efficiency×3=13 eff×3+reac×3=NEVER lan_coils=2 coils+eff×3+reac×3=NEVER
+  never browns out (120 s):
+   Jugg MD L [reactor×3] (vent 11%, dmg/s 428)
+   Jugg MD L [reactor×5] (vent 11%, dmg/s 428)
+   Jugg MD L [efficiency×3] (vent 12%, dmg/s 421)
+   Jugg MD L [eff×3+reac×3] (vent 11%, dmg/s 428)
+   Jugg MD L [lan_coils] (vent 9%, dmg/s 437)
+   Jugg MD L [coils+eff×3+reac×3] (vent 9%, dmg/s 437)
+   Jugg MD LR [coils+eff×3+reac×3] (vent 13%, dmg/s 805)
+   Jugg MD LS [reactor×5] (vent 16%, dmg/s 471)
+   Jugg MD LS [eff×3+reac×3] (vent 16%, dmg/s 471)
+   Jugg MD LS [lan_coils] (vent 13%, dmg/s 484)
+   Jugg MD LS [coils+eff×3+reac×3] (vent 13%, dmg/s 484)
+   Jugg MD LRS [coils+eff×3+reac×3] (vent 21%, dmg/s 836)
+   Jugg LZ L [base] (vent 12%, dmg/s 242)
+   Jugg LZ L [reactor×3] (vent 12%, dmg/s 242)
+   Jugg LZ L [reactor×5] (vent 12%, dmg/s 242)
+   Jugg LZ L [efficiency×3] (vent 12%, dmg/s 242)
+   Jugg LZ L [eff×3+reac×3] (vent 12%, dmg/s 242)
+   Jugg LZ L [lan_coils] (vent 10%, dmg/s 249)
+   Jugg LZ L [coils+eff×3+reac×3] (vent 10%, dmg/s 249)
+   Jugg LZ LR [eff×3+reac×3] (vent 20%, dmg/s 609)
+   Jugg LZ LR [coils+eff×3+reac×3] (vent 16%, dmg/s 620)
+   Jugg LZ LS [reactor×3] (vent 20%, dmg/s 288)
+   Jugg LZ LS [reactor×5] (vent 20%, dmg/s 288)
+   Jugg LZ LS [efficiency×3] (vent 20%, dmg/s 288)
+   Jugg LZ LS [eff×3+reac×3] (vent 20%, dmg/s 288)
+   Jugg LZ LS [lan_coils] (vent 16%, dmg/s 300)
+   Jugg LZ LS [coils+eff×3+reac×3] (vent 16%, dmg/s 300)
+   Jugg LZ LRS [coils+eff×3+reac×3] (vent 26%, dmg/s 657)
+   Jugg PH L [base] (vent 0%, dmg/s 152)
+   Jugg PH L [reactor×3] (vent 0%, dmg/s 152)
+   Jugg PH L [reactor×5] (vent 0%, dmg/s 152)
+   Jugg PH L [efficiency×3] (vent 0%, dmg/s 152)
+   Jugg PH L [eff×3+reac×3] (vent 0%, dmg/s 152)
+   Jugg PH L [lan_coils] (vent 0%, dmg/s 154)
+   Jugg PH L [coils+eff×3+reac×3] (vent 0%, dmg/s 154)
+   Jugg PH LR [reactor×3] (vent 0%, dmg/s 539)
+   Jugg PH LR [reactor×5] (vent 0%, dmg/s 539)
+   Jugg PH LR [efficiency×3] (vent 0%, dmg/s 539)
+   Jugg PH LR [eff×3+reac×3] (vent 0%, dmg/s 539)
+   Jugg PH LR [lan_coils] (vent 0%, dmg/s 541)
+   Jugg PH LR [coils+eff×3+reac×3] (vent 0%, dmg/s 541)
+   Jugg PH LS [base] (vent 0%, dmg/s 218)
+   Jugg PH LS [reactor×3] (vent 0%, dmg/s 218)
+   Jugg PH LS [reactor×5] (vent 0%, dmg/s 218)
+   Jugg PH LS [efficiency×3] (vent 0%, dmg/s 218)
+   Jugg PH LS [eff×3+reac×3] (vent 0%, dmg/s 218)
+   Jugg PH LS [lan_coils] (vent 0%, dmg/s 220)
+   Jugg PH LS [coils+eff×3+reac×3] (vent 0%, dmg/s 220)
+   Jugg PH LRS [reactor×5] (vent 0%, dmg/s 605)
+   Jugg PH LRS [eff×3+reac×3] (vent 0%, dmg/s 605)
+   Jugg PH LRS [coils+eff×3+reac×3] (vent 0%, dmg/s 607)
+   Arca MD L [reactor×3] (vent 14%, dmg/s 419)
+   Arca MD L [reactor×5] (vent 14%, dmg/s 419)
+   Arca MD L [efficiency×3] (vent 14%, dmg/s 419)
+   Arca MD L [eff×3+reac×3] (vent 14%, dmg/s 419)
+   Arca MD L [lan_coils] (vent 13%, dmg/s 422)
+   Arca MD L [coils+eff×3+reac×3] (vent 13%, dmg/s 422)
+   Arca MD LR [eff×3+reac×3] (vent 20%, dmg/s 595)
+   Arca MD LR [coils+eff×3+reac×3] (vent 16%, dmg/s 610)
+   Arca MD LS [reactor×3] (vent 20%, dmg/s 394)
+   Arca MD LS [reactor×5] (vent 20%, dmg/s 394)
+   Arca MD LS [efficiency×3] (vent 21%, dmg/s 390)
+   Arca MD LS [eff×3+reac×3] (vent 20%, dmg/s 394)
+   Arca MD LS [lan_coils] (vent 16%, dmg/s 408)
+   Arca MD LS [coils+eff×3+reac×3] (vent 16%, dmg/s 408)
+   Arca MD LRS [coils+eff×3+reac×3] (vent 28%, dmg/s 559)
+   Arca LZ L [base] (vent 13%, dmg/s 219)
+   Arca LZ L [reactor×3] (vent 13%, dmg/s 219)
+   Arca LZ L [reactor×5] (vent 13%, dmg/s 219)
+   Arca LZ L [efficiency×3] (vent 13%, dmg/s 219)
+   Arca LZ L [eff×3+reac×3] (vent 13%, dmg/s 219)
+   Arca LZ L [lan_coils] (vent 12%, dmg/s 221)
+   Arca LZ L [coils+eff×3+reac×3] (vent 12%, dmg/s 221)
+   Arca LZ LR [reactor×3] (vent 19%, dmg/s 406)
+   Arca LZ LR [reactor×5] (vent 19%, dmg/s 406)
+   Arca LZ LR [efficiency×3] (vent 20%, dmg/s 404)
+   Arca LZ LR [eff×3+reac×3] (vent 19%, dmg/s 406)
+   Arca LZ LR [lan_coils] (vent 16%, dmg/s 414)
+   Arca LZ LR [coils+eff×3+reac×3] (vent 16%, dmg/s 414)
+   Arca LZ LS [base] (vent 19%, dmg/s 204)
+   Arca LZ LS [reactor×3] (vent 19%, dmg/s 204)
+   Arca LZ LS [reactor×5] (vent 19%, dmg/s 204)
+   Arca LZ LS [efficiency×3] (vent 19%, dmg/s 204)
+   Arca LZ LS [eff×3+reac×3] (vent 19%, dmg/s 204)
+   Arca LZ LS [lan_coils] (vent 16%, dmg/s 213)
+   Arca LZ LS [coils+eff×3+reac×3] (vent 16%, dmg/s 213)
+   Arca LZ LRS [reactor×5] (vent 34%, dmg/s 367)
+   Arca LZ LRS [eff×3+reac×3] (vent 34%, dmg/s 369)
+   Arca LZ LRS [coils+eff×3+reac×3] (vent 29%, dmg/s 381)
+   Arca PH L [base] (vent 0%, dmg/s 144)
+   Arca PH L [reactor×3] (vent 0%, dmg/s 144)
+   Arca PH L [reactor×5] (vent 0%, dmg/s 144)
+   Arca PH L [efficiency×3] (vent 0%, dmg/s 144)
+   Arca PH L [eff×3+reac×3] (vent 0%, dmg/s 144)
+   Arca PH L [lan_coils] (vent 0%, dmg/s 145)
+   Arca PH L [coils+eff×3+reac×3] (vent 0%, dmg/s 145)
+   Arca PH LR [base] (vent 0%, dmg/s 345)
+   Arca PH LR [reactor×3] (vent 0%, dmg/s 345)
+   Arca PH LR [reactor×5] (vent 0%, dmg/s 345)
+   Arca PH LR [efficiency×3] (vent 0%, dmg/s 345)
+   Arca PH LR [eff×3+reac×3] (vent 0%, dmg/s 345)
+   Arca PH LR [lan_coils] (vent 0%, dmg/s 346)
+   Arca PH LR [coils+eff×3+reac×3] (vent 0%, dmg/s 346)
+   Arca PH LS [base] (vent 0%, dmg/s 144)
+   Arca PH LS [reactor×3] (vent 0%, dmg/s 144)
+   Arca PH LS [reactor×5] (vent 0%, dmg/s 144)
+   Arca PH LS [efficiency×3] (vent 0%, dmg/s 144)
+   Arca PH LS [eff×3+reac×3] (vent 0%, dmg/s 144)
+   Arca PH LS [lan_coils] (vent 0%, dmg/s 145)
+   Arca PH LS [coils+eff×3+reac×3] (vent 0%, dmg/s 145)
+   Arca PH LRS [reactor×3] (vent 0%, dmg/s 345)
+   Arca PH LRS [reactor×5] (vent 0%, dmg/s 345)
+   Arca PH LRS [efficiency×3] (vent 0%, dmg/s 345)
+   Arca PH LRS [eff×3+reac×3] (vent 0%, dmg/s 345)
+   Arca PH LRS [lan_coils] (vent 0%, dmg/s 346)
+   Arca PH LRS [coils+eff×3+reac×3] (vent 0%, dmg/s 346)
+   Arti MD L [base] (vent 14%, dmg/s 356)
+   Arti MD L [reactor×3] (vent 14%, dmg/s 356)
+   Arti MD L [reactor×5] (vent 14%, dmg/s 356)
+   Arti MD L [efficiency×3] (vent 14%, dmg/s 356)
+   Arti MD L [eff×3+reac×3] (vent 14%, dmg/s 356)
+   Arti MD L [lan_coils] (vent 11%, dmg/s 365)
+   Arti MD L [coils+eff×3+reac×3] (vent 11%, dmg/s 365)
+   Arti MD LR [base] (vent 24%, dmg/s 318)
+   Arti MD LR [reactor×3] (vent 21%, dmg/s 328)
+   Arti MD LR [reactor×5] (vent 21%, dmg/s 328)
+   Arti MD LR [efficiency×3] (vent 21%, dmg/s 328)
+   Arti MD LR [eff×3+reac×3] (vent 21%, dmg/s 328)
+   Arti MD LR [lan_coils] (vent 17%, dmg/s 344)
+   Arti MD LR [coils+eff×3+reac×3] (vent 17%, dmg/s 344)
+   Arti MD LS [reactor×3] (vent 21%, dmg/s 328)
+   Arti MD LS [reactor×5] (vent 21%, dmg/s 328)
+   Arti MD LS [eff×3+reac×3] (vent 21%, dmg/s 328)
+   Arti MD LS [lan_coils] (vent 17%, dmg/s 344)
+   Arti MD LS [coils+eff×3+reac×3] (vent 17%, dmg/s 344)
+   Arti MD LRS [coils+eff×3+reac×3] (vent 29%, dmg/s 301)
+   Arti LZ L [base] (vent 13%, dmg/s 188)
+   Arti LZ L [reactor×3] (vent 13%, dmg/s 188)
+   Arti LZ L [reactor×5] (vent 13%, dmg/s 188)
+   Arti LZ L [efficiency×3] (vent 13%, dmg/s 188)
+   Arti LZ L [eff×3+reac×3] (vent 13%, dmg/s 188)
+   Arti LZ L [lan_coils] (vent 11%, dmg/s 193)
+   Arti LZ L [coils+eff×3+reac×3] (vent 11%, dmg/s 193)
+   Arti LZ LR [base] (vent 20%, dmg/s 173)
+   Arti LZ LR [reactor×3] (vent 20%, dmg/s 173)
+   Arti LZ LR [reactor×5] (vent 20%, dmg/s 173)
+   Arti LZ LR [efficiency×3] (vent 20%, dmg/s 173)
+   Arti LZ LR [eff×3+reac×3] (vent 20%, dmg/s 173)
+   Arti LZ LR [lan_coils] (vent 17%, dmg/s 179)
+   Arti LZ LR [coils+eff×3+reac×3] (vent 17%, dmg/s 179)
+   Arti LZ LS [reactor×3] (vent 20%, dmg/s 173)
+   Arti LZ LS [reactor×5] (vent 20%, dmg/s 173)
+   Arti LZ LS [efficiency×3] (vent 20%, dmg/s 173)
+   Arti LZ LS [eff×3+reac×3] (vent 20%, dmg/s 173)
+   Arti LZ LS [lan_coils] (vent 17%, dmg/s 179)
+   Arti LZ LS [coils+eff×3+reac×3] (vent 17%, dmg/s 179)
+   Arti LZ LRS [reactor×5] (vent 34%, dmg/s 143)
+   Arti LZ LRS [eff×3+reac×3] (vent 34%, dmg/s 143)
+   Arti LZ LRS [coils+eff×3+reac×3] (vent 29%, dmg/s 154)
+   Arti PH L [base] (vent 0%, dmg/s 135)
+   Arti PH L [reactor×3] (vent 0%, dmg/s 135)
+   Arti PH L [reactor×5] (vent 0%, dmg/s 135)
+   Arti PH L [efficiency×3] (vent 0%, dmg/s 135)
+   Arti PH L [eff×3+reac×3] (vent 0%, dmg/s 135)
+   Arti PH L [lan_coils] (vent 0%, dmg/s 136)
+   Arti PH L [coils+eff×3+reac×3] (vent 0%, dmg/s 136)
+   Arti PH LR [base] (vent 0%, dmg/s 135)
+   Arti PH LR [reactor×3] (vent 0%, dmg/s 135)
+   Arti PH LR [reactor×5] (vent 0%, dmg/s 135)
+   Arti PH LR [efficiency×3] (vent 0%, dmg/s 135)
+   Arti PH LR [eff×3+reac×3] (vent 0%, dmg/s 135)
+   Arti PH LR [lan_coils] (vent 0%, dmg/s 136)
+   Arti PH LR [coils+eff×3+reac×3] (vent 0%, dmg/s 136)
+   Arti PH LS [base] (vent 0%, dmg/s 135)
+   Arti PH LS [reactor×3] (vent 0%, dmg/s 135)
+   Arti PH LS [reactor×5] (vent 0%, dmg/s 135)
+   Arti PH LS [efficiency×3] (vent 0%, dmg/s 135)
+   Arti PH LS [eff×3+reac×3] (vent 0%, dmg/s 135)
+   Arti PH LS [lan_coils] (vent 0%, dmg/s 136)
+   Arti PH LS [coils+eff×3+reac×3] (vent 0%, dmg/s 136)
+   Arti PH LRS [reactor×3] (vent 0%, dmg/s 135)
+   Arti PH LRS [reactor×5] (vent 0%, dmg/s 135)
+   Arti PH LRS [eff×3+reac×3] (vent 0%, dmg/s 135)
+   Arti PH LRS [coils+eff×3+reac×3] (vent 0%, dmg/s 136)
+
+  class wpn policy  | dps 0-2s  0-5s  0-10s  10-30s | dmg per power spent | brownouts | shield lost
+  Jugg MD hold    |   497   475   475    328  |  1.24              |   3       | 462
+  Jugg MD feather |   497   475   392    309  |  1.40              |   0       | 0
+  Jugg MD cold    |   497   386   353    304  |  2.07              |   0       | 0
+  Jugg LZ hold    |   276   276   276    235  |  0.89              |   0       | 203
+  Jugg LZ feather |   276   204   204    171  |  1.02              |   0       | 0
+  Jugg LZ cold    |   276   204   182    152  |  1.18              |   0       | 0
+  Jugg PH hold    |   322   274   209    149  |  1.28              |   0       | 0
+  Jugg PH feather |   322   225   201    165  |  1.64              |   0       | 0
+  Jugg PH cold    |   322   225   193    173  |  1.65              |   0       | 0
+  Arca MD hold    |   480   480   437    415  |  1.21              |   0       | 154
+  Arca MD feather |   480   346   341    269  |  1.44              |   0       | 0
+  Arca MD cold    |   432   326   278    257  |  2.32              |   0       | 0
+  Arca LZ hold    |   252   252   227    227  |  0.96              |   0       | 352
+  Arca LZ feather |   252   186   156    140  |  1.17              |   0       | 0
+  Arca LZ cold    |   227   151   136    123  |  1.40              |   0       | 0
+  Arca PH hold    |   280   224   182    140  |  1.48              |   0       | 0
+  Arca PH feather |   245   182   154    137  |  1.98              |   0       | 0
+  Arca PH cold    |   245   182   154    137  |  1.98              |   0       | 0
+  Arti MD hold    |   408   408   396    359  |  1.17              |   0       | 394
+  Arti MD feather |   408   294   290    228  |  1.36              |   0       | 0
+  Arti MD cold    |   408   294   245    228  |  2.08              |   0       | 0
+  Arti LZ hold    |   216   216   210    187  |  0.90              |   0       | 265
+  Arti LZ feather |   216   160   138    127  |  1.06              |   0       | 0
+  Arti LZ cold    |   205   138   127    108  |  1.23              |   0       | 0
+  Arti PH hold    |   268   214   173    131  |  1.33              |   0       | 0
+  Arti PH feather |   238   167   143    122  |  1.68              |   0       | 0
+  Arti PH cold    |   238   167   143    122  |  1.68              |   0       | 0
+=== F1. Overheat fix: drain arms the shield BREAK delay; vent to heat 40 for 1.5 s (sustained dps 10–30 s, hold vs feather) ===
+  Jugg MD: spec hold 328 vs feather 309 (hold/feather 1.06, hold ends with S 38) | fixed hold 339 vs feather 309 (1.10, hold ends with S 0)
+  Jugg LZ: spec hold 235 vs feather 171 (hold/feather 1.37, hold ends with S 297) | fixed hold 193 vs feather 171 (1.13, hold ends with S 0)
+  Arca MD: spec hold 415 vs feather 269 (hold/feather 1.54, hold ends with S 226) | fixed hold 386 vs feather 269 (1.44, hold ends with S 0)
+  Arca LZ: spec hold 227 vs feather 140 (hold/feather 1.62, hold ends with S 28) | fixed hold 195 vs feather 140 (1.40, hold ends with S 0)
+  Arti MD: spec hold 359 vs feather 228 (hold/feather 1.57, hold ends with S 56) | fixed hold 300 vs feather 228 (1.31, hold ends with S 0)
+  Arti LZ: spec hold 187 vs feather 127 (hold/feather 1.47, hold ends with S 185) | fixed hold 154 vs feather 127 (1.21, hold ends with S 103)
+
+=== F2. Strain also throttles regen (L2 ×0.85, L3 ×0.6): 120 s holds, shield broken at t 0 — brownouts (0 = never) ===
+  Jugg MD  LR: base 51→27, reactor×3 46→35, eff×3+reac×3 9→21 || LRS: base 39→37, reactor×3 49→24, eff×3+reac×3 9→67
+  Jugg LZ  LR: base 32→55, reactor×3 11→36, eff×3+reac×3 0→6 || LRS: base 44→40, reactor×3 39→42, eff×3+reac×3 5→61
+  Jugg PH  LR: base 6→21, reactor×3 0→0, eff×3+reac×3 0→0 || LRS: base 11→17, reactor×3 6→28, eff×3+reac×3 0→19
+  Arca MD  LR: base 30→18, reactor×3 25→33, eff×3+reac×3 0→8 || LRS: base 33→52, reactor×3 36→29, eff×3+reac×3 12→29
+  Arca LZ  LR: base 9→24, reactor×3 0→9, eff×3+reac×3 0→0 || LRS: base 22→43, reactor×3 11→42, eff×3+reac×3 0→6
+  Arca PH  LR: base 0→10, reactor×3 0→0, eff×3+reac×3 0→0 || LRS: base 22→8, reactor×3 0→5, eff×3+reac×3 0→12
+  Arti MD  LR: base 0→28, reactor×3 0→0, eff×3+reac×3 0→0 || LRS: base 60→51, reactor×3 73→54, eff×3+reac×3 23→63
+  Arti LZ  LR: base 0→0, reactor×3 0→0, eff×3+reac×3 0→0 || LRS: base 49→55, reactor×3 15→47, eff×3+reac×3 0→55
+  Arti PH  LR: base 0→0, reactor×3 0→0, eff×3+reac×3 0→0 || LRS: base 4→44, reactor×3 0→32, eff×3+reac×3 0→30
+
+=== F3. Bombs at 300 PvP (PvE keeps 630): 2 bombs vs each class from full ===
+  Jugg: S 20 I 900/900
+  Arca: S 0 I 270/420
+  Arti: S 0 I 560/600
+
+=== F4. Phaser fix: phase integrity ×0.7 → ×0.9 and overheat rate ×0.5 → ×0.75 (commit, 100%, 500 px) ===
+
+
+
+
+
+
+
+
+
+
+
+
+  Jugg PH vs Jugg/Arca/Arti: spec 12.03/2.90/4.32 s → fixed 7.45/2.33/3.47 s   (MD @350 for reference 6.22/2.83/3.77 s)
+  Arca PH vs Jugg/Arca/Arti: spec 13.82/2.82/5.32 s → fixed 7.98/2.32/3.65 s   (MD @350 for reference 5.25/2.45/3.25 s)
+  Arti PH vs Jugg/Arca/Arti: spec 15.08/3.15/6.08 s → fixed 8.78/2.68/3.98 s   (MD @350 for reference 6.57/3.07/4.07 s)

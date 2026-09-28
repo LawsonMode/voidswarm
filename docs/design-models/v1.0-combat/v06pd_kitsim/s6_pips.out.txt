@@ -1,0 +1,96 @@
+
+==============================================================================================================
+== S6. XP pip gravity vs today's 120 px magnet snap (live gems.ts: bind <= 120, home at max(520, v+350), keep <= 192)
+==============================================================================================================
+A. One pip at rest, parked Artificer: collect time (s) and visible curl (degrees swept around the ship):
+model              | 100 px     | 150         | 200         | 250         | 300        | 400 | 500
+-------------------|------------|-------------|-------------|-------------|------------|-----|----
+current snap (120) | 0.23 s 0°  | no          | no          | no          | no         | no  | no 
+Hero Kits          | 0.23 s 0°  | 0.72 s 22°  | 1.15 s 34°  | 1.62 s 41°  | no         | no  | no 
+Arcade Kit         | 0.25 s 29° | 0.40 s 57°  | 0.55 s 81°  | no          | no         | no  | no 
+Sortie Loadout     | 0.30 s 56° | 0.50 s 119° | 0.63 s 132° | 0.75 s 129° | 0.90 s 63° | no  | no 
+
+B. 400 pips scattered uniformly in a 450 px disc around a parked Artificer: collected within 3 s (mean time):
+model              | mods      | collected in 3 s | mean time
+-------------------|-----------|------------------|----------
+current snap (120) | base      | 7%               | 0.20 s   
+current snap (120) | Magnet L5 | 53%              | 0.48 s   
+Hero Kits          | base      | 38%              | 1.06 s   
+Hero Kits          | Magnet L5 | 100%             | 1.05 s   
+Hero Kits          | Tractor   | 100%             | 0.83 s   
+Arcade Kit         | base      | 28%              | 0.45 s   
+Arcade Kit         | Magnet L5 | 100%             | 0.52 s   
+Arcade Kit         | Tractor   | 100%             | 0.51 s   
+Sortie Loadout     | base      | 51%              | 0.67 s   
+Sortie Loadout     | Magnet L5 | 100%             | 0.70 s   
+Sortie Loadout     | Tractor   | 100%             | 0.64 s   
+
+C. Fly-through: effective collection width W (pips collected / (density x path length)) and pips per second at density 1 per 63x63 px:
+ship                  | model              | mods      | width W | pips/s  | vs current snap @470
+----------------------|--------------------|-----------|---------|---------|---------------------
+Artificer cruise 470  | current snap (120) | base      | 238 px  | 28.0/s  | 1.00x               
+Artificer cruise 470  | current snap (120) | Magnet L5 | 651 px  | 76.5/s  | 2.73x               
+Artificer cruise 470  | Hero Kits          | base      | 509 px  | 59.8/s  | 2.14x               
+Artificer cruise 470  | Hero Kits          | Magnet L5 | 960 px  | 112.8/s | 4.03x               
+Artificer cruise 470  | Hero Kits          | Tractor   | 1164 px | 136.7/s | 4.89x               
+Artificer cruise 470  | Arcade Kit         | base      | 471 px  | 55.3/s  | 1.98x               
+Artificer cruise 470  | Arcade Kit         | Magnet L5 | 980 px  | 115.1/s | 4.11x               
+Artificer cruise 470  | Arcade Kit         | Tractor   | 1176 px | 138.2/s | 4.94x               
+Artificer cruise 470  | Sortie Loadout     | base      | 631 px  | 74.1/s  | 2.65x               
+Artificer cruise 470  | Sortie Loadout     | Magnet L5 | 1251 px | 147.0/s | 5.25x               
+Artificer cruise 470  | Sortie Loadout     | Tractor   | 1547 px | 181.8/s | 6.50x               
+Artificer boost 700   | current snap (120) | base      | 238 px  | 41.7/s  | 1.00x               
+Artificer boost 700   | current snap (120) | Magnet L5 | 647 px  | 113.3/s | 2.72x               
+Artificer boost 700   | Hero Kits          | base      | 444 px  | 77.6/s  | 1.86x               
+Artificer boost 700   | Hero Kits          | Magnet L5 | 853 px  | 149.2/s | 3.58x               
+Artificer boost 700   | Hero Kits          | Tractor   | 1085 px | 190.0/s | 4.56x               
+Artificer boost 700   | Arcade Kit         | base      | 471 px  | 82.4/s  | 1.98x               
+Artificer boost 700   | Arcade Kit         | Magnet L5 | 978 px  | 171.2/s | 4.11x               
+Artificer boost 700   | Arcade Kit         | Tractor   | 1173 px | 205.2/s | 4.92x               
+Artificer boost 700   | Sortie Loadout     | base      | 593 px  | 103.7/s | 2.49x               
+Artificer boost 700   | Sortie Loadout     | Magnet L5 | 1193 px | 208.7/s | 5.01x               
+Artificer boost 700   | Sortie Loadout     | Tractor   | 1456 px | 254.9/s | 6.11x               
+Juggernaut cruise 430 | current snap (120) | base      | 238 px  | 25.6/s  | 1.00x               
+Juggernaut cruise 430 | current snap (120) | Magnet L5 | 651 px  | 70.0/s  | 2.73x               
+Juggernaut cruise 430 | Hero Kits          | base      | 582 px  | 62.5/s  | 2.44x               
+Juggernaut cruise 430 | Hero Kits          | Magnet L5 | 1049 px | 112.8/s | 4.40x               
+Juggernaut cruise 430 | Hero Kits          | Tractor   | 1296 px | 139.4/s | 5.44x               
+Juggernaut cruise 430 | Arcade Kit         | base      | 471 px  | 50.6/s  | 1.98x               
+Juggernaut cruise 430 | Arcade Kit         | Magnet L5 | 980 px  | 105.3/s | 4.11x               
+Juggernaut cruise 430 | Arcade Kit         | Tractor   | 1176 px | 126.5/s | 4.94x               
+Juggernaut cruise 430 | Sortie Loadout     | base      | 695 px  | 74.7/s  | 2.92x               
+Juggernaut cruise 430 | Sortie Loadout     | Magnet L5 | 1393 px | 149.7/s | 5.85x               
+Juggernaut cruise 430 | Sortie Loadout     | Tractor   | 1745 px | 187.6/s | 7.33x               
+Arcanist boost 760    | current snap (120) | base      | 238 px  | 45.3/s  | 1.00x               
+Arcanist boost 760    | current snap (120) | Magnet L5 | 642 px  | 121.9/s | 2.69x               
+Arcanist boost 760    | Hero Kits          | base      | 360 px  | 68.4/s  | 1.51x               
+Arcanist boost 760    | Hero Kits          | Magnet L5 | 756 px  | 143.7/s | 3.18x               
+Arcanist boost 760    | Hero Kits          | Tractor   | 982 px  | 186.5/s | 4.12x               
+Arcanist boost 760    | Arcade Kit         | base      | 469 px  | 89.1/s  | 1.97x               
+Arcanist boost 760    | Arcade Kit         | Magnet L5 | 976 px  | 185.5/s | 4.10x               
+Arcanist boost 760    | Arcade Kit         | Tractor   | 1173 px | 222.8/s | 4.92x               
+Arcanist boost 760    | Sortie Loadout     | base      | 535 px  | 101.6/s | 2.24x               
+Arcanist boost 760    | Sortie Loadout     | Magnet L5 | 1124 px | 213.5/s | 4.72x               
+Arcanist boost 760    | Sortie Loadout     | Tractor   | 1345 px | 255.6/s | 5.65x               
+Arena (pips only from takedowns; Hero has no Arena multiplier, Arcade x0.85, Sortie 240 base):
+model              | width W @470 (Arena) | vs current
+-------------------|----------------------|-----------
+current snap (120) | 238 px               | 1.00x     
+Hero Kits          | 509 px               | 2.14x     
+Arcade Kit         | 411 px               | 1.73x     
+Sortie Loadout     | 465 px               | 1.95x     
+
+D. Vacuum pickup (instant) on 400 pips scattered in a 1500 px disc around a parked Artificer: collected in 3 s:
+model          | collected in 3 s | mean   | last  
+---------------|------------------|--------|-------
+Hero Kits      | 100%             | 0.85 s | 1.08 s
+Arcade Kit     | 100%             | 0.54 s | 0.82 s
+Sortie Loadout | 100%             | 0.70 s | 1.05 s
+
+E. Contest: Dreadnought n5 (r 34) and an Arcanist (r 16) 500 px apart, 60 pips on the line between them: share won by the Dreadnought:
+model              | Dreadnought n5 wins | reach                
+-------------------|---------------------|----------------------
+current snap (120) | 14/59 pips (24%)    | 28/59 inside any well
+Hero Kits          | 45/59 pips (76%)    | 59/59 inside any well
+Arcade Kit         | 46/59 pips (78%)    | 59/59 inside any well
+Sortie Loadout     | 38/59 pips (64%)    | 59/59 inside any well

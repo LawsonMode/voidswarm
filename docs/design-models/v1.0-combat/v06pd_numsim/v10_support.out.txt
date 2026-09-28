@@ -1,0 +1,105 @@
+=== F. 1v1 duels (both shoot, 60% accuracy on weapons/skills, Laser users stand still, others thrust; hold LMB+RMB; fixed distance) ===
+  A vs B            @d   | winner  time  | A hull left  B hull left
+  Jugg MD vs Arca LZ          @120 | Jugg MD           1.6 |   790/900       0/420
+  Jugg MD vs Arca LZ          @350 | Jugg MD           1.9 |   724/900       0/420
+  Jugg MD vs Arca LZ          @600 | Jugg MD           3.7 |   190/900       0/420
+  Jugg MD vs Arti PH          @120 | Jugg MD           1.6 |   860/900       0/650
+  Jugg MD vs Arti PH          @350 | Jugg MD           2.1 |   771/900       0/650
+  Jugg MD vs Arti PH          @600 | Jugg MD           5.1 |   445/900       0/650
+  Arca LZ vs Arti PH          @120 | Arca LZ           2.6 |   130/420       0/650
+  Arca LZ vs Arti PH          @350 | Arca LZ           2.6 |   130/420       0/650
+  Arca LZ vs Arti PH          @600 | Arca LZ           2.6 |   216/420       0/650
+  Jugg MD vs Arti PH+Tender   @120 | Jugg MD           1.6 |   860/900       0/650
+  Jugg MD vs Arti PH+Tender   @350 | Jugg MD           2.2 |   756/900       0/650
+  Jugg MD vs Arti PH+Tender   @600 | Jugg MD           5.1 |   495/900       0/650
+  Arca LZ vs Arti PH+Tender   @120 | Arca LZ           3.3 |   150/420       0/650
+  Arca LZ vs Arti PH+Tender   @350 | Arca LZ           3.3 |   150/420       0/650
+  Arca LZ vs Arti PH+Tender   @600 | Arca LZ           3.3 |   196/420       0/650
+  Jugg MD vs Arti Leech       @120 | Jugg MD           2.0 |   897/900       0/650
+  Jugg MD vs Arti Leech       @350 | Jugg MD           2.8 |   866/900       0/650
+  Jugg MD vs Arti Leech       @600 | Jugg MD           5.1 |   445/900       0/650
+  Arca LZ vs Arti Leech       @120 | Arca LZ           3.3 |   231/420       0/650
+  Arca LZ vs Arti Leech       @350 | Arca LZ           3.3 |   231/420       0/650
+  Arca LZ vs Arti Leech       @600 | Arca LZ           2.6 |   216/420       0/650
+  Arti PH vs Arti Leech       @120 | Arti Leech        5.3 |     0/650      52/650
+  Arti PH vs Arti Leech       @350 | Arti Leech        5.3 |     0/650      30/650
+  Arti PH vs Arti Leech       @600 | draw              5.3 |     0/650       0/650
+  Arti PH+Tender vs Arti Leech@120 | Arti PH+Tender    7.1 |    86/650       0/650
+  Arti PH+Tender vs Arti Leech@350 | Arti PH+Tender    7.1 |    86/650       0/650
+  Arti PH+Tender vs Arti Leech@600 | Arti PH+Tender    5.9 |   189/650       0/650
+  (Leech self-repair = 60% of POST-mitigation damage dealt (shield dmg counts ×2.5 for ion); "raw" interpretation below)
+  RAW-interp Jugg MD vs Arti Leech @350 | Jugg MD 2.5 s; leech healed 102
+  RAW-interp Arca LZ vs Arti Leech @350 | Arca LZ 3.2 s; leech healed 137
+
+=== G. Repair Ray (Tender) sustain vs incoming DPS (target shield already broken; hull-only) ===
+  Ray power: 90/s × (1+0.2·min(3,t)) → 144/s after 3 s (Medic 108/s) vs Artificer regen 280/s: net +118/s while thrusting → INFINITE channel.
+  Break-even raw incoming DPS (hull loss = heal):  heal / (vsHull × (1 − armorEff))
+  heal source                  hull/s | vs Jugg kin/en/ion   | vs Arca kin/en/ion  | vs Arti kin/en/ion
+  ally ray (0-3 s)                              180 |  224/ 300/ 500  |  157/ 180/ 300  |  165/ 212/ 353
+  ally ray fatigued ×0.6                        108 |  134/ 180/ 300  |   94/ 108/ 180  |   99/ 127/ 212
+  ally ray, 2 targets alternating (no fatigue)  180 |  224/ 300/ 500  |  157/ 180/ 300  |  165/ 212/ 353
+  Medic ray +40%                                252 |  313/ 420/ 700  |  219/ 252/ 420  |  231/ 296/ 494
+  Medic fatigued                                151 |  188/ 252/ 419  |  131/ 151/ 252  |  138/ 178/ 296
+  Medic+Triage (<30% hull)                      378 |  470/ 630/1050  |  329/ 378/ 630  |  346/ 445/ 741
+  self ray (no fatigue)                         120 |  149/ 200/ 333  |  104/ 120/ 200  |  110/ 141/ 235
+  Medic self ray                                168 |  209/ 280/ 467  |  146/ 168/ 280  |  154/ 198/ 329
+  2 Tenders cross-healing (each)                180 |  224/ 300/ 500  |  157/ 180/ 300  |  165/ 212/ 353
+  Reference incoming raw DPS at 60% accuracy: Jugg MD@120 405 (kin, +15%), MD@350 280, Arca Laser still 331 (en), Arti Phaser 254 (ion).
+  TTK with a Tender pocketing the defender (60% acc, hold LMB): none / ray+fatigue / ray alternating / Medic+Triage+fatigue
+   Jugg  ← Jugg MD@120   :   4.8 /   8.8 /  14.4 /  18.5 s
+   Jugg  ← Jugg MD@350   :   8.2 /  21.4 /   inf /   inf s
+   Jugg  ← Arca LZ@600   :   6.5 /  12.9 /   inf /   inf s
+   Jugg  ← Arti PH@400   :  13.1 /   inf /   inf /   inf s
+   Arca  ← Jugg MD@120   :   2.8 /   3.9 /   4.1 /   4.5 s
+   Arca  ← Jugg MD@350   :   4.2 /   6.2 /  10.3 /  10.3 s
+   Arca  ← Arca LZ@600   :   3.5 /   5.2 /   6.2 /   6.8 s
+   Arca  ← Arti PH@400   :   4.0 /  35.1 /   inf /   inf s
+   Arti  ← Jugg MD@120   :   3.2 /   4.5 /   5.0 /   5.3 s
+   Arti  ← Jugg MD@350   :   4.8 /   9.2 /  18.0 /  22.8 s
+   Arti  ← Arca LZ@600   :   4.0 /   6.3 /   8.7 /  10.0 s
+   Arti  ← Arti PH@400   :   6.3 /   inf /   inf /   inf s
+
+=== H. Siphon Ray (Leech) value ===
+  vs Jugg : strips shield in 2.36 s (275/s), then hull 40/s → full TTK 25.1 s alone. Self-repair: 165/s on shield phase, 24/s on hull phase ("dealt" reading) or 66/s ("raw" reading). Target power −60/s, you +30/s.
+  vs Arca : strips shield in 2.18 s (275/s), then hull 66/s → full TTK 8.5 s alone. Self-repair: 165/s on shield phase, 40/s on hull phase ("dealt" reading) or 66/s ("raw" reading). Target power −60/s, you +30/s.
+  vs Arti : strips shield in 2.00 s (275/s), then hull 56/s → full TTK 13.6 s alone. Self-repair: 165/s on shield phase, 34/s on hull phase ("dealt" reading) or 66/s ("raw" reading). Target power −60/s, you +30/s.
+  Cost 70/s ×1.6 = 112/s − 30/s gained = 82/s net vs 280 regen → infinite. Phaser comparison: 424 ion dps (1059 vs shield) — the Siphon is 26% of the Phaser's damage.
+  Polarize reversal: Jugg healed 55 hull/s; siphoner pays 2× = 140 → 224/s at 3 s+ (+18 thrust = 242 < 280 regen) → reversal is NOT a power punishment for the Artificer.
+  PvE: 140 dps, 40% return = 56 hull/s self-repair forever (cost 112/s) = offsets 0.5 drone contacts/s (drone 110 kin → 120 hull on an Artificer).
+
+=== I. Polarize Shields vs a drone swarm (Juggernaut, base stats, MD fired with bot heat discipline; drones arrive at a steady rate) ===
+  !! Holding LMB (no discipline) with Polarize on, 2 drones/s: MD overheats at 2.9 s, taps own shield 320/s → Polarize drops when the SELF-TAP empties the shield; takedown at 10.0 s after only 9 polarized kills.
+  drones/s  Threat L | Polarize ON: shield breaks at  drones eaten  takedown at | OFF: shield breaks  takedown at | power left (ON)
+      1         0   |     51.0 s                  51          -1.0 s |    7.0 s        18.0 s | 900  | weapon off: breaks 51.0 s, 51 eaten, down -1.0 s
+      2         0   |     25.5 s                  51          31.0 s |    3.5 s         9.0 s | 900  | weapon off: breaks 25.5 s, 51 eaten, down 31.0 s
+      4         0   |     12.8 s                  51          15.5 s |    1.8 s         4.5 s | 794  | weapon off: breaks 12.8 s, 51 eaten, down 15.5 s
+      8         0   |      6.4 s                  51           7.8 s |    0.9 s         2.3 s | 527  | weapon off: breaks 6.4 s, 51 eaten, down 7.8 s
+      1       6.2   |     36.0 s                  36          43.0 s |    5.0 s        12.0 s | 900  | weapon off: breaks 36.0 s, 36 eaten, down 43.0 s
+      2       6.2   |     18.0 s                  36          21.5 s |    2.5 s         6.0 s | 894  | weapon off: breaks 18.0 s, 36 eaten, down 21.5 s
+      4       6.2   |      9.0 s                  36          10.8 s |    1.3 s         3.0 s | 804  | weapon off: breaks 9.0 s, 36 eaten, down 10.8 s
+      8       6.2   |      4.5 s                  36           5.4 s |    0.6 s         1.5 s | 602  | weapon off: breaks 4.5 s, 36 eaten, down 5.4 s
+      1      13.7   |     26.0 s                  26          32.0 s |    4.0 s         9.0 s | 890  | weapon off: breaks 26.0 s, 26 eaten, down 32.0 s
+      2      13.7   |     13.0 s                  26          16.0 s |    2.0 s         4.5 s | 900  | weapon off: breaks 13.0 s, 26 eaten, down 16.0 s
+      4      13.7   |      6.5 s                  26           8.0 s |    1.0 s         2.3 s | 807  | weapon off: breaks 6.5 s, 26 eaten, down 8.0 s
+      8      13.7   |      3.3 s                  26           4.0 s |    0.5 s         1.1 s | 701  | weapon off: breaks 3.3 s, 26 eaten, down 4.0 s
+  Shield per drone while polarized: 110×0.25×0.85×(1−0.45) = 12.9 (L=0) → 50 drones per full shield; if the 0.45 absorb is NOT applied on top: 23.4 → 28 drones.
+  Ram path Spiked Prow (×0.3) stacked with Polarize (×0.25) and absorb: 110×0.075×0.85×0.55 = 3.9 shield per drone → 169 drones per shield (effectively kamikaze-immune).
+  Ram+Polarize at 8 drones/s, L=0: shield breaks at 14.8 s, 116 kills in 60 s, power left 208
+  Power: 40/s + 10/contact vs (170 − 28 thrust) = sustainable up to 10.2 contacts/s indefinitely on base stats (weapon off).
+
+=== J. "Unkillable Juggernaut" checks (EHP vs energy, and heal break-even) ===
+  base Jugg: shield 650 hull 900 armor 0.40
+      kinetic EHP 1883 | energy EHP 2150 | ion EHP 2760
+  base Jugg polarized: shield 650 hull 900 armor 0.40
+      kinetic EHP 2508 | energy EHP 2682 | ion EHP 2973
+  Bulwark lvl~15 (shield×1.35×1.6 emitters5, hull×1.15×1.25 Titan×1.6 bulkhead5, plating5 → armor .65): shield 1404 hull 2070 armor 0.65
+      kinetic EHP 7003 | energy EHP 8467 | ion EHP 10878
+  Dreadnought n=5 of the above (+.15 armor→cap .70, shield ×1.4) + Brace: shield 1966 hull 2070 armor 0.70
+      kinetic EHP 14468 | energy EHP 14698 | ion EHP 17533
+    ... + 2 Hull Weld turrets (280/s) + a Tender ray (180/s, fatigue-free by alternating): shield 1966 hull 2070 armor 0.70
+      kinetic EHP 14468 / break-even 1778 raw dps | energy EHP 14698 / break-even 2044 raw dps | ion EHP 17533 / break-even 3407 raw dps
+  Docked turret power: Artificer welder regen 280×1.5 (docked)×1.5 (Clamp) = 630/s vs Weld 150/s; Juggernaut bracer 170×1.5×1.5 = 382/s vs Brace 160/s → both INFINITE.
+  6 attackers at 60%: MD@120 6×405 = 2430 raw kin (> 1333 break-even: net ~1100/s vs 5.9k hull-EHP ... dies in ~5 s after shield);
+                      Laser still 6×331 = 1986 raw energy (< 2044 break-even) → the Dreadnought NEVER dies to 6 laser Arcanists once shields are gone,
+                      Phaser 6×254 = 1524 raw ion (< 3407) → never dies to Phasers.
+  EMP vs it: capital ×0.6 shield disrupt, 1.5 s EMP. Spec says EMP stops channels + turret OFFENSE, but not Brace / Hull Weld (turret DEFENSE) → EMP does not break the loop.

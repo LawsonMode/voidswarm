@@ -1,0 +1,6 @@
+Arcade as specced                      none 27%/DOWN/107% (mean 78%) | overdrive 18%/DOWN/66% (mean 61%) | blink 0%/DOWN/0% (mean 33%) | ram 2%/DOWN/11% (mean 38%) | dodge 3%/DOWN/70% (mean 58%)
+Overdrive cap x1.3                     none 27%/DOWN/107% (mean 78%) | overdrive 15%/DOWN/57% (mean 57%) | blink 0%/DOWN/0% (mean 33%) | ram 2%/DOWN/11% (mean 38%) | dodge 3%/DOWN/70% (mean 58%)
+Overdrive cap x1.3 thrust x1.8         none 27%/DOWN/107% (mean 78%) | overdrive 13%/DOWN/57% (mean 56%) | blink 0%/DOWN/0% (mean 33%) | ram 2%/DOWN/11% (mean 38%) | dodge 3%/DOWN/70% (mean 58%)
+x1.25/thrust1.8 + 25% shield on start  none 27%/DOWN/107% (mean 78%) | overdrive 13%/DOWN/57% (mean 57%) | blink 0%/DOWN/0% (mean 33%) | ram 2%/DOWN/11% (mean 38%) | dodge 3%/DOWN/70% (mean 58%)
+same, 4 s                              none 27%/DOWN/107% (mean 78%) | overdrive 13%/95%/57% (mean 55%) | blink 0%/DOWN/0% (mean 33%) | ram 2%/DOWN/11% (mean 38%) | dodge 3%/DOWN/70% (mean 58%)
+Warp on Artificer 360 px (od as specced) none 27%/DOWN/107% (mean 78%) | overdrive 15%/DOWN/66% (mean 60%) | blink 0%/DOWN/43% (mean 48%) | ram 2%/DOWN/11% (mean 38%) | dodge 3%/DOWN/70% (mean 58%)

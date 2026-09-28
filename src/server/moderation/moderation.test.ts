@@ -527,6 +527,50 @@ describe('CLI', () => {
   });
 });
 
+describe("review-only 'flag' lines", () => {
+  it("action 'flag' finds lines for review (flag, or any line with a flag: hit); 'flagged' = the lines the filter acted on", async () => {
+    const { svc, dbPath, student, teach } = rig();
+    const t = Date.now();
+    const long = `flag:${'c'.repeat(24)}:${'zorblax'.repeat(9)}`; // category 24 + term 63: kept whole (128-char labels)
+    svc.hook().logChat({ ...entry(student, 'plain line', t - 400) });
+    svc.hook().logChat({ ...entry(student, 'meet at zorblax', t - 300, 'flag'), shown: 'meet at zorblax', hits: ['flag:crew:zorblax'] });
+    svc.hook().logChat({ ...entry(student, 'quenth zorblax', t - 200, 'mask'), shown: 'q*** zorblax', hits: ['custom:crew:quenth', long] });
+    svc.hook().logChat({ ...entry(student, 'quenth', t - 100, 'mask'), shown: 'q***', hits: ['custom:crew:quenth'] });
+    svc.flushAllQuiet();
+    const review = svc.store.searchLog({ action: 'flag' }).lines;
+    expect(review.map((l) => l.original)).toEqual(['quenth zorblax', 'meet at zorblax']);
+    expect(review[0]!.hits[1]).toBe(long);
+    // 'flagged' (and the whois count) = lines the filter acted on: a review-only line was shown and is no misconduct
+    expect(svc.store.searchLog({ action: 'flagged' }).lines.map((l) => l.action)).toEqual(['mask', 'mask']);
+    expect(svc.whois(svc.resolveTarget('Student')!).flagged24h).toBe(2);
+    const exported: string[] = [];
+    svc.store.exportLog({ action: 'flag' }, (rows) => { for (const r of rows) exported.push(r.original); });
+    expect(exported).toEqual(['meet at zorblax', 'quenth zorblax']);
+    const out: string[] = [];
+    const io = { out: (x: string) => out.push(x), err: () => {}, env: { DB_PATH: dbPath } };
+    expect(await runCli(['export-log', '--review'], io)).toBe(0);
+    expect(out.join('').trim().split(/\r?\n/)).toHaveLength(3); // header + 2
+    out.length = 0;
+    expect(await runCli(['log', '--review'], io)).toBe(0);
+    expect(out.join('')).toContain('meet at zorblax  [for review: flag:crew:zorblax]');
+    expect(out.join('')).not.toContain('plain line');
+    // the in-game /log shows the tag too
+    const lines = runAdminCommand(svc, teach, 'log', ['Student']) as string[];
+    expect(lines.some((l) => l.endsWith('meet at zorblax [for review]'))).toBe(true);
+  });
+
+  it('a refused name that also matched a review-only term is found by the review filter (labels logged one per hit)', () => {
+    const { svc, student } = rig();
+    const t = Date.now();
+    // exactly what the Zone logs for a refused callsign: one label per hit
+    svc.hook().logChat({ ...entry(student, 'QuenthZorblax', t - 100, 'block'), channel: 'name', hits: ['custom:crew:quenth', 'flag:watch:zorblax'] });
+    svc.hook().logChat({ ...entry(student, 'QuenthOnly', t - 50, 'block'), channel: 'name', hits: ['custom:crew:quenth'] });
+    svc.flushAllQuiet();
+    expect(svc.store.searchLog({ action: 'flag' }).lines.map((l) => l.original)).toEqual(['QuenthZorblax']);
+    expect(svc.store.searchLog({ action: 'flagged' }).lines).toHaveLength(2);
+  });
+});
+
 describe('network targets, purge-log, CSV numbers', () => {
   it('/mute <address> mutes that network (everyone there, moderators excepted) after /confirm — not one callsign', () => {
     const { svc, zone, teach, clock } = rig();

@@ -1,0 +1,62 @@
+=== K. Inertia (60 Hz linear drag form, MOVE_GRIP 0.6) ===
+  hull          drag  mass | 0→95%max | coast→20: t   dist | coast→60 (Focus) | brake(counter) t dist | 90° turn: t  drift | reverse 180: t | dodge 0.25/0.5 s rest | dodge 0.5 s cruising | 500 knock slide | aim 180° t
+  Juggernaut     0.50  2.00 |  0.62 s  |  6.07 s   793 px |  3.88 s         |  0.62 s  132 px     |  1.40 s  338 px |  1.23 s        |  22 /  84 px          |   80 px            |  456 px         | 0.35 s
+  Dreadnought n=1 0.43  2.25 |  0.62 s  |  6.82 s   846 px |  4.30 s         |  0.62 s  123 px     |  1.42 s  319 px |  1.23 s        |  20 /  78 px          |   74 px            |  462 px         | 0.35 s
+  Dreadnought n=3 0.34  2.75 |  0.62 s  |  8.13 s   899 px |  4.95 s         |  0.62 s  104 px     |  1.45 s  277 px |  1.23 s        |  17 /  66 px          |   62 px            |  467 px         | 0.35 s
+  Dreadnought n=5 0.29  3.25 |  0.62 s  |  9.13 s   881 px |  5.30 s         |  0.60 s   86 px     |  1.48 s  231 px |  1.23 s        |  14 /  55 px          |   51 px            |  466 px         | 0.35 s
+  Arcanist       9.00  0.80 |  0.38 s  |  0.35 s    47 px |  0.23 s         |  0.40 s  100 px     |  0.35 s   76 px |  0.77 s        |  43 / 161 px          |  161 px            |   56 px         | 0.20 s
+  Spire n=1      7.83  1.05 |  0.38 s  |  0.38 s    52 px |  0.25 s         |  0.40 s   93 px     |  0.38 s   80 px |  0.77 s        |  40 / 149 px          |  149 px            |   51 px         | 0.20 s
+  Spire n=3      6.21  1.55 |  0.38 s  |  0.47 s    57 px |  0.30 s         |  0.38 s   79 px     |  0.43 s   84 px |  0.77 s        |  34 / 127 px          |  126 px            |   44 px         | 0.20 s
+  Spire n=5      5.14  2.05 |  0.38 s  |  0.53 s    57 px |  0.33 s         |  0.38 s   65 px     |  0.48 s   80 px |  0.77 s        |  28 / 104 px          |  103 px            |   40 px         | 0.20 s
+  Artificer      2.40  1.10 |  0.48 s  |  1.30 s   180 px |  0.85 s         |  0.48 s  112 px     |  0.78 s  200 px |  0.95 s        |  32 / 123 px          |  120 px            |  174 px         | 0.24 s
+  Foundry n=1    2.09  1.35 |  0.48 s  |  1.47 s   193 px |  0.95 s         |  0.48 s  105 px     |  0.83 s  200 px |  0.95 s        |  29 / 114 px          |  111 px            |  162 px         | 0.24 s
+  Foundry n=3    1.66  1.85 |  0.48 s  |  1.75 s   207 px |  1.10 s         |  0.48 s   89 px     |  0.90 s  187 px |  0.95 s        |  25 /  97 px          |   93 px            |  147 px         | 0.24 s
+  Foundry n=5    1.37  2.35 |  0.48 s  |  1.97 s   203 px |  1.18 s         |  0.47 s   73 px     |  0.93 s  163 px |  0.95 s        |  21 /  80 px          |   75 px            |  138 px         | 0.24 s
+  Under Strain 3 (speedMult 0.72) and Brownout+Strain 3 (0.576):
+  Jugg ×0.72   0→95% 0.62 s | dodge 0.5 s 60 px | 90° turn 1.40 s drift 243 px | brake 0.62 s
+  Jugg ×0.576  0→95% 0.62 s | dodge 0.5 s 48 px | 90° turn 1.40 s drift 195 px | brake 0.60 s
+  Arca ×0.72   0→95% 0.38 s | dodge 0.5 s 115 px | 90° turn 0.35 s drift 54 px | brake 0.38 s
+  Arca ×0.576  0→95% 0.38 s | dodge 0.5 s 92 px | 90° turn 0.35 s drift 44 px | brake 0.38 s
+  Arti ×0.72   0→95% 0.48 s | dodge 0.5 s 88 px | 90° turn 0.78 s drift 144 px | brake 0.47 s
+  Arti ×0.576  0→95% 0.48 s | dodge 0.5 s 71 px | 90° turn 0.78 s drift 115 px | brake 0.47 s
+  Mass Driver knock stream: 25 px/s per slug ÷ mass × 13.3 slugs/s = accel Jugg 167 px/s² → coasting terminal drift 333 px/s; Arca 417 px/s² → coasting terminal drift 46 px/s; Arti 303 px/s² → coasting terminal drift 126 px/s
+    Jugg coasting under a 3 s point-blank MD stream is pushed 485 px (MD full damage only ≤160 px, bleed 0 by 560 px)
+    Arca coasting under a 3 s point-blank MD stream is pushed 134 px (MD full damage only ≤160 px, bleed 0 by 560 px)
+    Arti coasting under a 3 s point-blank MD stream is pushed 328 px (MD full damage only ≤160 px, bleed 0 by 560 px)
+
+=== L. Items ===
+  Bomb PvP (480 kinetic direct, r 170, falloff to 40% at edge; Juggernaut thrower +15%):
+    vs Jugg  480: break@2 kill@4 | 336: break@3 kill@6 | 192: break@4 kill@10 | 552: break@2 kill@4
+    vs Arca  480: break@2 kill@3 | 336: break@3 kill@4 | 192: break@4 kill@6 | 552: break@2 kill@2
+    vs Arti  480: break@2 kill@3 | 336: break@2 kill@4 | 192: break@4 kill@7 | 552: break@2 kill@3
+    3 charges, cd 1.0 s: a full stack (3 direct) = 1440 raw → Arcanist EHP vs kinetic 1071 → an Arcanist dies to 3 direct bombs in ~2.0 s (+flight). Arena spawns everyone with 1.
+  Bomb PvE (760, r 200, falloff to 40%): kill radius vs drone HP 160×(1+0.06L)×partyHp:
+    L    0 n=1: drone hp 160 → killed within 200 px (area 126k px²); elite drone 480 hp → 123 px; brute 2400 hp → 32% of hp
+    L    0 n=6: drone hp 328 → killed within 189 px (area 113k px²); elite drone 984 hp → 0 px; brute 4920 hp → 15% of hp
+    L  6.2 n=4: drone hp 384 → killed within 165 px (area 85k px²); elite drone 1152 hp → 0 px; brute 5762 hp → 13% of hp
+    L 13.7 n=6: drone hp 598 → killed within 71 px (area 16k px²); elite drone 1793 hp → 0 px; brute 8964 hp → 8% of hp
+    L   19 n=6: drone hp 702 → killed within 25 px (area 2k px²); elite drone 2106 hp → 0 px; brute 10529 hp → 7% of hp
+
+  EMP (r 340): shield disrupted 60% (polarized ×0.5 → 30%, capital ×0.6 → 36%), power −35%, EMP'd 2.5 s (capital 1.5 s) = no shield/power regen.
+    vs Jugg : −390 shield, −315 power. Remaining shield breaks in MD 0.50 s (vs 1.24 full) | Laser 0.47 (1.18) | Phaser 0.25 (0.61); regen blocked 2.5 s ≈ 325 regen denied
+    vs Arca : −360 shield, −403 power. Remaining shield breaks in MD 0.51 s (vs 1.28 full) | Laser 0.54 (1.36) | Phaser 0.23 (0.57); regen blocked 2.5 s ≈ 500 regen denied
+    vs Arti : −330 shield, −350 power. Remaining shield breaks in MD 0.47 s (vs 1.17 full) | Laser 0.40 (1.00) | Phaser 0.21 (0.52); regen blocked 2.5 s ≈ 400 regen denied
+    PvE: 200 ion (enemies raw → 200; ×2.5 vs wards = 500) + stun 1.8 s in r 340 (area 363k px²): a whole floor-1 pulse (10–33 bodies) is stunned; drones at L 0 (160 hp) survive (200 < 160? no: 200 ≥ 160 → killed at n=1; n=6 hp 328 → survive).
+
+  Ion Storm (r 230, 6 s, strike every 0.4 s: 5 ships × 60 ion, 10 enemies × 130 ion; ships inside: speed ×0.75, shield regen blocked):
+    Jugg  standing in it 6 s: shield breaks at 2.0 s (375 shield/s), hull left 670/900; escape from center at ×0.75 speed ≈ 0.73 s (≈ 274 shield lost)
+    Arca  standing in it 6 s: shield breaks at -1.0 s (375 shield/s), hull left 24/420; escape from center at ×0.75 speed ≈ 0.59 s (≈ 221 shield lost)
+    Arti  standing in it 6 s: shield breaks at 1.6 s (375 shield/s), hull left 303/650; escape from center at ×0.75 speed ≈ 0.65 s (≈ 245 shield lost)
+    PvE: 10 enemies × 130 per 0.4 s = 3250 dps area, 19.5k total per storm; drones (160–330 hp) die in 2–3 strikes → up to ~150 swarm bodies per storm if density allows.
+
+  Singularity Drive (5 s, r 650 / Void 845 / capital ×1.25; owner anchored at speedMult 0.18):
+    drone (175 px/s, L 0) reaches the horizon, R 650: 300px→0.43s  650px→0.97s  900px→2.40s  1200px→4.10s
+    drone (245 px/s, L 13.7) reaches the horizon, R 650: 300px→0.40s  650px→0.90s  900px→1.92s  1200px→3.13s
+    drone (175 px/s, L 0) reaches the horizon, R 845: 300px→0.42s  650px→0.82s  900px→1.47s  1200px→3.17s
+    ⇒ every kamikaze starting within ~1150 px dies at the horizon inside the 5 s (full XP/kit rolls); bosses immune; brutes pulled ×0.3.
+    Projectile absorption: +12 shield per hostile projectile destroyed → a Mass Driver stream (13.3/s) feeds the owner +160 shield/s, Phaser +71/s, rockets +12 each.
+    vs ships: pull 520/mass → Arca 650, Arti 473, Jugg 260 px/s² vs thrust (and multipliers):
+      Jugg  net escape accel px/s²: free 390 | strain3 208 | strain3+BO 114 | storm 228 | strain3+storm 91 | S3+BO+storm 21
+      Arca  net escape accel px/s²: free 650 | strain3 286 | strain3+BO 99 | storm 325 | strain3+storm 52 | S3+BO+storm -88
+      Arti  net escape accel px/s²: free 477 | strain3 211 | strain3+BO 74 | storm 240 | strain3+storm 40 | S3+BO+storm -62
+    crush inside horizon: 160 ion dps → 400 shield/s then 96 hull/s ×(1−armor): Arcanist 600 shield in 1.5 s + 420 hull in 4.4 s; collapse 300 energy.

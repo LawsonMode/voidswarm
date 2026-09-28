@@ -1,0 +1,89 @@
+=== T1. Isolated floors (start fresh AT the floor, level 1+3(f−1)), Veteran, skill average, progression true, 3 seeds ===
+  cfg        f  | floor s  sealed cleared | wipes | lives lost/pool | end H | peak | deaths per class (first death s, earliest)
+  solo Jugg  1 |    133  3.0/3         | 0/3   |  0.0/4          | 1.92  |  18  | Jugg 0.0 (—)
+  solo Jugg  2 |    159  3.0/3         | 0/3   |  0.0/4          | 2.34  |  24  | Jugg 0.0 (—)
+  solo Jugg  3 |    296  3.0/3         | 0/3   | -1.3/4          | 3.62  |  34  | Jugg 0.7 (180)
+  solo Jugg  4 |    263  4.0/4         | 0/3   |  0.7/4          | 3.65  |  50  | Jugg 0.7 (176)
+  solo Jugg  5 |    276  4.0/4         | 0/3   |  2.3/4          | 3.99  |  65  | Jugg 2.3 (42)
+  solo Jugg  6 |    365  4.0/4         | 0/3   | -0.7/4          | 4.51  |  96  | Jugg 1.3 (199)
+  solo Jugg  7 |    360  4.3/5         | 2/3   |  3.3/4          | 4.62  | 111  | Jugg 4.0 (17)
+  solo Jugg  8 |    337  4.7/5         | 1/3   |  3.3/4          | 4.65  | 121  | Jugg 3.7 (128)
+  solo Jugg  9 |    328  3.7/5         | 3/3   |  4.0/4          | 4.71  | 126  | Jugg 5.0 (24)
+  solo Jugg 10 |    294  3.3/5         | 2/3   |  4.0/4          | 4.70  | 135  | Jugg 4.7 (26)
+  solo Arca  1 |    130  3.0/3         | 0/3   |  0.0/4          | 1.90  |  16  | Arca 0.0 (—)
+  solo Arca  2 |    152  3.0/3         | 0/3   |  0.0/4          | 2.29  |  24  | Arca 0.0 (—)
+  solo Arca  3 |    333  3.0/3         | 0/3   |  0.3/4          | 3.88  |  37  | Arca 2.3 (18)
+  solo Arca  4 |    311  4.0/4         | 0/3   |  1.3/4          | 3.98  |  65  | Arca 1.3 (95)
+  solo Arca  5 |    235  2.7/4         | 3/3   |  4.0/4          | 3.62  |  71  | Arca 5.0 (35)
+  solo Arca  6 |    310  3.0/4         | 2/3   |  3.3/4          | 4.22  | 124  | Arca 4.7 (7)
+  solo Arca  7 |    282  2.7/5         | 3/3   |  4.0/4          | 4.24  | 114  | Arca 5.0 (18)
+  solo Arca  8 |    248  2.0/5         | 3/3   |  4.0/4          | 4.22  | 124  | Arca 5.0 (33)
+  solo Arca  9 |    262  2.0/5         | 3/3   |  4.0/4          | 4.41  | 152  | Arca 5.0 (39)
+  solo Arca 10 |    197  1.3/5         | 3/3   |  4.0/4          | 4.27  | 160  | Arca 5.0 (27)
+  solo Arti  1 |    157  3.0/3         | 0/3   |  0.3/4          | 2.07  |  20  | Arti 0.3 (102)
+  solo Arti  2 |    195  3.0/3         | 0/3   |  0.0/4          | 2.59  |  27  | Arti 0.0 (—)
+  solo Arti  3 |    578  2.7/3         | 1/3   |  1.3/4          | 4.87  |  73  | Arti 3.0 (91)
+  solo Arti  4 |    325  3.7/4         | 1/3   |  2.0/4          | 4.00  |  84  | Arti 2.3 (34)
+  solo Arti  5 |    353  3.0/4         | 3/3   |  4.0/4          | 4.31  |  95  | Arti 5.0 (39)
+  solo Arti  6 |    327  2.0/4         | 3/3   |  4.0/4          | 4.29  | 128  | Arti 5.0 (50)
+  solo Arti  7 |    301  2.0/5         | 3/3   |  4.0/4          | 4.31  | 160  | Arti 5.0 (49)
+  solo Arti  8 |    216  1.3/5         | 3/3   |  4.0/4          | 4.03  | 130  | Arti 5.0 (14)
+  solo Arti  9 |    196  1.0/5         | 3/3   |  4.0/4          | 4.12  | 160  | Arti 5.0 (28)
+  solo Arti 10 |    226  1.0/5         | 3/3   |  4.0/4          | 4.36  | 160  | Arti 5.0 (27)
+  n4         1 |    113  3.0/3         | 0/3   |  0.0/10          | 1.79  |  26  | Jugg 0.0 (—)  Arca 0.0 (—)  Arti 0.0 (—)
+  n4         2 |    123  3.0/3         | 0/3   |  0.0/10          | 2.10  |  47  | Jugg 0.0 (—)  Arca 0.0 (—)  Arti 0.0 (—)
+  n4         3 |    232  3.0/3         | 0/3   | -1.7/10          | 3.11  |  55  | Jugg 0.3 (219)  Arca 0.0 (—)  Arti 0.0 (—)
+  n4         4 |    232  4.0/4         | 0/3   |  2.7/10          | 3.41  |  88  | Jugg 0.7 (175)  Arca 0.3 (138)  Arti 1.7 (83)
+  n4         5 |    256  4.0/4         | 0/3   |  6.0/10          | 3.84  | 105  | Jugg 1.7 (33)  Arca 0.7 (185)  Arti 3.7 (24)
+  n4         6 |    334  3.3/4         | 2/3   |  9.3/10          | 4.33  | 129  | Jugg 3.0 (100)  Arca 2.3 (101)  Arti 7.7 (23)
+  n4         7 |    235  2.7/5         | 3/3   | 10.0/10          | 4.02  | 160  | Jugg 3.0 (30)  Arca 3.3 (106)  Arti 7.7 (19)
+  n4         8 |    207  2.3/5         | 3/3   | 10.0/10          | 4.06  | 160  | Jugg 3.3 (26)  Arca 2.7 (31)  Arti 8.0 (23)
+  n4         9 |    187  2.0/5         | 3/3   | 10.0/10          | 4.12  | 160  | Jugg 3.0 (25)  Arca 3.3 (27)  Arti 7.7 (21)
+  n4        10 |    169  1.3/5         | 3/3   | 10.0/10          | 4.17  | 160  | Jugg 3.3 (25)  Arca 4.0 (16)  Arti 6.7 (18)
+  n6         1 |    110  3.0/3         | 0/3   |  0.3/14          | 1.77  |  30  | Jugg 0.3 (90)  Arca 0.0 (—)  Arti 0.0 (—)
+  n6         2 |    122  3.0/3         | 0/3   |  0.0/14          | 2.09  |  51  | Jugg 0.0 (—)  Arca 0.0 (—)  Arti 0.0 (—)
+  n6         3 |    195  3.0/3         | 0/3   | -1.3/14          | 2.84  |  77  | Jugg 0.7 (112)  Arca 0.0 (—)  Arti 0.0 (—)
+  n6         4 |    220  4.0/4         | 0/3   |  6.7/14          | 3.32  | 103  | Jugg 2.3 (128)  Arca 1.3 (139)  Arti 3.0 (79)
+  n6         5 |    232  4.0/4         | 0/3   | 11.3/14          | 3.66  | 124  | Jugg 3.7 (29)  Arca 2.3 (25)  Arti 5.3 (24)
+  n6         6 |    249  3.0/4         | 3/3   | 14.0/14          | 3.96  | 160  | Jugg 6.3 (29)  Arca 5.0 (30)  Arti 8.7 (20)
+  n6         7 |    214  3.0/5         | 3/3   | 14.0/14          | 3.96  | 165  | Jugg 6.0 (24)  Arca 5.0 (27)  Arti 9.0 (27)
+  n6         8 |    211  3.0/5         | 3/3   | 14.0/14          | 4.10  | 161  | Jugg 5.7 (21)  Arca 6.7 (28)  Arti 7.7 (19)
+  n6         9 |    184  2.3/5         | 3/3   | 14.0/14          | 4.11  | 166  | Jugg 6.0 (22)  Arca 6.7 (24)  Arti 7.3 (18)
+  n6        10 |    180  1.7/5         | 3/3   | 14.0/14          | 4.21  | 160  | Jugg 6.0 (22)  Arca 6.0 (17)  Arti 8.0 (16)
+
+=== T2. Kit economy (per pilot per minute, averaged over seeds; integrity points and % of that class's max integrity) ===
+  cfg        f  | class: dmg taken I/min (%max)  kit repair I/min (%max)  ray+pulse I/min | kits dropped/min (party) taken% expired% | Drive uses/kills
+  solo Jugg  1 | Jugg    0 (  0%) kit    0 (  0%) heal    0 | 8.1/min 4% 48% | 0.0/0
+  solo Jugg  3 | Jugg  765 ( 74%) kit  624 ( 60%) heal    0 | 12.2/min 43% 33% | 0.0/0
+  solo Jugg  5 | Jugg 1487 (127%) kit  893 ( 76%) heal    0 | 21.5/min 37% 46% | 2.3/100
+  solo Jugg  6 | Jugg 1746 (141%) kit 1475 (119%) heal    0 | 26.3/min 47% 40% | 2.7/116
+  solo Jugg  8 | Jugg 2685 (196%) kit 1787 (130%) heal    0 | 39.3/min 41% 47% | 3.7/204
+  solo Jugg 10 | Jugg 3368 (223%) kit 1932 (128%) heal    0 | 43.5/min 44% 42% | 5.3/375
+  solo Arca  1 | Arca    4 (  1%) kit    4 (  1%) heal    0 | 8.6/min 5% 39% | 0.3/5
+  solo Arca  3 | Arca  272 ( 56%) kit   68 ( 14%) heal    0 | 14.3/min 8% 68% | 0.7/11
+  solo Arca  5 | Arca  906 (166%) kit  209 ( 38%) heal    0 | 18.6/min 16% 51% | 1.0/24
+  solo Arca  6 | Arca  787 (136%) kit  266 ( 46%) heal    0 | 27.1/min 17% 60% | 2.7/86
+  solo Arca  8 | Arca  964 (150%) kit  190 ( 30%) heal    0 | 27.5/min 11% 65% | 0.7/23
+  solo Arca 10 | Arca 1329 (189%) kit  255 ( 36%) heal    0 | 25.2/min 10% 74% | 0.7/17
+  solo Arti  1 | Arti   81 ( 14%) kit    0 (  0%) heal    4 | 4.9/min 0% 45% | 0.3/1
+  solo Arti  3 | Arti  304 ( 44%) kit   20 (  3%) heal   69 | 3.7/min 9% 64% | 1.0/20
+  solo Arti  5 | Arti 1157 (148%) kit  240 ( 31%) heal  254 | 9.2/min 26% 46% | 0.7/27
+  solo Arti  6 | Arti 1058 (128%) kit  125 ( 15%) heal  175 | 8.9/min 17% 49% | 1.0/35
+  solo Arti  8 | Arti 2204 (241%) kit  538 ( 59%) heal  392 | 13.2/min 40% 43% | 1.3/46
+  solo Arti 10 | Arti 2135 (212%) kit  427 ( 42%) heal  376 | 12.3/min 24% 59% | 0.0/0
+  n4         1 | Jugg    0 (  0%) kit    0 (  0%) heal    0 | Arca    0 (  0%) kit    0 (  0%) heal    0 | Arti    0 (  0%) kit    0 (  0%) heal    0 | 13.8/min 4% 41% | 0.0/0
+  n4         3 | Jugg  595 ( 57%) kit  230 ( 22%) heal  276 | Arca   43 (  9%) kit   26 (  5%) heal   17 | Arti   47 (  7%) kit   24 (  4%) heal   23 | 21.6/min 23% 40% | 1.3/44
+  n4         5 | Jugg 1750 (150%) kit  847 ( 72%) heal  445 | Arca  170 ( 31%) kit   69 ( 13%) heal   16 | Arti  671 ( 86%) kit  139 ( 18%) heal  197 | 30.0/min 43% 36% | 2.3/45
+  n4         6 | Jugg 1405 (114%) kit  443 ( 36%) heal  296 | Arca  436 ( 76%) kit  126 ( 22%) heal   69 | Arti 1049 (127%) kit  284 ( 34%) heal  197 | 28.2/min 44% 36% | 2.3/72
+  n4         8 | Jugg 3167 (231%) kit 1455 (106%) heal  388 | Arca  787 (123%) kit  199 ( 31%) heal   93 | Arti 1781 (195%) kit  448 ( 49%) heal  273 | 46.3/min 55% 28% | 3.3/106
+  n4        10 | Jugg 4216 (280%) kit 2070 (137%) heal  365 | Arca 1058 (150%) kit   25 (  4%) heal   36 | Arti 1597 (159%) kit  253 ( 25%) heal  156 | 42.5/min 50% 26% | 2.0/78
+  n6         1 | Jugg   82 (  9%) kit    0 (  0%) heal    0 | Arca    0 (  0%) kit    0 (  0%) heal    0 | Arti    0 (  0%) kit    0 (  0%) heal    0 | 16.9/min 0% 37% | 0.7/7
+  n6         3 | Jugg  373 ( 36%) kit  150 ( 14%) heal  117 | Arca   21 (  4%) kit   17 (  4%) heal    3 | Arti    9 (  1%) kit    7 (  1%) heal    2 | 26.6/min 22% 40% | 1.3/19
+  n6         5 | Jugg 1648 (141%) kit  776 ( 66%) heal  317 | Arca  323 ( 59%) kit   99 ( 18%) heal   58 | Arti 1088 (140%) kit  305 ( 39%) heal  245 | 42.3/min 59% 22% | 4.0/99
+  n6         6 | Jugg 2028 (164%) kit  818 ( 66%) heal  266 | Arca  572 ( 99%) kit  164 ( 28%) heal   61 | Arti 1435 (174%) kit  327 ( 40%) heal  247 | 50.7/min 57% 26% | 4.3/187
+  n6         8 | Jugg 2913 (212%) kit 1456 (106%) heal  350 | Arca  899 (140%) kit  190 ( 30%) heal  101 | Arti 1829 (200%) kit  590 ( 64%) heal  240 | 72.3/min 63% 20% | 6.7/374
+  n6        10 | Jugg 3493 (232%) kit 1676 (111%) heal  311 | Arca 1031 (147%) kit  231 ( 33%) heal   97 | Arti 1955 (195%) kit  478 ( 48%) heal  139 | 68.8/min 68% 15% | 4.7/221
+
+real	0m45.815s
+user	0m0.015s
+sys	0m0.000s

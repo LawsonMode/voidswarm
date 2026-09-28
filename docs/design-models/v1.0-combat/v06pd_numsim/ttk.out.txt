@@ -1,0 +1,132 @@
+=== TTK (1v1, passive defender with its own shield-regen rules, attacker full reactor + heat model) ===
+Bands: MD 150 px, Laser 900 px, Phaser 500 px. "commit" = hold LMB; accuracy 100% unless stated.
+
+--- A1. Primary only, commit, shields UP, acc 100% ---
+  attacker weapon @px  →  defender: Jugg        Arca        Arti
+  Jugg MD @150                     3.73 s      1.63 s      2.22 s
+  Jugg LZ @900                     7.28 s      2.88 s      4.08 s
+  Jugg PH @500                    12.03 s      2.90 s      4.32 s
+  Arca MD @150                     3.70 s      1.60 s      2.20 s
+  Arca LZ @900                     7.98 s      3.18 s      4.48 s
+  Arca PH @500                    13.82 s      2.82 s      5.32 s
+  Arti MD @150                     4.32 s      1.92 s      2.62 s
+  Arti LZ @900                     9.28 s      3.78 s      5.18 s
+  Arti PH @500                    15.08 s      3.15 s      6.08 s
+
+--- A2. Primary only, commit, shields UP, acc 60% (projectiles realistic; laser time-on-target) ---
+  attacker weapon @px  →  defender: Jugg        Arca        Arti
+  Jugg MD @150                     6.30 s      2.80 s      3.73 s
+  Jugg LZ @900                    13.17 s      4.88 s      6.88 s
+  Jugg PH @500                    23.03 s      4.88 s      9.28 s
+  Arca MD @150                     6.20 s      2.70 s      3.70 s
+  Arca LZ @900                    14.37 s      5.38 s      7.48 s
+  Arca PH @500                    25.32 s      6.32 s     11.32 s
+  Arti MD @150                     7.22 s      3.22 s      4.42 s
+  Arti LZ @900                    16.47 s      6.38 s      8.68 s
+  Arti PH @500                    27.23 s      6.98 s     12.38 s
+
+--- A3. Primary only, feather 90/40 until shield breaks, shields UP, acc 100% ---
+  attacker weapon @px  →  defender: Jugg        Arca        Arti
+  Jugg MD @150                     3.73 s      1.63 s      2.22 s
+  Jugg LZ @900                     7.28 s      2.88 s      4.08 s
+  Jugg PH @500                    12.03 s      2.90 s      4.32 s
+  Arca MD @150                     3.70 s      1.60 s      2.20 s
+  Arca LZ @900                     7.98 s      3.18 s      4.48 s
+  Arca PH @500                    13.82 s      2.82 s      5.32 s
+  Arti MD @150                     4.32 s      1.92 s      2.62 s
+  Arti LZ @900                     9.28 s      3.78 s      5.18 s
+  Arti PH @500                    15.08 s      3.15 s      6.08 s
+
+--- A4. Primary only, commit, shields DOWN (e.g. after an EMP or a Phaser strip), acc 100% ---
+  attacker weapon @px  →  defender: Jugg        Arca        Arti
+  Jugg MD @150                     2.57 s      0.70 s      1.17 s
+  Jugg LZ @900                     5.48 s      1.58 s      2.48 s
+  Jugg PH @500                    10.38 s      2.33 s      3.47 s
+  Arca MD @150                     2.50 s      0.70 s      1.10 s
+  Arca LZ @900                     5.98 s      1.68 s      2.68 s
+  Arca PH @500                    12.32 s      2.32 s      3.82 s
+  Arti MD @150                     2.92 s      0.82 s      1.32 s
+  Arti LZ @900                     6.98 s      1.98 s      3.08 s
+  Arti PH @500                    13.73 s      2.68 s      4.73 s
+
+--- B1. Primary + secondary (L2 surcharge), shields UP, acc 100% ---
+  attacker weapon @px  →  defender: Jugg        Arca        Arti
+  Jugg MD @150                     1.72 s      0.58 s      1.17 s
+  Jugg LZ @900                     2.88 s      1.38 s      1.88 s
+  Jugg PH @500                     2.62 s      0.77 s      1.20 s
+  Arca MD @150                     2.40 s      1.10 s      1.30 s
+  Arca LZ @900                     7.98 s      3.18 s      4.48 s
+  Arca PH @500                     4.40 s      1.32 s      2.20 s
+  Arti MD @150                     3.83 s      1.82 s      2.42 s
+  Arti LZ @900                     9.28 s      3.78 s      5.18 s
+  Arti PH @500                     8.23 s      2.83 s      4.03 s
+
+--- B2. Primary + secondary, shields UP, acc 60% ---
+  attacker weapon @px  →  defender: Jugg        Arca        Arti
+  Jugg MD @150                     2.80 s      1.05 s      1.62 s
+  Jugg LZ @900                     4.08 s      1.48 s      2.68 s
+  Jugg PH @500                     3.57 s      1.20 s      2.17 s
+  Arca MD @150                     3.50 s      1.40 s      2.20 s
+  Arca LZ @900                    15.35 s      5.38 s      7.48 s
+  Arca PH @500                     5.50 s      2.20 s      2.57 s
+  Arti MD @150                     5.92 s      2.92 s      3.72 s
+  Arti LZ @900                    17.45 s      6.38 s      8.68 s
+  Arti PH @500                    11.23 s      4.03 s      5.83 s
+
+--- B3. Primary + secondary, shields DOWN, acc 100% ---
+  attacker weapon @px  →  defender: Jugg        Arca        Arti
+  Jugg MD @150                     1.40 s      0.27 s      0.32 s
+  Jugg LZ @900                     2.68 s      1.28 s      1.33 s
+  Jugg PH @500                     2.22 s      0.77 s      0.82 s
+  Arca MD @150                     1.80 s      0.40 s      0.80 s
+  Arca LZ @900                     5.98 s      1.68 s      2.68 s
+  Arca PH @500                     3.32 s      1.10 s      1.32 s
+  Arti MD @150                     2.72 s      0.82 s      1.22 s
+  Arti LZ @900                     6.98 s      1.98 s      3.08 s
+  Arti PH @500                     7.63 s      2.22 s      3.15 s
+
+--- C1. BURST: 2 bombs + damaging Space/E skill + primary + secondary, shields UP, acc 100% (MD @150, LZ 500 px for the well/ram, PH 500) ---
+  attacker weapon @px  →  defender: Jugg        Arca        Arti
+  Jugg MD @150                     1.03 s      0.23 s      0.23 s
+  Jugg LZ @500                     1.57 s      0.77 s      0.77 s
+  Jugg PH @500                     1.57 s      0.77 s      0.77 s
+  Arca MD @150                     1.10 s      0.30 s      0.77 s
+  Arca LZ @500                     1.78 s      0.77 s      1.10 s
+  Arca PH @500                     1.57 s      0.77 s      1.07 s
+  Arti MD @150                     2.22 s      0.92 s      1.03 s
+  Arti LZ @500                     4.48 s      1.57 s      1.57 s
+  Arti PH @500                     4.63 s      0.82 s      1.57 s
+
+--- C2. EMP opener @200 px then primary + secondary, shields UP, acc 100% ---
+  attacker weapon @px  →  defender: Jugg        Arca        Arti
+  Jugg MD @200                     1.67 s      0.33 s      0.38 s
+  Jugg LZ @200                     1.78 s      0.33 s      0.38 s
+  Jugg PH @200                     1.78 s      0.33 s      0.38 s
+  Arca MD @200                     2.13 s      0.88 s      1.10 s
+  Arca LZ @200                     3.08 s      1.10 s      1.47 s
+  Arca PH @200                     3.30 s      1.10 s      1.63 s
+  Arti MD @200                     3.05 s      1.05 s      1.55 s
+  Arti LZ @200                     5.38 s      1.88 s      2.68 s
+  Arti PH @200                     7.55 s      2.15 s      3.18 s
+
+=== D. Juggernaut vs Arcanist burst (both directions), per weapon and distance ===
+  Jugg→Arca MD (burst/primary-only, s):  100: 0.15/1.48  200: 0.30/1.78  300: 0.47/2.45  450: 0.70/4.20  600: 0.95/inf  900: 1.38/inf
+  Jugg→Arca LZ (burst/primary-only, s):  100: 0.15/2.88  200: 0.30/2.88  300: 0.47/2.88  450: 0.70/2.88  600: 0.92/2.88  900: 1.38/2.88
+  Jugg→Arca PH (burst/primary-only, s):  100: 0.15/2.62  200: 0.30/2.70  300: 0.47/2.77  450: 0.70/2.87  600: 0.90/2.98  900: 1.38/inf
+  Arca→Jugg MD (burst/primary-only, s):  100: 1.10/3.37  200: 1.13/4.03  300: 1.32/4.72  450: 1.72/6.52  600: 3.30/inf  900: inf/inf
+  Arca→Jugg LZ (burst/primary-only, s):  100: 1.88/7.98  200: 1.85/7.98  300: 1.83/7.98  450: 1.78/7.98  600: 1.78/7.98  900: 4.28/7.98
+  Arca→Jugg PH (burst/primary-only, s):  100: 1.57/13.57  200: 1.63/13.63  300: 1.30/13.70  450: 1.50/13.80  600: 1.72/13.88  900: inf/inf
+  Jugg Ram (400) + Rocket Salvo (3×180) on a full Arcanist: DEAD — 400 kinetic → S 60 I 420 | 180 kinetic → S 0 I 294 | 180 kinetic → S 0 I 78 | 180 kinetic → S 0 I -138
+  2 standard-issue bombs on a full Arcanist: DEAD — 420 kinetic → S 44 I 420 | 420 kinetic → S 0 I -18
+  2 bombs + Ram on a full Artificer: DEAD — 420 kinetic → S 114 I 600 | 420 kinetic → S 0 I 300 | 400 kinetic → S 0 I -132
+  Arcanist 2 bombs + Arc + full well (360) on a full Juggernaut: alive — 420 kinetic → S 164 I 900 | 420 kinetic → S 0 I 745 | 220 energy → S 0 I 613 | 360 energy → S 0 I 397
+
+=== E. Mass Driver TTK vs distance (commit, acc 100%, shields up) ===
+  Jugg MD @50/150/250/350/450: Jugg 3.2/3.7/4.6/6.2/9.3  Arca 1.4/1.6/2.1/2.8/4.2  Arti 1.9/2.2/2.8/3.8/5.7
+  Arca MD @50/150/250/350/450: Jugg 3.1/3.7/4.4/5.3/6.5  Arca 1.4/1.6/2.0/2.5/3.0  Arti 1.9/2.2/2.7/3.3/4.0
+  Arti MD @50/150/250/350/450: Jugg 3.7/4.3/5.2/6.6/8.9  Arca 1.6/1.9/2.4/3.1/4.2  Arti 2.2/2.6/3.2/4.1/5.5
+
+=== F. Two attackers: Phaser strip + Mass Driver finish (both commit, 100%), vs one attacker MD ===
+  vs Jugg: Arca PH@500 + Jugg MD@150 2.45 s | 2× Jugg MD@150 1.87 s | 2× Arca LZ@900 3.98 s | PH+PH@500 5.82 s
+  vs Arca: Arca PH@500 + Jugg MD@150 1.05 s | 2× Jugg MD@150 0.82 s | 2× Arca LZ@900 1.58 s | PH+PH@500 1.57 s
+  vs Arti: Arca PH@500 + Jugg MD@150 1.32 s | 2× Jugg MD@150 1.17 s | 2× Arca LZ@900 2.28 s | PH+PH@500 2.32 s

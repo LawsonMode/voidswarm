@@ -1,0 +1,17 @@
+
+=== T5. Full runs: floors 1→N carrying the lives pool (+2 per boss), average skill, 3 seeds ===
+  n6        Story    : floors cleared per seed: 7✗ (23 min, lives 0) | 7✗ (21 min, lives 0) | 7✗ (22 min, lives 0)
+  n6        Veteran  : floors cleared per seed: 5✗ (16 min, lives 0) | 5✗ (17 min, lives 0) | 4✗ (15 min, lives 0)
+  n6        Nightmare: floors cleared per seed: 3✗ (12 min, lives 0) | 3✗ (13 min, lives 0) | 3✗ (13 min, lives 0)
+  n4        Story    : floors cleared per seed: 7✗ (25 min, lives 0) | 7✗ (24 min, lives 0) | 7✗ (27 min, lives 0)
+  n4        Veteran  : floors cleared per seed: 5✗ (18 min, lives 0) | 5✗ (19 min, lives 0) | 5✗ (19 min, lives 0)
+  n4        Nightmare: floors cleared per seed: 4✗ (18 min, lives 0) | 3✗ (13 min, lives 0) | 3✗ (14 min, lives 0)
+  solo Jugg Story    : floors cleared per seed: 8✗ (36 min, lives 0) | 10 (39 min, lives 4) | 10 (40 min, lives 0)
+  solo Jugg Veteran  : floors cleared per seed: 7✗ (36 min, lives 0) | 7✗ (34 min, lives 0) | 5✗ (23 min, lives 0)
+  solo Jugg Nightmare: floors cleared per seed: 2✗ (11 min, lives 0) | 3✗ (15 min, lives 0) | 2✗ (12 min, lives 0)
+  solo Arca Story    : floors cleared per seed: 7✗ (28 min, lives 0) | 6✗ (24 min, lives 0) | 7✗ (27 min, lives 0)
+  solo Arca Veteran  : floors cleared per seed: 4✗ (18 min, lives 0) | 4✗ (19 min, lives 0) | 4✗ (18 min, lives 0)
+  solo Arca Nightmare: floors cleared per seed: 2✗ (10 min, lives 0) | 2✗ (8 min, lives 0) | 2✗ (9 min, lives 0)
+  solo Arti Story    : floors cleared per seed: 5✗ (30 min, lives 0) | 6✗ (37 min, lives 0) | 6✗ (35 min, lives 0)
+  solo Arti Veteran  : floors cleared per seed: 2✗ (17 min, lives 0) | 3✗ (19 min, lives 0) | 4✗ (26 min, lives 0)
+  solo Arti Nightmare: floors cleared per seed: 2✗ (14 min, lives 0) | 2✗ (16 min, lives 0) | 2✗ (11 min, lives 0)

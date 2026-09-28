@@ -67,8 +67,9 @@ Any non-2xx answer is `{ "error": "<human-readable text>" }` (plus the fields no
 ### Types
 
 ```ts
-type Action = 'pass' | 'mask' | 'block' | 'spam' | 'muted';
-// pass = shown as typed; mask = shown with words starred; block = not shown (language);
+type Action = 'pass' | 'flag' | 'mask' | 'block' | 'spam' | 'muted';
+// pass = shown as typed; flag = shown as typed (a name: allowed), but a host custom term marked 'flag' matched —
+// logged for review, never a strike; mask = shown with words starred; block = not shown (language);
 // spam = not shown (repeat flood); muted = not shown (sender is muted)
 
 interface ChatLogRow {
@@ -76,8 +77,9 @@ interface ChatLogRow {
   roomId: string | null;        // null = the zone lobby (Command screen chat)
   roomName: string;             // 'Zone' for the lobby
   channel: 'all' | 'team' | 'name' | 'room';
-  // 'name' = a callsign attempt that was refused (original = the attempted name);
-  // 'room' = a refused room name (original = the attempted room name)
+  // 'name' = a callsign attempt that was refused (original = the attempted name) — or, with action 'flag', an
+  // allowed one that a custom 'flag' term matched (shown = the name), or an ACCOUNT username that the current
+  // lists match, logged on every join (kept, never renamed, no strike); 'room' = the same for a room name
   team: number;                 // -1 = none
   playerId: number; name: string;
   accountId: string | null;     // null = guest
@@ -85,11 +87,16 @@ interface ChatLogRow {
   original: string;             // what they typed
   shown: string;                // what others saw ('' when not shown)
   action: Action;
-  hits: string[];               // "category:term" per filter hit, e.g. "profanity:<term>", "selfharm:<phrase>";
-                                // categories: slur hate sexual threat selfharm profanity mild (refused names too)
+  hits: string[];               // one label per filter hit (≤ 128 chars each; a refused name too, one per hit):
+                                //   "category:term" — the built-in lists, e.g. "profanity:<term>", "selfharm:<phrase>";
+                                //     categories: slur hate sexual threat selfharm profanity mild (refused names too)
+                                //   "custom:category:term" — a host custom term's block / mask hit
+                                //   "flag:category:term" — a host custom term marked 'flag' (review only)
+                                // custom categories are the host's labels (lowercase a-z 0-9 space _ -, ≤ 24 chars)
 }
 // Self-harm statements are blocked but never counted as a strike; online moderators get an alert in chat
-// ("… may be about self-harm … /log <name>"). Filter on hits starting with "selfharm:" to find them.
+// ("… may be about self-harm … /log <name>"). Filter on hits starting with "selfharm:" (built-in) or
+// "custom:selfharm:" (a host custom term; any spelling of the label self-harm is stored as selfharm) to find them.
 
 interface OnlinePlayer {
   playerId: number; name: string;
@@ -150,7 +157,9 @@ All paths are under `/api/admin/`. Success answers always include `"ok": true`.
 ```ts
 { player?: string; accountId?: string; address?: string;
   grep?: string;                 // case-insensitive substring of original OR shown text (≤ 100 chars)
-  action?: Action | 'flagged';   // flagged = everything except 'pass'
+  action?: Action | 'flagged';   // flagged = the lines the filter acted on: mask, block, spam, muted
+                                 //   (not 'pass', and not 'flag': a review-only line was shown, no strike);
+                                 // flag = lines FOR REVIEW: action 'flag', or any line with a "flag:" hit
   roomId?: string;
   since?: number | string;       // epoch ms, or a duration such as '2h' (= 2 hours ago)
   until?: number;
@@ -214,7 +223,8 @@ login and (for address bans) registration.
   addresses: string[];                      // addresses seen in their chat log (most recent first, ≤ 10)
   activeBans: BanRow[];
   strikes: number;                          // blocked messages in the last 10 minutes
-  flagged24h: number;                       // their non-'pass' log lines in the last 24 h
+  flagged24h: number;                       // their log lines the filter acted on in the last 24 h (mask, block,
+                                            // spam, muted — review-only 'flag' lines are not counted)
   recentActions: ActionRow[];               // last ≤ 20 moderation actions against them
 } }
 ```

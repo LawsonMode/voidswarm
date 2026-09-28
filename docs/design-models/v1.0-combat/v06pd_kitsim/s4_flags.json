@@ -1,0 +1,20 @@
+[
+ {
+  "kit": "arcade",
+  "sev": "MED",
+  "what": "FULL STOP slower than counter-thrust (Jugg)",
+  "detail": "Arcade Kit Jugg: FULL STOP 0.77 s / 149 px but reversing thrust stops in 0.67 s / 138 px: the new brake is a trap on this hull (raise stopDecel to >= thrust - brake)."
+ },
+ {
+  "kit": "sortie",
+  "sev": "LOW",
+  "what": "Arcanist coast brake nerf 1800 -> 1100",
+  "detail": "Coast 0.23 s -> 0.33 s; the Arcanist now pays +1 load (x0.85 regen, x1.25 surcharge) for its old free stop. Retune the CR movement tests (stop time +-2 ticks)."
+ },
+ {
+  "kit": "all",
+  "sev": "LOW",
+  "what": "Held brake counts as load even at v = 0",
+  "detail": "Hero/Arcade/Sortie all count Space-held FULL STOP in L; a parked pilot holding Space is strained (regen x0.85, surcharge x1.25) for no benefit. Count it only while |v| > 5 px/s."
+ }
+]

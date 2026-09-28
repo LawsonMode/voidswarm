@@ -27,8 +27,28 @@ export type BanScope = 'account' | 'address' | 'guest';
 export type ReportStatus = 'open' | 'reviewed' | 'dismissed';
 export type ModActionKind = 'ban' | 'unban' | 'mute' | 'unmute' | 'kick' | 'warn' | 'note' | 'promote' | 'demote';
 
-export const CHAT_ACTIONS: readonly ChatAction[] = ['pass', 'mask', 'block', 'spam', 'muted'];
+export const CHAT_ACTIONS: readonly ChatAction[] = ['pass', 'flag', 'mask', 'block', 'spam', 'muted'];
 export const REPORT_STATUSES: readonly ReportStatus[] = ['open', 'reviewed', 'dismissed'];
+/** Longest hit label kept in the log ("flag:<category ≤ 24>:<term ≤ 64>" fits). */
+const MAX_HIT_LABEL = 128;
+
+/**
+ * The lines the filter acted on (masked, blocked, repeat flood, sent while muted): not 'pass', and not 'flag' either —
+ * a review-only line was shown as typed and is never a strike, so it must not count against a pilot.
+ */
+const ACTED_SQL = "action NOT IN ('pass', 'flag')";
+
+/**
+ * SQL for a log query's `action` filter: 'flagged' = the lines the filter acted on (ACTED_SQL); 'flag' = lines FOR
+ * REVIEW — logged as 'flag', or masked / blocked / withheld lines that also carry a review-only hit ("flag:..."
+ * label; built-in categories are never 'flag').
+ */
+function actionWhere(action: LogQuery['action'], where: string[], args: (string | number | null)[]): void {
+  if (!action) return;
+  if (action === 'flagged') where.push(ACTED_SQL);
+  else if (action === 'flag') where.push(`(action = 'flag' OR hits LIKE '%"flag:%')`);
+  else { where.push('action = ?'); args.push(action); }
+}
 
 export interface ChatLogRow {
   id: number; ts: number;
@@ -97,6 +117,7 @@ export interface LogQuery {
   address?: string;
   /** case-insensitive substring of original or shown */
   grep?: string;
+  /** one action; 'flagged' = the lines the filter acted on (not 'pass' / 'flag'); 'flag' = lines for review (see actionWhere) */
   action?: ChatAction | 'flagged';
   roomId?: string;
   since?: number;
@@ -251,8 +272,8 @@ export class ModStore {
                           GROUP BY address ORDER BY t DESC LIMIT 10`),
       addrsByName: p(`SELECT address, MAX(ts) AS t FROM chat_log WHERE name_key = ? AND account_id IS NULL AND address IS NOT NULL
                        GROUP BY address ORDER BY t DESC LIMIT 10`),
-      flaggedByAccount: p("SELECT COUNT(*) AS n FROM chat_log WHERE account_id = ? AND action <> 'pass' AND ts >= ?"),
-      flaggedByName: p("SELECT COUNT(*) AS n FROM chat_log WHERE name_key = ? AND account_id IS NULL AND action <> 'pass' AND ts >= ?"),
+      flaggedByAccount: p(`SELECT COUNT(*) AS n FROM chat_log WHERE account_id = ? AND ${ACTED_SQL} AND ts >= ?`),
+      flaggedByName: p(`SELECT COUNT(*) AS n FROM chat_log WHERE name_key = ? AND account_id IS NULL AND ${ACTED_SQL} AND ts >= ?`),
       insertAction: p(`INSERT INTO mod_actions (ts, actor_account_id, actor_name, action, target_account_id, target_name,
                          target_address, duration_sec, expires_at, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
       insertBan: p(`INSERT INTO bans (kind, scope, account_id, username, address_prefix, created_at, expires_at, reason, by)
@@ -331,7 +352,7 @@ export class ModStore {
             this.st.insertChat!.run(
               Math.floor(e.time), e.roomId, clampText(e.roomName, 64), e.channel, Math.floor(e.team) || 0, Math.floor(e.playerId) || 0,
               clampText(e.name, 64), nameKey(String(e.name ?? '')), e.accountId, e.address, clampText(e.original), clampText(e.shown),
-              e.action, JSON.stringify((e.hits ?? []).slice(0, 20).map((h) => String(h).slice(0, 64))),
+              e.action, JSON.stringify((e.hits ?? []).slice(0, 20).map((h) => String(h).slice(0, MAX_HIT_LABEL))),
             );
           }
         });
@@ -365,8 +386,7 @@ export class ModStore {
       const like = likeOf(q.grep.slice(0, 100));
       args.push(like, like);
     }
-    if (q.action === 'flagged') where.push("action <> 'pass'");
-    else if (q.action) { where.push('action = ?'); args.push(q.action); }
+    actionWhere(q.action, where, args);
     if (q.roomId) { where.push('room_id = ?'); args.push(q.roomId); }
     if (typeof q.since === 'number' && Number.isFinite(q.since)) { where.push('ts >= ?'); args.push(Math.floor(q.since)); }
     if (typeof q.until === 'number' && Number.isFinite(q.until)) { where.push('ts <= ?'); args.push(Math.floor(q.until)); }
@@ -388,7 +408,7 @@ export class ModStore {
     let total = 0;
     for (;;) {
       const where: string[] = ['id > ?'];
-      const args: (string | number)[] = [after];
+      const args: (string | number | null)[] = [after];
       if (q.player) {
         const acc = this.accountByUsername(q.player);
         if (acc) { where.push('(name_key = ? OR account_id = ?)'); args.push(nameKey(q.player), acc.id); }
@@ -397,8 +417,7 @@ export class ModStore {
       if (q.accountId) { where.push('account_id = ?'); args.push(q.accountId); }
       if (q.address) { where.push('address = ?'); args.push(q.address); }
       if (q.grep) { where.push("(original LIKE ? ESCAPE '\\' OR shown LIKE ? ESCAPE '\\')"); const l = likeOf(q.grep.slice(0, 100)); args.push(l, l); }
-      if (q.action === 'flagged') where.push("action <> 'pass'");
-      else if (q.action) { where.push('action = ?'); args.push(q.action); }
+      actionWhere(q.action, where, args);
       if (typeof q.since === 'number') { where.push('ts >= ?'); args.push(Math.floor(q.since)); }
       if (typeof q.until === 'number') { where.push('ts <= ?'); args.push(Math.floor(q.until)); }
       const rows = (this.db.prepare(`SELECT * FROM chat_log WHERE ${where.join(' AND ')} ORDER BY id ASC LIMIT ?`).all(...args, page) as Row[]).map(chatRowOf);
@@ -435,7 +454,7 @@ export class ModStore {
     return rows.map((r) => String(r.address));
   }
 
-  /** Non-'pass' lines of a pilot since `since`. */
+  /** Lines of a pilot since `since` that the filter acted on (not 'pass', not review-only 'flag'). */
   flaggedCount(who: ChatIdent, since: number): number {
     if (who.accountId) return n((this.st.flaggedByAccount!.get(who.accountId, since) as Row).n);
     if (who.nameKey) return n((this.st.flaggedByName!.get(who.nameKey, since) as Row).n);

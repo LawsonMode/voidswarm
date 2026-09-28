@@ -1,0 +1,357 @@
+
+====================================================================================================
+== 0. Class sheet (spec §1) — EHP vs each damage type from full (ignoring the gate)
+====================================================================================================
+class       shield  hull  armor  hard  EHP(neutral)  EHP kinetic  EHP energy  EHP ion  refill s  refill firing  refill idle
+----------  ------  ----  -----  ----  ------------  -----------  ----------  -------  --------  -------------  -----------
+Juggernaut     800   900   0.35  0.15          2326         2363        2326     2201      2.50           5.00         2.00
+Arcanist       600   450      0     0          1050         1160        1050      863      1.50           3.00         1.20
+Artificer      650   650    0.1     0          1372         1444        1372     1228      1.81           3.61         1.44
+
+====================================================================================================
+== 1. Weapon DPS vs distance (full rate, raw before type mults) per weapon x class  [also: per-type effective vs shield / hull]
+====================================================================================================
+weapon (class)      range   @0  @100  @150  @200  @300  @400  @500  @520  @600  @700  @800  @950  @1100
+------------------  -----  ---  ----  ----  ----  ----  ----  ----  ----  ----  ----  ----  ----  -----
+Mass Driver (Jugg)    494  591   591   591   540   437   334     0     0     0     0     0     0      0
+Mass Driver (Arc)     598  600   600   600   560   479   399   319   303     0     0     0     0      0
+Mass Driver (Art)     520  570   570   570   524   431   339   246   228     0     0     0     0      0
+Laser (Jugg)          903  506   506   506   506   506   506   506   506   506   506   506     0      0
+Laser (Arc)          1093  440   440   440   440   440   440   440   440   440   440   440   440      0
+Laser (Art)           950  418   418   418   418   418   418   418   418   418   418   418   418      0
+Phaser (Jugg)         665  446   446   446   446   446   446   446   430   365     0     0     0      0
+Phaser (Arc)          805  440   440   440   440   440   440   440   431   397   353   310     0      0
+Phaser (Art)          700  418   418   418   418   418   418   418   405   355   293     0     0      0
+
+Effective DPS at the weapon band (MD 200 / Laser 700 / Phaser 450) vs each target LAYER (type mult, hardness, armor):
+weapon (class)      raw  vs Jugg S/H  vs Arc S/H  vs Art S/H
+------------------  ---  -----------  ----------  ----------
+Mass Driver (Jugg)  540    344 / 439   405 / 675   405 / 607
+Mass Driver (Arc)   560    357 / 455   420 / 700   420 / 630
+Mass Driver (Art)   524    334 / 426   393 / 655   393 / 589
+Laser (Jugg)        506    430 / 329   506 / 506   506 / 455
+Laser (Arc)         440    374 / 286   440 / 440   440 / 396
+Laser (Art)         418    355 / 272   418 / 418   418 / 376
+Phaser (Jugg)       446    759 / 232   893 / 357   893 / 321
+Phaser (Arc)        440    748 / 229   880 / 352   880 / 317
+Phaser (Art)        418    711 / 217   836 / 334   836 / 301
+
+====================================================================================================
+== 2. Heat / overheat / burst vs sustained (held LMB vs a dummy at band distance, thrusting, strain 1, own shield full)
+====================================================================================================
+weapon (class)      t hot(60)  t 100  t own S=0  t 1st jam/cut/vent  t brownout  DPS 0-3s  DPS 0-10s  DPS 0-30s  sust/max  own S drained  dmg/power  P left
+------------------  ---------  -----  ---------  ------------------  ----------  --------  ---------  ---------  --------  -------------  ---------  ------
+Mass Driver (Jugg)       1.87   3.15       12.5                12.6       never       546        542        458       85%           1347       3.18     919
+Mass Driver (Arc)        1.40   2.40        8.4                 8.5       never       578        521        455       81%           1527       2.55    1210
+Mass Driver (Art)        1.40   2.40        8.9                 9.0       never       541        492        407       78%           1244       3.38    1100
+Laser (Jugg)             1.65   2.77        8.5                 8.5       never       506        460        365       72%           1568       4.56    1000
+Laser (Arc)              1.50   2.48        6.8                 6.8       never       440        359        333       76%           1972       3.61    1298
+Laser (Art)              1.50   2.48        7.1                 7.1       never       418        350        293       70%           1433       4.71    1100
+Phaser (Jugg)            1.98      ∞          -                 3.4       never       464        367        363       81%              0       3.85     980
+Phaser (Arc)             1.50      ∞          -                 2.7       never       440        352        337       77%              0       2.99    1289
+Phaser (Art)             1.50      ∞          -                 2.7       never       418        334        320       77%              0       3.90    1100
+
+Bot heat discipline (§14: release MD at 92, Laser 97, Phaser 85; resume at 55 assumed) — sustained DPS over 30 s:
+weapon (class)      DPS 30s (bot)  sust/max  own S drained
+------------------  -------------  --------  -------------
+Mass Driver (Jugg)            342       63%              0
+Mass Driver (Arc)             315       56%              0
+Mass Driver (Art)             318       61%              0
+Laser (Jugg)                  273       54%              0
+Laser (Arc)                   226       51%              0
+Laser (Art)                   227       54%              0
+Phaser (Jugg)                 283       63%              0
+Phaser (Arc)                  253       58%              0
+Phaser (Art)                  258       62%              0
+
+====================================================================================================
+== 3. TTK (s) from full, attacker holds fire, thrusting; target passive but regenerates by the rules. P = primary only, P+S = primary + secondary (strain 2).
+====================================================================================================
+   distance = weapon band (MD 200, Laser 700, Phaser 450). "dn" = target starts with shield broken (S = 0, break delay running). acc = 1 (theoretical).
+attacker (* default)  vs Jugg  P | P+S | P dn | P+S dn  vs Arc  P | P+S | P dn | P+S dn  vs Art  P | P+S | P dn | P+S dn
+--------------------  --------------------------------  -------------------------------  -------------------------------
+Jugg Mass Driver *           4.50 | 2.40 | 2.17 | 1.35        2.28 | 1.00 | 0.77 | 0.33        2.75 | 1.47 | 1.23 | 0.42
+Jugg Laser                   4.60 | 2.50 | 2.80 | 1.70        2.10 | 1.10 | 0.90 | 0.90        2.80 | 1.80 | 1.50 | 1.05
+Jugg Phaser                  6.27 | 3.02 | 5.13 | 2.08        2.17 | 1.32 | 1.60 | 0.68        3.30 | 2.07 | 2.45 | 0.75
+Arc Mass Driver              4.37 | 2.97 | 2.07 | 1.47        2.17 | 1.37 | 0.77 | 0.47        2.67 | 1.87 | 1.17 | 0.87
+Arc Laser *                  5.30 | 5.30 | 3.20 | 3.20        2.40 | 2.40 | 1.10 | 1.10        3.20 | 3.20 | 1.70 | 1.70
+Arc Phaser                   6.45 | 3.35 | 5.20 | 2.43        2.43 | 1.43 | 1.68 | 0.93        3.18 | 2.18 | 2.43 | 1.18
+Art Mass Driver              4.68 | 4.18 | 2.28 | 2.08        2.38 | 2.18 | 0.78 | 0.78        2.88 | 2.68 | 1.28 | 1.28
+Art Laser                    5.60 | 5.60 | 3.40 | 3.40        2.60 | 2.60 | 1.10 | 1.10        3.30 | 3.30 | 1.80 | 1.80
+Art Phaser *                 6.73 | 5.48 | 5.48 | 4.73        2.47 | 2.22 | 1.72 | 1.72        3.22 | 2.97 | 2.47 | 2.22
+
+Spec §19 distances, primary only, acc 1 (compare with the design table):
+attacker                               vs Jugg           vs Arc           vs Art
+-----------------------------  ---------------  ---------------  ---------------
+Jugg Mass Driver @100/300/500  4.07 / 5.62 / ∞  1.97 / 2.82 / ∞  2.43 / 3.52 / ∞
+Arc Laser @800                            5.30             2.40             3.20
+Art Phaser @400/650                6.68 / 9.45      2.42 / 3.17      3.17 / 5.43
+
+Realistic accuracy (MD 0.6, Laser 0.8 beam-time, Phaser 0.55, rockets 2 of 3), band distance, P / P+S:
+attacker          vs Jugg P | P+S  vs Arc P | P+S  vs Art P | P+S
+----------------  ---------------  --------------  --------------
+Jugg Mass Driver      7.53 | 3.15     3.80 | 1.47     4.62 | 1.73
+Jugg Laser            5.80 | 4.50     2.60 | 2.20     3.40 | 2.60
+Jugg Phaser          11.48 | 4.92     3.87 | 2.08     6.83 | 3.02
+Arc Mass Driver       7.27 | 4.47     3.67 | 2.17     4.47 | 2.27
+Arc Laser             6.70 | 6.70     3.00 | 3.00     3.90 | 3.90
+Arc Phaser           12.97 | 5.58     5.45 | 2.23     6.70 | 3.35
+Art Mass Driver       7.78 | 6.18     3.98 | 3.28     4.78 | 3.98
+Art Laser             7.00 | 7.00     3.20 | 3.20     4.20 | 4.20
+Art Phaser           13.25 | 8.02     5.48 | 4.38     6.73 | 5.00
+
+Arena DM pace proxy: mean default-weapon TTK over all 9 class pairs, band distance, realistic acc, P+S:
+  mean 4.15 s; vs Juggernaut targets 5.96 s; v0.x reference ≈ 2.9 s vs an Arcanist (spec)
+
+====================================================================================================
+== 4. Mutual duels, default weapons, both hold P+S, fixed distance, realistic accuracy. Winner (time) and winner hull% left
+====================================================================================================
+duel               winner  time s  win hull  win shield
+-----------------  ------  ------  --------  ----------
+200px Jugg v Jugg   trade    3.15         -           -
+200px Jugg v Arc     Jugg    1.47      100%          1%
+200px Jugg v Art     Jugg    1.73      100%         24%
+200px Arc v Arc     trade    1.80         -           -
+200px Arc v Art       Arc    2.23       61%          0%
+200px Art v Art     trade    4.73         -           -
+450px Jugg v Jugg   trade    6.32         -           -
+450px Jugg v Arc     Jugg    2.70       57%          0%
+450px Jugg v Art     Jugg    3.48       82%          0%
+450px Arc v Arc     trade    1.80         -           -
+450px Arc v Art       Arc    2.23       61%          0%
+450px Art v Art     trade    5.00         -           -
+700px Jugg v Jugg   trade   27.15         -           -
+700px Jugg v Arc     Jugg    6.67       46%          0%
+700px Jugg v Art     Jugg   12.22       45%          0%
+700px Arc v Arc     trade    3.90         -           -
+700px Arc v Art       Arc    5.80       35%          0%
+700px Art v Art     trade   10.25         -           -
+900px Jugg v Jugg   trade   25.05         -           -
+900px Jugg v Arc     Jugg    6.97       38%          0%
+900px Jugg v Art     Jugg   14.98      100%         50%
+900px Arc v Arc     trade    3.90         -           -
+900px Arc v Art       Arc    3.90      100%         67%
+900px Art v Art      none   60.02         -           -
+
+SMART duels: LMB only when in range with bot heat discipline (release 92/97/85, resume 55); RMB only inside its range (rockets 1260, arc 600, sentry 550):
+duel              winner  time s  win hull
+----------------  ------  ------  --------
+200px Jugg v Arc    Jugg    1.47      100%
+200px Jugg v Art    Jugg    1.73      100%
+200px Arc v Art      Arc    2.23       61%
+450px Jugg v Arc    Jugg    2.70       58%
+450px Jugg v Art    Jugg    3.48       88%
+450px Arc v Art      Arc    2.23       61%
+700px Jugg v Arc    Jugg    8.08       51%
+700px Jugg v Art    Jugg   10.88       68%
+700px Arc v Art      Arc    6.22       36%
+900px Jugg v Arc    Jugg    8.38       44%
+900px Jugg v Art    Jugg   11.18      100%
+900px Arc v Art      Arc    6.22      100%
+
+====================================================================================================
+== 5. Scripted bursts
+====================================================================================================
+Jugg -> Arc burst (Ram + Rockets + MD): takedown 0.63 s; Arc hull left 0
+    t=0.00 RAM | t=0.27 ram hit | t=0.40 ARC SHIELD BREAK
+Jugg -> Arc burst (Ram + Rockets + MD + Polarize aura): takedown 0.63 s; Arc hull left 0
+    t=0.00 RAM | t=0.27 ram hit | t=0.40 ARC SHIELD BREAK
+Jugg -> Arc burst (Ram + Rockets + MD), Arcanist blinks 0.25 s after break: takedown 0.63 s; Arc hull left 0
+    t=0.00 RAM | t=0.27 ram hit | t=0.40 ARC SHIELD BREAK
+Arc -> Jugg (Laser + Arc Lightning, 600 px, acc 1, stop-and-pop): takedown 3.35 s (Jugg shield broke at 1.18 s)
+
+Combined arms, 2 attackers (Art Phaser @450 + Jugg MD @150) vs each class, acc 1:
+  vs Juggernaut: shield down 0.95 s, takedown 2.23 s
+  vs Arcanist: shield down 0.70 s, takedown 1.18 s
+  vs Artificer: shield down 0.70 s, takedown 1.48 s
+
+Shield gate — hull damage from one hit vs Arcanist (600 S / 450 H) at shield 100% / 21% / 19%:
+hit                                 S 100%  S 21%  S 19%  S 0
+----------------------------------  ------  -----  -----  ---
+Bomb centre 480 blast                    0      0    366  480
+Ram 400 kinetic                          0      0    310  500
+Railshot MD 4x69                         0      0    155  345
+Broadside flank 4x160 (one volley)       0    590    610  600
+Rocket volley 3x180                      0    360    426  540
+
+====================================================================================================
+== 6. Strain / brownout / breaker — hold buttons continuously for 30 s (thrusting), then release everything (idle) and recover
+====================================================================================================
+   Space held: Jugg Ram every 6 s, Arc Blink every 5 s, Art Repair Ray 130/s (+Pulse 60 every 9 s). RMB auto-repeats at cooldown. Target dummy at band distance.
+class held        t brownout  t breaker  #breakers  avg speed  avg S-regen mult  DPS  P@30s  S@30s  rec to 25%  rec to full P
+----------------  ----------  ---------  ---------  ---------  ----------------  ---  -----  -----  ----------  -------------
+Jugg LMB               never      never          0       100%              100%  458    92%     0%        0.02            0.4
+Jugg LMB+RMB             4.2        7.8          5        63%               17%  593     9%     4%        2.35            6.4
+Jugg LMB+SPC             9.6       24.2          1        78%               40%  422    40%     0%        0.02            4.9
+Jugg LMB+RMB+SPC         2.8        6.2          9        47%                0%  560     4%     5%        1.20            6.6
+Jugg RMB+SPC           never      never          0        85%               50%  396    87%   100%        0.02            0.7
+Arc LMB                never      never          0       100%              100%  333   100%    22%        0.02            0.0
+Arc LMB+RMB             14.4      never          0        77%               38%  488     8%     0%        1.98            6.2
+Arc LMB+SPC            never      never          0        85%               50%  305   100%     0%        0.02            0.0
+Arc LMB+RMB+SPC          5.0       28.9          1        54%                0%  374    11%     0%        1.83            6.1
+Arc RMB+SPC            never      never          0        85%               50%  198   100%   100%        0.02            0.0
+Art LMB                never      never          0       100%              100%  320   100%   100%        0.02            0.0
+Art LMB+RMB            never      never          0        85%               50%  452   100%   100%        0.02            0.0
+Art LMB+SPC            never      never          0        85%               50%  320    98%   100%        0.02            0.1
+Art LMB+RMB+SPC          3.0        9.5          6        56%                0%  418    34%    50%        0.02            2.7
+Art RMB+SPC            never      never          0        85%               50%  132   100%   100%        0.02            0.0
+
+Breaker under the "strict" reading (trip when a wanted discrete cost is refused for lack of power), LMB+RMB+SPC 30 s:
+  Juggernaut: 13 breaker trips in 30 s, breaker time 13.2 s, DPS 550
+  Arcanist: 8 breaker trips in 30 s, breaker time 8.1 s, DPS 412
+  Artificer: 7 breaker trips in 30 s, breaker time 7.1 s, DPS 415
+
+====================================================================================================
+== 6b. Never-brownout builds: net power/s while HOLDING the combo (sustained average, hot weapon), by card stack
+====================================================================================================
+class weapon      LMB net/s (min cards)  LMB+RMB net/s  LMB+RMB+SPC net/s
+----------------  ---------------------  -------------  -----------------
+Jugg Mass Driver             -38 (C0R2)    -205 (C3R5)    -307 (no build)
+Jugg Laser                  +45 (never)    -106 (C0R5)        -186 (C3R5)
+Jugg Phaser                 +53 (never)     -96 (C0R5)        -175 (C2R5)
+Arc Mass Driver            -38 (C0R0+L)  -229 (C0R3+L)      -355 (C1R5+L)
+Arc Laser                   +89 (never)   -77 (C0R0+L)      -172 (C0R3+L)
+Arc Phaser                  +82 (never)   -85 (C0R0+L)      -181 (C0R3+L)
+Art Mass Driver             +95 (never)     -21 (C0R1)        -281 (C2R5)
+Art Laser                  +187 (never)    +89 (never)        -147 (C1R3)
+Art Phaser                 +182 (never)    +84 (never)        -154 (C0R5)
+   (C = Efficient Coils level, R = Reactor level, L = lan_coils; "(never)" = already power-positive with no cards.)
+
+====================================================================================================
+== 7. Inertia — stop time / distance, 0->max, reverse, 90° strafe response, turn (60 Hz; stop = speed < 5 px/s)
+====================================================================================================
+class       stop s (max)  stop px  stop s (AB)  stop px AB  0->95% s  reverse to 0 s  reverse to -90% s  90° strafe (to 80°) s  180° turn s
+----------  ------------  -------  -----------  ----------  --------  --------------  -----------------  ---------------------  -----------
+Juggernaut          2.82      459         3.10         603      0.63            0.67               1.27                   1.63         0.39
+Arcanist            0.23       40         0.27          57      0.37            0.40               0.73                   0.97         0.20
+Artificer           0.68      123         0.77         169      0.45            0.48               0.90                   1.17         0.24
+v0.x reference (drag 1.2, no brake) from 470: 3.75 s / 380 px
+
+Capital stop from their (penalised) max speed: mass 1 + 0.4n divides drag and brake; speed penalty 1 - 0.07n:
+capital of              n=1              n=3              n=5
+----------  ---------------  ---------------  ---------------
+Juggernaut  3.80 s / 585 px  5.48 s / 737 px  6.68 s / 765 px
+Arcanist     0.32 s / 53 px   0.47 s / 69 px   0.57 s / 72 px
+Artificer   0.93 s / 157 px  1.33 s / 198 px  1.62 s / 205 px
+
+Overspeed-bleed check (literal code: clamp = max(maxS, sp - bleed*dt), bleed = max(400, 4*brake)) — speed after holding thrust along velocity:
+ship                       cap  accel  bleed  v@1s  v@3s  v@5s
+-------------------------  ---  -----  -----  ----  ----  ----
+Juggernaut                 430    650    400   517  1018  1517
+Juggernaut +Thrusters5     559    910    400   763  1783  2803
+Juggernaut AB              640    975    400   845  1995  3145
+Juggernaut AB +Thrusters5  832   1365    400  1221  3151  5081
+Arcanist                   500   1300   3600   500   500   500
+Arcanist +Thrusters5       650   1820   3600   650   650   650
+Arcanist AB                760   1950   3600   760   760   760
+Arcanist AB +Thrusters5    988   2730   3600   988   988   988
+Artificer                  470   1000   1200   470   470   470
+Artificer +Thrusters5      611   1400   1200   724  1124  1524
+Artificer AB               700   1500   1200   865  1465  2065
+Artificer AB +Thrusters5   910   2100   1200  1435  3235  5035
+
+v0.x EXISTING code (movement.ts, OVERSPEED_DECEL 1200, AB thrust x1.5) — speed after 1/3/5 s of afterburner:
+  Juggernaut: AB cap 640, accel 1275 vs bleed 1200 -> 678 / 828 / 978 px/s
+  Arcanist: AB cap 760, accel 1425 vs bleed 1200 -> 869 / 1319 / 1769 px/s
+  Artificer: AB cap 700, accel 1350 vs bleed 1200 -> 773 / 1073 / 1373 px/s
+
+====================================================================================================
+== 8. Items
+====================================================================================================
+Singularity Core pull on ships (A 700, R 540) vs thrust — can the ship thrust straight out?
+ship                    thrust  net@40  net@120  net@270  net@500  escape from 60 px (thrust) t/crush  escape (AB) t/crush
+----------------------  ------  ------  -------  -------  -------  ----------------------------------  -------------------
+Juggernaut                 650     -16       51      177      371                       7.93 s / 1765         1.58 s / 176
+Juggernaut capital n=3     514     211      241      299      387                        2.15 s / 229         1.47 s / 155
+Arcanist                  1300     634      701      828     1021                        1.33 s / 112          0.92 s / 80
+Arcanist capital n=3      1027     724      755      812      900                        1.48 s / 117          1.03 s / 85
+Artificer                 1000     334      401      528      721                        1.63 s / 160         1.08 s / 101
+Artificer capital n=3      790     487      518      575      663                        1.67 s / 144         1.18 s / 107
+
+Singularity Core vs a swarm (A 1400 on enemies, own chase speed added, kamikaze consumed at r+40):
+enemy     reach core from 150 px  from 300 px  from 540 px
+--------  ----------------------  -----------  -----------
+drone                       0.27         0.55         0.98
+dart                        0.30         0.58         1.05
+weaver                      0.25         0.52         0.93
+splitter                    0.28         0.57         1.03
+brute                       0.32         0.62         1.10
+  -> every kamikaze in 540 px is consumed in < ~1.2 s; over the 5 s duration the Core eats the whole local wave. Crush 512 DPS vs non-kamikaze inside r+90.
+
+EMP vs shields (r 400): shield -> 0 (break, no hull), regen blocked 3.5 s, -40% max power (can trip breaker), DISRUPTED 2 s
+  Juggernaut: strips 800 shield instantly (Phaser needs 1.13 s); power -400; Jugg MD @150 follow-up TTK 2.00 s vs 4.10 s without EMP
+  Arcanist: strips 600 shield instantly (Phaser needs 0.72 s); power -520; Jugg MD @150 follow-up TTK 0.72 s vs 2.00 s without EMP
+  Artificer: strips 650 shield instantly (Phaser needs 0.78 s); power -440; Jugg MD @150 follow-up TTK 1.07 s vs 2.47 s without EMP
+
+Bomb (r 180, 480 blast centre -> 40% edge, full shield gates it; x1.6 vs enemies):
+  mean falloff over a uniform disc = 0.60 -> 288 per ship, 461 per enemy in radius
+  Juggernaut (hull 900): full S: hull -0 | S 19%: hull -196 | S 0: hull -312
+  Arcanist (hull 450): full S: hull -0 | S 19%: hull -366 | S 0: hull -480 (TAKEDOWN)
+  Artificer (hull 650): full S: hull -0 | S 19%: hull -321 | S 0: hull -432
+  EMP (teammate) + direct Bomb on an Arcanist from full: shield 0 then 480 blast on 450 hull -> takedown in ~0.35 s + bomb flight
+
+Ion Storm (r 240, 6 s, 4 arcs/s to <=5 hostiles, 60 ion each; x1.8 vs enemies):
+  Juggernaut: shield DPS 408 (strip in 1.96 s), then hull 125 DPS -> takedown if it stays 9.17 s (storm lasts 6 s); DISRUPTED = no regen inside
+  Arcanist: shield DPS 480 (strip in 1.25 s), then hull 192 DPS -> takedown if it stays 3.59 s (storm lasts 6 s); DISRUPTED = no regen inside
+  Artificer: shield DPS 480 (strip in 1.35 s), then hull 173 DPS -> takedown if it stays 5.12 s (storm lasts 6 s); DISRUPTED = no regen inside
+  vs a swarm: 5 targets x 4 arcs/s x 108 = 2160 DPS for 6 s = 12960 damage (+30% slow)
+
+====================================================================================================
+== 9. Repair Ray / Siphon / Weld / Repair Bay sustain vs incoming DPS
+====================================================================================================
+Ray healer -> target         hull/s  Triage<30%  negates kinetic raw DPS  energy  ion  s to refill hull  hull refills/min
+---------------------------  ------  ----------  -----------------------  ------  ---  ----------------  ----------------
+base -> Juggernaut              120         180                      148     185  231               7.5              8.0x
+base -> Arcanist                120         180                       96     120  150               3.8             16.0x
+base -> Artificer               120         180                      107     133  167               5.4             11.1x
+Medic -> Juggernaut             168         252                      207     258  323               5.4             11.2x
+Medic -> Arcanist               168         252                      134     168  210               2.7             22.4x
+Medic -> Artificer              168         252                      149     187  233               3.9             15.5x
+Medic+Medkit5 -> Juggernaut     294         441                      362     452  565               3.1             19.6x
+Medic+Medkit5 -> Arcanist       294         441                      235     294  367               1.5             39.2x
+Medic+Medkit5 -> Artificer      294         441                      261     327  408               2.2             27.1x
+
+Self Repair Ray (no ally in cone): 72 hull/s base for 130 power/s — sustainability vs the 300/s reactor:
+  Space only (strain 1): draw 155/s vs reactor 300 -> net 145/s; INDEFINITE; self-repair 72 hull/s = 6.6x max hull per minute
+  Phaser + Space (strain 2): draw 289/s vs reactor 300 -> net 11/s; INDEFINITE; self-repair 72 hull/s = 6.6x max hull per minute
+  Phaser + Sentry + Space (strain 3): draw 440/s vs reactor 300 -> net -140/s; brownout in 5.9 s; self-repair 72 hull/s = 6.6x max hull per minute
+
+Ray on a FULL-hull target: +220 shield/s and a jump-start every payout (6 ticks). If the jump-start lets the target's own regen run under fire:
+  Juggernaut: shield regen under fire = 220 (ray) + 160 (own, firing x0.5) = 380/s; incoming shield DPS from Jugg MD 344, Arc Laser 374, Art Phaser 711 -> MD NEVER breaks, Laser NEVER breaks, Phaser breaks in 2.4 s
+  Arcanist: shield regen under fire = 220 (ray) + 200 (own, firing x0.5) = 420/s; incoming shield DPS from Jugg MD 405, Arc Laser 440, Art Phaser 836 -> MD NEVER breaks, Laser breaks in 30.0 s, Phaser breaks in 1.4 s
+  Artificer: shield regen under fire = 220 (ray) + 180 (own, firing x0.5) = 400/s; incoming shield DPS from Jugg MD 405, Arc Laser 440, Art Phaser 836 -> MD breaks in 133.0 s, Laser breaks in 16.3 s, Phaser breaks in 1.5 s
+
+Siphon (med_siphon): 150/s ion drain (x2 on shields) + 60% return, 110 power/s:
+  vs Juggernaut: shield DPS 255 (return 153 hull/s), hull DPS 78 (return 47 hull/s)
+  vs Arcanist: shield DPS 300 (return 180 hull/s), hull DPS 120 (return 72 hull/s)
+  vs Artificer: shield DPS 300 (return 180 hull/s), hull DPS 108 (return 65 hull/s)
+  vs a PvE enemy: 150 HP/s drained (x2 on aegis) -> 90 hull/s returned while ANY hostile is in the 20° cone <= 440 px. Phaser + Siphon draw 265/s vs reactor 300 -> INDEFINITE; = 8.3x max hull/min
+  Siphon alone vs Phaser alone on a Juggernaut shield: 255 vs 711 shield DPS; Siphon + Phaser 966
+
+Docked defense sustain (turret own power: reactor x1.5 docked; x2.25 on a Clamp host):
+  Brace (Jugg turret) 200/s: turret reactor 285 (428 clamp) -> INDEFINITE hold
+  Hull Weld (Art turret) 180/s: turret reactor 450 (675 clamp) -> INDEFINITE hold
+  Deflector (Arc turret) 35/shot: turret reactor 345 (518 clamp) -> per shot
+
+====================================================================================================
+== 9b. "Unkillable Juggernaut" — Dreadnought fortress EHP and hull sustain
+====================================================================================================
+build                                          shield  hull  armor  EHP raw  raw DPS negated by weld  TTK vs 1 laser  vs 3  vs 6
+---------------------------------------------  ------  ----  -----  -------  -----------------------  --------------  ----  ----
+Jugg base                                         800   900   0.35     2326                        0             5.3   1.8   0.9
+Jugg + Polarize                                   800   900   0.35     3876                        0             8.8   2.9   1.5
+Bulwark+Titan, Shield5, Hull5, Plating5          1997  2074   0.60     7533                        0            17.1   5.7   2.9
+ ^ as Dreadnought n=2 (2 Art welders)            2316  2074   0.66     8824                      824               ∞  14.3   4.4
+ ^ n=5 (2 Jugg brace + 3 Art weld) + Polarize    2796  2074   0.75    38611                     5600               ∞     ∞     ∞
+  (TTK uses 440 raw energy DPS per attacker, no shield regen; weld shield part and jump-starts ignored = optimistic for attackers.)
+
+====================================================================================================
+== 10. Polarize Shields vs a drone swarm (analytic)
+====================================================================================================
+  Flux Core 0: cooldown 9.0 s, uptime 56% -> kamikaze contact damage taken x0.44; non-kamikaze x0.78 with 50% reflected; drain 30/s + 120 per cast = 30 power/s avg
+  Flux Core 2: cooldown 7.3 s, uptime 69% -> kamikaze contact damage taken x0.31; non-kamikaze x0.73 with 50% reflected; drain 30/s + 120 per cast = 37 power/s avg
+  Flux Core 4: cooldown 5.9 s, uptime 85% -> kamikaze contact damage taken x0.15; non-kamikaze x0.66 with 50% reflected; drain 30/s + 120 per cast = 46 power/s avg
+  tier 1: a drone touch is 110 kinetic (x0.75x0.85 = 70 shield / 89 hull on a Jugg); under Polarize: 0, and it dies through killEnemy (XP + kit roll).
+  tier 5: a drone touch is 128 kinetic (x0.75x0.85 = 81 shield / 104 hull on a Jugg); under Polarize: 0, and it dies through killEnemy (XP + kit roll).
+  tier 11: a drone touch is 154 kinetic (x0.75x0.85 = 98 shield / 125 hull on a Jugg); under Polarize: 0, and it dies through killEnemy (XP + kit roll).
+  Only non-kamikaze contact, shots and a shield break end it; a drone-only swarm cannot break it (it deals 0). With Flux Core 4 the Jugg is drone-immune 85% of the time.

@@ -1,0 +1,20 @@
+[
+ {
+  "kit": "hero",
+  "sev": "MED",
+  "what": "Pip gravity roughly doubles passive XP pickup",
+  "detail": "fly-by collection width 509 px vs today's 238 px (2.14x) before any Magnet card; Magnet L5 960 px, Tractor 1164 px. Levels (and the level-3 path / ult unlocks) arrive earlier; re-pin the XP curve or trim the base well."
+ },
+ {
+  "kit": "arcade",
+  "sev": "MED",
+  "what": "Pip gravity roughly doubles passive XP pickup",
+  "detail": "fly-by collection width 471 px vs today's 238 px (1.98x) before any Magnet card; Magnet L5 980 px, Tractor 1176 px. Levels (and the level-3 path / ult unlocks) arrive earlier; re-pin the XP curve or trim the base well."
+ },
+ {
+  "kit": "sortie",
+  "sev": "MED",
+  "what": "Pip gravity roughly doubles passive XP pickup",
+  "detail": "fly-by collection width 631 px vs today's 238 px (2.65x) before any Magnet card; Magnet L5 1251 px, Tractor 1547 px. Levels (and the level-3 path / ult unlocks) arrive earlier; re-pin the XP curve or trim the base well."
+ }
+]

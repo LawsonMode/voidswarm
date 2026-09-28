@@ -1,0 +1,44 @@
+[
+ {
+  "kit": "arcade",
+  "sev": "MED",
+  "what": "Room-clear bonus wording",
+  "detail": "\"+6% for each live party pilot\" read as x6 = +36% per room per pilot -> 11.0 vs 8.0 ults/10 min on floor 1 (38% more). Pin it to +6% per pilot."
+ },
+ {
+  "kit": "sortie",
+  "sev": "LOW",
+  "what": "Charge during an active ult is unspecified",
+  "detail": "Sortie only stops the PASSIVE while an ult runs; pending (incl. the ult's own damage) keeps filling and draining. Harmless in Arena (pending cap 400, rate 12/s floor 49 s) but state it: \"no source points while ult-active; ult damage never charges\"."
+ },
+ {
+  "kit": "sortie",
+  "sev": "LOW",
+  "what": "Ultimate Core breaks the 49 s Arena floor",
+  "detail": "x1.3 on passive + points with the fixed 12/s drain: floor 1000/(8.5 x 1.3 + 12) = 43 s; model shortest gap 44 s. Scale the drain too or cap the card at x1.15."
+ },
+ {
+  "kit": "arcade",
+  "sev": "LOW",
+  "what": "Flux Core pushes ults under the \"never under ~52 s\" promise",
+  "detail": "all gains x1.2 -> 39 s shortest gap for a top pilot (floor 59.4 / 1.2 = 49.5 s)."
+ },
+ {
+  "kit": "hero",
+  "sev": "LOW",
+  "what": "Healer charges fastest",
+  "detail": "Drone Carrier: healer 8.2 vs avg damage pilot 6.5 ults/10 min."
+ },
+ {
+  "kit": "hero",
+  "sev": "LOW",
+  "what": "Healer charges fastest",
+  "detail": "Lifeline: healer 7.8 vs avg damage pilot 5.8 ults/10 min."
+ },
+ {
+  "kit": "hero",
+  "sev": "LOW",
+  "what": "Healer charges fastest",
+  "detail": "Citadel: healer 8.2 vs avg damage pilot 6.2 ults/10 min."
+ }
+]

@@ -1,0 +1,68 @@
+=== S. Sensitivity: contact-connect probability (kiting skill) × damage efficiency, spec numbers, one floor with a FRESH lives pool ===
+  cell = hull lost per pilot per floor (×max) / lives lost;  X = wiped
+  Mixed4    eff 0.5 connect 0.5 : f1 0.6/0.3    f2 3.7/6.0    f3 *4.6/10.3  f4 X3.6/9.7   f5 X3.5/10.3  f6 X3.3/9.3   f8 X3.4/9.3   f10 X3.1/9.0  
+  Mixed4    eff 0.5 connect 0.35: f1 0.9/1.3    f2 2.6/4.0    f3 *4.7/9.0   f4 X4.5/10.3  f5 X4.3/11.0  f6 X3.7/10.3  f8 X3.8/10.7  f10 X3.3/9.0  
+  Mixed4    eff 0.5 connect 0.2 : f1 0.3/0.0    f2 2.3/2.3    f3 3.4/5.0    f4 X5.3/11.0  f5 X4.6/11.0  f6 X3.8/10.0  f8 X3.7/10.3  f10 X3.5/9.0  
+  Mixed4    eff 0.5 connect 0.1 : f1 0.0/0.0    f2 0.7/0.0    f3 3.2/4.0    f4 X6.8/10.7  f5 X5.9/11.0  f6 X5.3/10.7  f8 X3.6/9.7   f10 X3.7/9.3  
+  Mixed4    eff 0.7 connect 0.5 : f1 0.1/0.0    f2 1.9/3.3    f3 4.3/6.7    f4 X3.8/10.0  f5 X4.2/10.3  f6 X3.7/9.7   f8 X3.6/9.3   f10 X3.7/9.3  
+  Mixed4    eff 0.7 connect 0.35: f1 0.2/0.0    f2 1.6/2.3    f3 3.1/4.7    f4 X5.2/10.7  f5 X4.5/10.0  f6 X3.6/10.0  f8 X3.8/10.3  f10 X3.6/9.0  
+  Mixed4    eff 0.7 connect 0.2 : f1 0.1/0.0    f2 1.0/0.7    f3 1.7/2.3    f4 X6.4/10.3  f5 X5.9/11.3  f6 X3.8/10.0  f8 X4.0/9.3   f10 X3.5/9.0  
+  Mixed4    eff 0.7 connect 0.1 : f1 0.0/0.0    f2 0.2/0.0    f3 1.7/2.3    f4 *6.8/8.3   f5 X7.4/10.3  f6 X4.4/10.0  f8 X4.2/9.7   f10 X3.8/9.3  
+  Mixed6    eff 0.5 connect 0.5 : f1 0.5/0.0    f2 2.5/4.3    f3 3.5/7.7    f4 X5.0/15.7  f5 X3.9/14.7  f6 X3.5/14.0  f8 X2.9/12.0  f10 X2.7/11.7 
+  Mixed6    eff 0.5 connect 0.35: f1 0.3/0.0    f2 1.3/1.0    f3 3.0/6.0    f4 X4.5/14.0  f5 X3.9/13.7  f6 X3.4/13.0  f8 X3.0/12.0  f10 X3.1/12.0 
+  Mixed6    eff 0.5 connect 0.2 : f1 0.1/0.0    f2 0.8/1.3    f3 2.3/3.0    f4 X6.0/14.0  f5 X4.6/13.3  f6 X3.5/13.7  f8 X3.3/12.3  f10 X2.9/11.7 
+  Mixed6    eff 0.5 connect 0.1 : f1 0.2/0.0    f2 0.1/0.0    f3 1.3/2.3    f4 6.9/10.0   f5 X7.7/14.0  f6 X5.8/14.0  f8 X3.6/12.0  f10 X4.2/13.7 
+  Mixed6    eff 0.7 connect 0.5 : f1 0.1/0.0    f2 1.1/1.7    f3 3.0/5.3    f4 X6.3/13.7  f5 X4.0/13.3  f6 X3.2/12.3  f8 X3.2/12.0  f10 X3.0/11.7 
+  Mixed6    eff 0.7 connect 0.35: f1 0.1/0.0    f2 0.6/1.0    f3 2.4/3.0    f4 X5.8/14.0  f5 X5.9/14.3  f6 X3.1/12.3  f8 X3.4/11.7  f10 X3.1/12.0 
+  Mixed6    eff 0.7 connect 0.2 : f1 0.0/0.0    f2 0.2/0.0    f3 1.1/0.3    f4 6.1/11.0   f5 X5.9/13.0  f6 X5.0/14.7  f8 X3.7/12.0  f10 X3.1/11.7 
+  Mixed6    eff 0.7 connect 0.1 : f1 0.0/0.0    f2 0.2/0.0    f3 1.0/0.7    f4 5.5/7.3    f5 *7.9/12.3  f6 X7.5/15.0  f8 X3.8/12.7  f10 X3.8/12.3 
+  Arca4     eff 0.5 connect 0.5 : f1 0.2/0.0    f2 2.9/5.3    f3 X4.6/11.7  f4 X3.8/10.0  f5 X3.3/9.0   f6 X3.3/9.3   f8 X3.3/10.0  f10 X2.9/9.0  
+  Arca4     eff 0.5 connect 0.35: f1 0.8/1.7    f2 2.5/5.0    f3 *3.6/8.0   f4 X3.4/9.0   f5 X3.1/9.0   f6 X3.3/9.3   f8 X3.2/9.3   f10 X3.2/9.3  
+  Arca4     eff 0.5 connect 0.2 : f1 0.0/0.0    f2 2.6/5.0    f3 4.1/7.0    f4 X3.3/9.0   f5 X4.0/10.7  f6 X3.6/10.0  f8 X3.1/9.0   f10 X2.9/9.0  
+  Arca4     eff 0.5 connect 0.1 : f1 0.0/0.0    f2 0.3/0.3    f3 2.1/2.3    f4 X4.0/9.7   f5 X3.7/9.3   f6 X3.2/9.0   f8 X3.2/9.0   f10 X2.9/9.0  
+  Arca4     eff 0.7 connect 0.5 : f1 0.4/0.7    f2 0.9/1.0    f3 2.8/5.0    f4 X4.3/10.7  f5 X3.6/9.7   f6 X3.4/9.3   f8 X3.2/9.0   f10 X3.4/9.7  
+  Arca4     eff 0.7 connect 0.35: f1 0.0/0.0    f2 0.9/1.3    f3 2.6/6.0    f4 X3.8/9.3   f5 X3.6/9.7   f6 X3.7/10.0  f8 X3.2/9.0   f10 X3.4/9.3  
+  Arca4     eff 0.7 connect 0.2 : f1 0.1/0.0    f2 0.6/0.7    f3 2.5/4.0    f4 X5.0/9.7   f5 X4.3/9.3   f6 X3.5/9.3   f8 X3.5/9.3   f10 X3.1/9.0  
+  Arca4     eff 0.7 connect 0.1 : f1 0.0/0.0    f2 0.1/0.0    f3 0.4/0.0    f4 *6.8/9.3   f5 X6.5/10.0  f6 X4.2/9.7   f8 X3.6/9.0   f10 X3.4/9.3  
+  solo Jugg eff 0.5 connect 0.5 : f1 0.2/0.0    f2 3.8/1.7    f3 5.4/2.0    f4 X8.4/4.0   f5 X7.9/4.0   f6 X9.4/4.0   f8 X7.8/4.0   f10 X8.2/4.0  
+  solo Jugg eff 0.5 connect 0.35: f1 0.3/0.0    f2 2.7/1.0    f3 4.6/1.3    f4 X9.5/4.0   f5 X8.7/4.0   f6 X10.0/4.0  f8 X8.5/4.0   f10 X8.4/4.0  
+  solo Jugg eff 0.5 connect 0.2 : f1 0.0/0.0    f2 2.9/0.7    f3 3.9/1.3    f4 X10.7/4.0  f5 X9.3/4.0   f6 X9.3/4.0   f8 X8.3/4.0   f10 X7.9/4.0  
+  solo Jugg eff 0.5 connect 0.1 : f1 0.0/0.0    f2 0.8/0.0    f3 4.0/1.7    f4 X11.0/4.0  f5 X10.6/4.0  f6 X10.2/4.0  f8 X9.5/4.0   f10 X8.0/4.0  
+  solo Jugg eff 0.7 connect 0.5 : f1 0.0/0.0    f2 2.5/0.7    f3 4.5/1.7    f4 X10.1/4.0  f5 X8.8/4.0   f6 X9.3/4.0   f8 X7.9/4.0   f10 X8.9/4.0  
+  solo Jugg eff 0.7 connect 0.35: f1 0.0/0.0    f2 4.3/1.3    f3 3.1/1.3    f4 X11.9/4.0  f5 X9.1/4.0   f6 X12.1/4.0  f8 X9.5/4.0   f10 X8.6/4.0  
+  solo Jugg eff 0.7 connect 0.2 : f1 0.0/0.0    f2 1.5/0.0    f3 1.7/0.7    f4 X10.2/4.0  f5 X11.1/4.0  f6 X12.2/4.0  f8 X8.3/4.0   f10 X8.1/4.0  
+  solo Jugg eff 0.7 connect 0.1 : f1 0.0/0.0    f2 0.3/0.0    f3 1.0/0.0    f4 *11.0/3.7  f5 X15.2/4.0  f6 X12.4/4.0  f8 X10.8/4.0  f10 X8.8/4.0  
+  solo Arca eff 0.5 connect 0.5 : f1 *5.1/3.3   f2 *5.1/3.7   f3 X5.8/4.0   f4 X5.6/4.0   f5 X5.4/4.0   f6 X5.2/4.0   f8 X5.3/4.0   f10 X5.7/4.0  
+  solo Arca eff 0.5 connect 0.35: f1 3.1/1.7    f2 *5.8/3.7   f3 X6.3/4.0   f4 X5.6/4.0   f5 X5.2/4.0   f6 X5.7/4.0   f8 X5.4/4.0   f10 X5.7/4.0  
+  solo Arca eff 0.5 connect 0.2 : f1 2.2/1.3    f2 *6.1/3.3   f3 X7.9/4.0   f4 X6.8/4.0   f5 X5.8/4.0   f6 X5.5/4.0   f8 X5.3/4.0   f10 X5.7/4.0  
+  solo Arca eff 0.5 connect 0.1 : f1 1.6/0.7    f2 2.6/1.3    f3 *7.3/3.7   f4 X7.0/4.0   f5 X6.2/4.0   f6 X5.6/4.0   f8 X5.1/4.0   f10 X5.9/4.0  
+  solo Arca eff 0.7 connect 0.5 : f1 1.9/1.0    f2 *6.0/3.3   f3 X6.7/4.0   f4 X6.6/4.0   f5 X5.9/4.0   f6 X5.7/4.0   f8 X5.6/4.0   f10 X5.8/4.0  
+  solo Arca eff 0.7 connect 0.35: f1 1.0/0.3    f2 *4.2/2.3   f3 *6.7/3.7   f4 X6.2/4.0   f5 X5.9/4.0   f6 X5.9/4.0   f8 X5.6/4.0   f10 X5.7/4.0  
+  solo Arca eff 0.7 connect 0.2 : f1 1.0/0.3    f2 3.2/1.7    f3 X6.7/4.0   f4 X7.2/4.0   f5 X6.1/4.0   f6 X5.6/4.0   f8 X5.6/4.0   f10 X6.1/4.0  
+  solo Arca eff 0.7 connect 0.1 : f1 0.1/0.0    f2 2.6/1.3    f3 *6.1/2.7   f4 X8.0/4.0   f5 X7.5/4.0   f6 X7.2/4.0   f8 X6.0/4.0   f10 X5.7/4.0  
+  solo Arti eff 0.5 connect 0.5 : f1 X6.7/4.0   f2 X5.9/4.0   f3 X5.8/4.0   f4 X5.0/4.0   f5 X4.8/4.0   f6 X5.0/4.0   f8 X4.5/4.0   f10 X4.9/4.0  
+  solo Arti eff 0.5 connect 0.35: f1 X5.9/4.0   f2 X5.8/4.0   f3 X4.9/4.0   f4 X5.1/4.0   f5 X5.1/4.0   f6 X4.9/4.0   f8 X4.7/4.0   f10 X4.9/4.0  
+  solo Arti eff 0.5 connect 0.2 : f1 *5.5/3.7   f2 X6.4/4.0   f3 X5.3/4.0   f4 X5.3/4.0   f5 X4.6/4.0   f6 X5.0/4.0   f8 X4.7/4.0   f10 X4.8/4.0  
+  solo Arti eff 0.5 connect 0.1 : f1 4.5/2.3    f2 X7.2/4.0   f3 X5.7/4.0   f4 X5.3/4.0   f5 X5.0/4.0   f6 X5.0/4.0   f8 X4.7/4.0   f10 X4.9/4.0  
+  solo Arti eff 0.7 connect 0.5 : f1 *5.2/3.3   f2 X6.4/4.0   f3 X5.9/4.0   f4 X5.2/4.0   f5 X5.2/4.0   f6 X4.8/4.0   f8 X4.7/4.0   f10 X5.1/4.0  
+  solo Arti eff 0.7 connect 0.35: f1 4.2/2.7    f2 X5.9/4.0   f3 X6.2/4.0   f4 X5.1/4.0   f5 X5.0/4.0   f6 X5.0/4.0   f8 X4.7/4.0   f10 X5.1/4.0  
+  solo Arti eff 0.7 connect 0.2 : f1 3.2/1.7    f2 X6.5/4.0   f3 X6.0/4.0   f4 X5.2/4.0   f5 X5.1/4.0   f6 X5.1/4.0   f8 X5.1/4.0   f10 X5.3/4.0  
+  solo Arti eff 0.7 connect 0.1 : f1 1.4/0.0    f2 *6.1/3.3   f3 X6.3/4.0   f4 X7.1/4.0   f5 X5.2/4.0   f6 X5.2/4.0   f8 X5.0/4.0   f10 X5.3/4.0  
+
+  Danger gate (§18 gate 4: 4 bots, floor 1, Veteran: hull lost/bot ≥ 1.0, ≥ 1 kit/bot, ≤ 4 lives) — Mixed4 across regimes (6 seeds):
+   eff 0.5 connect 0.5: floor 58 s, hull lost 0.85/bot, kits 1.8/bot, lives lost 0.8 → FAIL ; Threat at clear 3.3
+   eff 0.5 connect 0.35: floor 59 s, hull lost 0.97/bot, kits 1.6/bot, lives lost 1.3 → FAIL ; Threat at clear 2.9
+   eff 0.5 connect 0.2: floor 60 s, hull lost 0.30/bot, kits 0.8/bot, lives lost 0.0 → FAIL ; Threat at clear 3.5
+   eff 0.5 connect 0.1: floor 63 s, hull lost 0.11/bot, kits 0.4/bot, lives lost 0.0 → FAIL ; Threat at clear 3.6
+   eff 0.7 connect 0.5: floor 54 s, hull lost 0.32/bot, kits 0.7/bot, lives lost 0.2 → FAIL ; Threat at clear 3.6
+   eff 0.7 connect 0.35: floor 54 s, hull lost 0.10/bot, kits 0.2/bot, lives lost 0.0 → FAIL ; Threat at clear 3.6
+   eff 0.7 connect 0.2: floor 54 s, hull lost 0.06/bot, kits 0.3/bot, lives lost 0.0 → FAIL ; Threat at clear 3.6
+   eff 0.7 connect 0.1: floor 54 s, hull lost 0.00/bot, kits 0.0/bot, lives lost 0.0 → FAIL ; Threat at clear 3.5
+
+  Whole 6-floor run with ONE shared lives pool (lives(n) + boss +2/+3), Mixed4 / Mixed6, spec: lives consumed per floor (median seeds):
+   Mixed4 eff 0.5 connect 0.35: lives used per floor [0, 5, 6] → run ends on floor 3
+   Mixed4 eff 0.7 connect 0.2: lives used per floor [0, 0, 3, wipe] → run ends on floor 4
+   Mixed4 eff 0.7 connect 0.1: lives used per floor [0, 0, 1, 8, wipe] → run ends on floor 5
+   Mixed6 eff 0.5 connect 0.35: lives used per floor [0, 1, 5, wipe] → run ends on floor 4
+   Mixed6 eff 0.7 connect 0.2: lives used per floor [0, 0, 2, 14] → run ends on floor 4
+   Mixed6 eff 0.7 connect 0.1: lives used per floor [0, 0, 0, 6, 11] → run ends on floor 5

@@ -1,0 +1,134 @@
+=== M. Ramp tables (§13 formulas as written, Veteran) ===
+  n | count  hp   boss | lives S/V/N | per-pilot vs solo: EHP (count×hp/n)  contact (count/n)  boss/n  lives/n
+  1 | 1.00  1.00  1.00 |  6/ 4/ 2    |   1.00                  1.00             1.00   4.00
+  2 | 1.30  1.25  1.60 |  8/ 6/ 4    |   0.81                  0.65             0.80   3.00
+  3 | 1.60  1.50  2.20 | 10/ 8/ 6    |   0.80                  0.53             0.73   2.67
+  4 | 1.90  1.75  2.80 | 11/ 9/ 7    |   0.83                  0.47             0.70   2.25
+  5 | 2.10  1.90  3.20 | 12/10/ 8    |   0.80                  0.42             0.64   2.00
+  6 | 2.30  2.05  3.60 | 13/11/ 9    |   0.79                  0.38             0.60   1.83
+  Threat and the offense a party needs vs floor-1-start (to kill a pulse as fast as on floor 1): need = (8+2f)/10 × (1+0.08L) × (1+0.06L) × speed
+  floor | L start  need× | L +4min(≈3 pulses/min)  need× | contact× start/+4m | elite% | k0 bodies n1/n4/n6 | k3 n6 | Matriarch n6
+    1  |   0.0     1.0 |   6.2                     2.4 | 1.00 / 1.43        |   5    |  10/ 19/ 23        |  33  | 138k (no boss)
+    2  |   1.5     1.5 |   7.7                     3.5 | 1.10 / 1.54        |   7    |  13/ 26/ 31        |  45  | 148k (no boss)
+    3  |   3.0     2.2 |   9.2                     4.8 | 1.21 / 1.64        |   9    |  17/ 33/ 40        |  58  | 158k
+    4  |   4.5     3.1 |  10.7                     6.4 | 1.31 / 1.75        |  10    |  22/ 41/ 50        |  73  | 168k (no boss)
+    5  |   6.0     4.3 |  12.2                     8.4 | 1.42 / 1.85        |  12    |  27/ 51/ 61        |  89  | 177k (no boss)
+    6  |   7.5     5.7 |  13.7                    10.7 | 1.52 / 1.96        |  14    |  32/ 61/ 74        | 107  | 187k
+    7  |   9.0     7.4 |  15.2                    13.0 | 1.63 / 2.06        |  16    |  38/ 72/ 87        | 126  | 197k (no boss)
+    8  |  10.5     9.5 |  16.7                    15.7 | 1.74 / 2.17        |  18    |  44/ 84/102        | 147  | 206k (no boss)
+    9  |  12.0    11.9 |  18.2                    18.7 | 1.84 / 2.27        |  19    |  51/ 97/117        | 170  | 216k
+   10  |  13.5    14.8 |  19.7                    22.0 | 1.95 / 2.38        |  21    |  58/111/134        | 194  | 226k (no boss)
+  Base growth assumption used below (NOT in the spec): weapon+skill ×(1+0.12(f−1)), autos (60+50(f−1)) dps AoE×2, shield/hull ×(1+0.05(f−1))
+   → offense at floor 6 ≈ ×1.6 weapon + 310 autos (≈ ×2.1 total) vs need ×5.7; "matched" growth = offense set to need×, defense as base.
+
+=== N. Pilot PvE output under bot discipline (heat 80/40, skills only above cost + 25% reserve), single target 250 px, base stats ===
+  Jugg  weapon 279 dps + skills 279 dps = 559; brownout 0% of time, jam 0%
+  Arca  weapon 297 dps + skills 177 dps = 475; brownout 0% of time, jam 0%
+  Arti  weapon 224 dps + skills 146 dps = 370; brownout 0% of time, jam 0%
+
+=== O. One FLOOR = its sealed rooms back-to-back (3 on f1-3, 4 on f4+; 10 s walks + hall packs), Mixed party, kiting (contact connects 0.35), eff 0.5, kits + respawns on ===
+  cell = floor time s / hull lost per pilot (×maxHull) / kits picked per pilot / lives lost (of pool) / Threat at clear;  X = run wiped (lives out) before clearing
+  growth base, n=1 (lives 4):
+    f1: 57/0.28/0.7/0.0/3.8       f2: 69/2.67/8.0/1.0/5.2       f3: 73/4.63/14.0/1.3/6.7      f4: X/9.52/25.7/4.0/6.4       f5: X/8.68/20.3/4.0/7.2       
+    f6: X/9.96/24.3/4.0/8.0       f7: X/9.00/22.0/4.0/9.1       f8: X/8.49/18.7/4.0/10.5      f9: X/8.64/19.3/4.0/12.0      f10: X/8.41/16.7/4.0/13.5     
+  growth base, n=4 (lives 9):
+    f1: 59/0.95/1.4/1.3/2.9       f2: 65/2.63/4.0/4.0/3.2       f3: 91*/4.73/6.1/9.0/3.3      f4: X/4.48/5.6/10.3/4.5       f5: X/4.25/4.1/11.0/6.0       
+    f6: X/3.69/3.4/10.3/7.5       f7: X/3.40/2.4/10.0/9.0       f8: X/3.78/3.3/10.7/10.5      f9: X/3.73/3.0/9.3/12.0       f10: X/3.26/2.8/9.0/13.5      
+  growth base, n=6 (lives 11):
+    f1: 59/0.27/0.4/0.0/3.6       f2: 68/1.29/2.6/1.0/4.8       f3: 66/2.99/4.9/6.0/3.6       f4: X/4.54/6.2/14.0/4.5       f5: X/3.91/4.4/13.7/6.0       
+    f6: X/3.42/3.1/13.0/7.5       f7: X/2.99/2.6/11.3/9.0       f8: X/2.98/2.5/12.0/10.5      f9: X/2.90/2.1/12.0/12.0      f10: X/3.10/2.7/12.0/13.5     
+  growth matched, n=1 (lives 4):
+    f1: 57/0.28/0.7/0.0/3.8       f2: 66/1.83/5.3/0.3/5.3       f3: 74/3.26/8.7/0.7/6.6       f4: X/12.00/31.7/4.0/8.2      f5: X/14.29/43.3/4.0/9.4      
+    f6: X/15.19/48.3/4.0/10.5     f7: X/15.43/47.7/4.0/10.8     f8: X/12.20/34.7/4.0/10.7     f9: X/20.65/69.7/4.0/12.7     f10: X/19.43/61.0/4.0/13.8    
+  growth matched, n=4 (lives 9):
+    f1: 59/0.95/1.4/1.3/2.9       f2: 62/1.38/2.8/1.7/4.3       f3: 67/2.83/6.1/4.0/4.8       f4: 125*/7.63/15.9/10.7/5.0   f5: 104*/6.37/13.9/9.0/6.9    
+    f6: X/7.88/18.5/9.7/7.5       f7: X/8.79/18.4/10.7/9.0      f8: X/5.80/12.2/9.7/10.5      f9: X/5.27/10.0/9.0/12.0      f10: X/5.58/10.3/9.7/13.5     
+  growth matched, n=6 (lives 11):
+    f1: 59/0.27/0.4/0.0/3.6       f2: 59/0.93/2.3/1.0/4.7       f3: 57/1.51/4.1/0.3/6.4       f4: 104/5.83/12.9/9.3/6.0     f5: 113*/7.46/16.1/11.7/6.6   
+    f6: X/7.97/17.3/13.3/7.5      f7: 104*/8.93/21.5/12.3/9.2   f8: X/11.07/27.3/14.7/10.5    f9: X/7.80/17.1/12.7/12.0     f10: 89*/9.08/21.8/11.3/13.5  
+  (* = some seeds wiped)
+
+=== Pa. Swarm survival, growth base, kits OFF: rooms back-to-back on floor f (Threat keeps climbing), kiting 0.35; median time (s) to the FIRST pilot down, cap 600 ===
+  n=1       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg       79    35    13    10     9     8     6     6     6     4
+  Arca       33    12     7     6     5     4     3     3     3     3
+  Arti       11    10     7     6     5     4     3     3     3     3
+  Mixed      79    35    13    10     9     8     6     6     6     4
+  n=4       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg      115    80    87    13    13    10     9     7     6     5
+  Arca       52    34    11     7     7     5     4     3     3     3
+  Arti       61    11     8     7     8     4     3     4     3     3
+  Mixed      54    34    11     7     6     4     4     4     3     3
+  n=6       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg      153   114    86    48    14    11     9     7     6     6
+  Arca       75    35    11     9     6     5     4     4     3     3
+  Arti       96    39    14     9     8     4     4     3     3     3
+  Mixed      79    35    10     9     7     5     4     4     3     3
+
+=== Pa. Swarm survival, growth matched, kits OFF: rooms back-to-back on floor f (Threat keeps climbing), kiting 0.35; median time (s) to the FIRST pilot down, cap 600 ===
+  n=1       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg       79    60    33    13    10     8     7     8     7     5
+  Arca       33    28    10    13     9     8     6     5     5     5
+  Arti       11    14     8     7     7     6     4     4     3     3
+  Mixed      79    60    33    13    10     8     7     8     7     5
+  n=4       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg      115   104    80    14    64    14    11    10     8     8
+  Arca       52    52    51    31    12    11     8    10     9     5
+  Arti       61    39    12     8     7     7     6     6     4     4
+  Mixed      54    32    32    10    12     9     6     7     5     5
+  n=6       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg      153   134   105    65    38    12    12    11    10     8
+  Arca       75    52    51    35    13    11    11     9     8     6
+  Arti       96    63    35    19    10     7     6     6     5     4
+  Mixed      79    32    33    35    12    10     8     7     5     5
+
+=== Pb. Swarm survival, growth base, kits ON: rooms back-to-back on floor f (Threat keeps climbing), kiting 0.35; median time (s) to the FIRST pilot down, cap 600 ===
+  n=1       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg      111    62    63    12    10    10     6     7     6     4
+  Arca       31    10     8     6     4     4     3     3     3     3
+  Arti       12     8     7     5     4     4     3     3     3     3
+  Mixed     111    62    63    12    10    10     6     7     6     4
+  n=4       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg      186   146   156    82    16    15    10    10     9     7
+  Arca       53    36     9    11     7     4     4     4     3     3
+  Arti       90    39     9     7     7     4     4     3     3     3
+  Mixed      55    32    11     8     7     4     4     4     3     3
+  n=6       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg      261   187   200    86    82    51    19    13    11    10
+  Arca       75    57    33    10     7     4     4     4     4     3
+  Arti       88    69    15     9     7     6     4     3     4     3
+  Mixed      80    86    11    10     7     6     4     4     4     3
+
+=== Pb. Swarm survival, growth matched, kits ON: rooms back-to-back on floor f (Threat keeps climbing), kiting 0.35; median time (s) to the FIRST pilot down, cap 600 ===
+  n=1       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg      111    72    46    13    10    10    11     9     9     7
+  Arca       31    10    12     9     8    10     6     6     6     5
+  Arti       12     7     8     6     7     6     4     4     3     3
+  Mixed     111    72    46    13    10    10    11     9     9     7
+  n=4       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg      186   143   179    99    72    93    62    37    59    82
+  Arca       53    54    54    35    12    33    32     9    11     9
+  Arti       90    37    14    12     8     7     7     6     6     5
+  Mixed      55    58    33    14    13    13    12     7     5     6
+  n=6       f1    f2    f3    f4    f5    f6    f7    f8    f9   f10
+  Jugg      261   277   237   158   126   147   141   140   161   210
+  Arca       75    79    31    60    35    34    34    10    11    11
+  Arti       88    60    38    12    10    11     7     7     6     4
+  Mixed      80    33    77    14    12    12    13    11     9     6
+
+=== Q. Kit economy (Mixed party, rooms back-to-back 6 min, kiting 0.35, base growth, kits + respawns on) — per pilot per minute ===
+  n  floor | hull dmg taken/min (×maxHull) | kits dropped/min (party) | kit hull restored/min/pilot (×max) | ray heal/min/pilot (×max) | kit restore ÷ dmg | lives lost /6 min | Threat at 6 min
+  1    1   |   2.92                        |  11.6                    |  1.63                              |  0.00                     |  0.56           |  4.0 (run 3.3 min)  | 8.8
+  1    3   |   4.88                        |  17.0                    |  3.01                              |  0.00                     |  0.62           |  4.0 (run 2.4 min)  | 8.3
+  1    6   |   9.02                        |  25.7                    |  5.15                              |  0.00                     |  0.57           |  4.0 (run 1.1 min)  | 8.0
+  1    9   |  21.10                        |  65.1                    | 10.87                              |  0.00                     |  0.51           |  4.0 (run 0.4 min)  | 12.0
+  4    1   |   1.92                        |  17.9                    |  0.69                              |  0.23                     |  0.36           | 11.0 (run 2.8 min)  | 3.5
+  4    3   |   3.35                        |  28.2                    |  1.15                              |  0.31                     |  0.34           | 10.7 (run 1.5 min)  | 3.0
+  4    6   |  11.04                        |  47.8                    |  2.21                              |  0.10                     |  0.20           | 10.3 (run 0.3 min)  | 7.5
+  4    9   |  14.84                        |  63.0                    |  2.90                              |  0.07                     |  0.20           |  9.3 (run 0.2 min)  | 12.0
+  6    1   |   1.48                        |  23.9                    |  0.60                              |  0.26                     |  0.41           | 14.7 (run 4.0 min)  | 5.0
+  6    3   |   2.33                        |  35.6                    |  1.03                              |  0.37                     |  0.44           | 15.7 (run 2.9 min)  | 3.7
+  6    6   |  10.39                        |  60.7                    |  2.26                              |  0.61                     |  0.22           | 13.0 (run 0.3 min)  | 7.5
+  6    9   |  13.99                        |  90.7                    |  3.32                              |  0.15                     |  0.24           | 12.0 (run 0.2 min)  | 12.0
+  Supply check vs spec §10 estimate ("4-pilot floor ≈560 takedowns → ~22 small + ~20 large + 8 room-clear large"):
+   modelled floor 1 (3 sealed rooms + 2 hall packs), n=4: 211 takedowns, 17.0 kits dropped (incl. 6 room-clear large), pops (kamikaze hits, no drop) 39

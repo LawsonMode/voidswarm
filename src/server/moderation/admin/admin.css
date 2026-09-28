@@ -214,6 +214,8 @@ tr.row-spam td:first-child { box-shadow: inset 3px 0 0 var(--violet); }
 tr.row-hot td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 tr.row-ended td { opacity: 0.6; }
 .pill-pass { border-color: rgba(59, 255, 154, 0.6); color: #aaffd2; }
+.pill-flag { border-color: rgba(59, 242, 255, 0.75); color: #b5f9ff; background: rgba(59, 242, 255, 0.1); }
+tr.row-flag td:first-child { box-shadow: inset 3px 0 0 var(--cyan); }
 .pill-spam { border-color: rgba(155, 91, 255, 0.8); color: #d7c2ff; background: rgba(155, 91, 255, 0.12); }
 .pill-muted { border-color: rgba(255, 212, 59, 0.75); color: #ffe58a; background: rgba(255, 212, 59, 0.1); }
 .pill-admin { border-color: var(--cyan); color: var(--cyan); }

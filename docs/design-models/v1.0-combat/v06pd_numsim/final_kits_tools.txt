@@ -1,0 +1,71 @@
+
+==============================================================================================================
+== C. Repair-kit economy (Veteran, typical). Per pilot per minute: hull lost vs restored (kits / Ray+Pulse), in % of that pilot's max hull
+==============================================================================================================
+party floor   kits dropped/min  large share  taken/min  expired/min  hull lost %/min/pilot  kit %/min  ray+pulse %/min  restored/lost  cleared
+------------  ----------------  -----------  ---------  -----------  ---------------------  ---------  ---------------  -------------  -------
+Jugg solo f1              10.2          76%        0.4          7.5                     7%         7%               0%           100%      4/4
+Jugg solo f2              10.8          64%        3.7          5.3                   130%        80%               0%            61%      4/4
+Jugg solo f3               9.5          72%        2.2          7.1                   149%        60%               0%            40%      0/4
+Jugg solo f6              15.1          74%        5.4          8.2                   271%       135%               0%            50%      0/4
+Arc solo f1               10.2          73%        0.0          8.2                     0%         0%               0%             0%      4/4
+Arc solo f2               10.7          73%        0.6          8.3                    11%        11%               0%           100%      4/4
+Arc solo f3               10.2          65%        0.7          9.2                   101%        18%               0%            18%      0/4
+Arc solo f6                6.8          72%        1.8          3.1                   280%        46%               0%            17%      0/4
+Art solo f1                6.3          79%        1.8          3.0                   149%        40%              23%            42%      4/4
+Art solo f2                6.3          82%        2.1          2.7                   320%        54%              48%            32%      1/4
+Art solo f3                6.5          70%        1.3          4.4                   298%        35%              45%            27%      0/4
+Art solo f6                6.1          83%        1.6          2.3                   494%        52%              72%            25%      0/4
+n=4 f1                    17.7          77%        0.0         14.5                     0%         0%               0%             0%      4/4
+n=4 f2                    19.3          69%        2.8         14.0                    23%        17%               3%            89%      4/4
+n=4 f3                    15.7          68%        4.9         10.5                    91%        34%              18%            57%      0/4
+n=4 f6                    20.6          71%       14.3          3.5                   269%        98%              45%            53%      0/4
+n=6 f1                    20.6          80%        0.0         17.1                     0%         0%               0%             0%      4/4
+n=6 f2                    23.4          55%        4.0         16.0                    17%        13%               4%           100%      4/4
+n=6 f3                    18.8          64%        7.3         11.0                    95%        34%              30%            67%      0/4
+n=6 f6                    23.3          77%       15.6          4.0                   252%        73%              55%            51%      0/4
+
+==============================================================================================================
+== D. Tool value in the swarm (4 seeds, typical progression, Veteran)
+==============================================================================================================
+Polarize, Jugg solo floor 1
+    without: 4/4, 123 s, deaths 0.0, focal hull lost 14%/min, focal 1st takedown 123 s
+    with   : 4/4, 122 s, deaths 0.0, focal hull lost 7%/min, focal 1st takedown 122 s
+Polarize + Flux Core 4 (cd 5.9 s), Jugg solo floor 1
+    without: 4/4, 122 s, deaths 0.0, focal hull lost 7%/min, focal 1st takedown 122 s
+    with   : 4/4, 121 s, deaths 0.0, focal hull lost 0%/min, focal 1st takedown 121 s
+Siphon, Art solo floor 1
+    without: 4/4, 160 s, deaths 2.0, focal hull lost 149%/min, focal 1st takedown 63 s
+    with   : 4/4, 129 s, deaths 0.3, focal hull lost 72%/min, focal 1st takedown 118 s
+Polarize, Jugg solo floor 2
+    without: 4/4, 170 s, deaths 2.8, focal hull lost 180%/min, focal 1st takedown 56 s
+    with   : 4/4, 157 s, deaths 1.3, focal hull lost 130%/min, focal 1st takedown 92 s
+Polarize + Flux Core 4 (cd 5.9 s), Jugg solo floor 2
+    without: 4/4, 157 s, deaths 1.3, focal hull lost 130%/min, focal 1st takedown 92 s
+    with   : 4/4, 146 s, deaths 0.5, focal hull lost 39%/min, focal 1st takedown 119 s
+Siphon, Art solo floor 2
+    without: 1/4, 178 s, deaths 5.8, focal hull lost 320%/min, focal 1st takedown 37 s
+    with   : 4/4, 201 s, deaths 3.3, focal hull lost 221%/min, focal 1st takedown 41 s
+Polarize, Jugg solo floor 4
+    without: 0/4, 168 s, deaths 6.0, focal hull lost 277%/min, focal 1st takedown 20 s
+    with   : 0/4, 281 s, deaths 6.0, focal hull lost 281%/min, focal 1st takedown 40 s
+Polarize + Flux Core 4 (cd 5.9 s), Jugg solo floor 4
+    without: 0/4, 281 s, deaths 6.0, focal hull lost 281%/min, focal 1st takedown 40 s
+    with   : 1/4, 318 s, deaths 5.3, focal hull lost 225%/min, focal 1st takedown 41 s
+Siphon, Art solo floor 4
+    without: 0/4, 147 s, deaths 6.0, focal hull lost 408%/min, focal 1st takedown 25 s
+    with   : 0/4, 163 s, deaths 6.0, focal hull lost 430%/min, focal 1st takedown 15 s
+  endurance Jugg solo Polarize         f1/f2/f3/f4/f6: 212 / 97 / 18 / 13 / 9 s
+  endurance Jugg solo no Polarize      f1/f2/f3/f4/f6: 154 / 36 / 13 / 8 / 4 s
+  endurance Jugg solo Polarize+Flux4   f1/f2/f3/f4/f6: 320 / 97 / 68 / 25 / 10 s
+  endurance Art solo                   f1/f2/f3/f4/f6: 68 / 13 / 8 / 6 / 4 s
+  endurance Art solo + Siphon          f1/f2/f3/f4/f6: 146 / 34 / 25 / 9 / 5 s
+Artificer in the party (vs a 2nd Arcanist), n=4 floor 1
+    without: 4/4, 110 s, deaths 0.0, focal hull lost 0%/min, focal 1st takedown 110 s
+    with   : 4/4, 109 s, deaths 0.0, focal hull lost 0%/min, focal 1st takedown 109 s
+Artificer in the party (vs a 2nd Arcanist), n=4 floor 2
+    without: 4/4, 123 s, deaths 0.0, focal hull lost 3%/min, focal 1st takedown 123 s
+    with   : 4/4, 130 s, deaths 0.3, focal hull lost 17%/min, focal 1st takedown 130 s
+Artificer in the party (vs a 2nd Arcanist), n=4 floor 3
+    without: 0/4, 611 s, deaths 15.0, focal hull lost 88%/min, focal 1st takedown 360 s
+    with   : 0/4, 653 s, deaths 15.0, focal hull lost 98%/min, focal 1st takedown 535 s

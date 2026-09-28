@@ -1,0 +1,62 @@
+
+==============================================================================================================
+== S7. Power budget chains (30 s, shield full unless stated). cells: net power/s over the first 2 s | first brownout | brownout duty | mean recovery
+==============================================================================================================
+E hold = Polarize sustain (Jugg), the Ray (Arcade/Sortie Arti E; Hero Arti ray is RMB), Gravity Well/Sentry are taps. Perk = signature perk on cooldown.
+Brownout trips deterministically when stored power < 2% after all draws or a continuous draw is refused (judge fix); recovers at 25%.
+LMB is blocked in brownout (CR reactor), although Hero/Arcade list only RMB/E/perk/R/boost as brownout-locked (spec wording gap).
+
+--- Hero Kits ---
+combo                     | Jugg MD                      | Arca LZ                      | Arti PH                     
+--------------------------|------------------------------|------------------------------|-----------------------------
+LMB (held, heat builds)   | 62/s | 12.5 s | 17% | 1.0 s  | 149/s | never | 0% | -       | 282/s | never | 0% | -      
+LMB feathered (bot 95/70) | 62/s | never | 0% | -        | 149/s | never | 0% | -       | 282/s | never | 0% | -      
+LMB+RMB                   | -237/s | 4.1 s | 74% | 1.2 s | -126/s | 8.6 s | 20% | 1.2 s | 3/s | never | 0% | -        
+LMB+RMB+E tap             | -312/s | 3.4 s | 64% | 1.2 s | -263/s | 9.0 s | 23% | 1.2 s | -122/s | never | 0% | -     
+LMB+RMB+E hold            | -312/s | 3.4 s | 64% | 1.2 s | -263/s | 9.0 s | 23% | 1.2 s | -122/s | never | 0% | -     
+LMB+RMB+E+boost+perk      | -392/s | 0.5 s | 89% | 1.8 s | -541/s | 0.8 s | 90% | 1.7 s | -485/s | 0.7 s | 79% | 1.1 s
+LMB+RMB+E hold+boost+perk | -392/s | 0.5 s | 89% | 1.8 s | -541/s | 0.8 s | 90% | 1.7 s | -485/s | 0.7 s | 79% | 1.1 s
+LMB+RMB+E+FULL STOP+perk  | -493/s | 2.0 s | 62% | 1.4 s | -594/s | 2.4 s | 53% | 1.6 s | -429/s | 2.3 s | 56% | 1.0 s
+boost only                | -280/s | 3.5 s | 49% | 1.0 s | -215/s | 5.9 s | 33% | 1.0 s | -225/s | 4.3 s | 32% | 0.6 s
+
+--- Arcade Kit ---
+combo                     | Jugg MD                      | Arca LZ                      | Arti PH                     
+--------------------------|------------------------------|------------------------------|-----------------------------
+LMB (held, heat builds)   | 62/s | 12.5 s | 17% | 1.0 s  | 149/s | never | 0% | -       | 282/s | never | 0% | -      
+LMB feathered (bot 95/70) | 62/s | never | 0% | -        | 149/s | never | 0% | -       | 282/s | never | 0% | -      
+LMB+RMB                   | -237/s | 4.1 s | 74% | 1.2 s | -126/s | 8.6 s | 20% | 1.2 s | 66/s | never | 0% | -       
+LMB+RMB+E tap             | -312/s | 3.4 s | 64% | 1.2 s | -263/s | 9.0 s | 23% | 1.2 s | 16/s | never | 0% | -       
+LMB+RMB+E hold            | -312/s | 3.4 s | 64% | 1.2 s | -263/s | 9.0 s | 23% | 1.2 s | -386/s | 2.7 s | 41% | 1.0 s
+LMB+RMB+E+boost+perk      | -392/s | 0.5 s | 89% | 1.8 s | -541/s | 0.8 s | 90% | 1.7 s | -263/s | 3.2 s | 58% | 1.0 s
+LMB+RMB+E hold+boost+perk | -392/s | 0.5 s | 89% | 1.8 s | -541/s | 0.8 s | 90% | 1.7 s | -471/s | 2.9 s | 69% | 1.1 s
+LMB+RMB+E+FULL STOP+perk  | -477/s | 1.8 s | 63% | 1.4 s | -594/s | 2.4 s | 53% | 1.6 s | -273/s | 14.1 s | 6% | 1.0 s
+boost only                | -280/s | 3.5 s | 49% | 1.0 s | -215/s | 5.9 s | 33% | 1.0 s | -225/s | 4.3 s | 32% | 0.6 s
+
+--- Sortie Loadout ---
+combo                     | Jugg MD                      | Arca LZ                      | Arti PH                     
+--------------------------|------------------------------|------------------------------|-----------------------------
+LMB (held, heat builds)   | 62/s | 12.5 s | 17% | 1.0 s  | 149/s | never | 0% | -       | 282/s | never | 0% | -      
+LMB feathered (bot 95/70) | 62/s | never | 0% | -        | 149/s | never | 0% | -       | 282/s | never | 0% | -      
+LMB+RMB                   | -237/s | 4.1 s | 74% | 1.2 s | -126/s | 8.6 s | 20% | 1.2 s | 66/s | never | 0% | -       
+LMB+RMB+E tap             | -312/s | 3.4 s | 64% | 1.2 s | -263/s | 9.0 s | 23% | 1.2 s | 16/s | never | 0% | -       
+LMB+RMB+E hold            | -312/s | 3.4 s | 64% | 1.2 s | -263/s | 9.0 s | 23% | 1.2 s | -386/s | 2.7 s | 41% | 1.0 s
+LMB+RMB+E+boost+perk      | -392/s | 0.5 s | 88% | 1.8 s | -541/s | 0.8 s | 90% | 1.7 s | -431/s | 0.7 s | 72% | 1.0 s
+LMB+RMB+E hold+boost+perk | -392/s | 0.5 s | 88% | 1.8 s | -541/s | 0.8 s | 90% | 1.7 s | -494/s | 0.7 s | 80% | 1.0 s
+LMB+RMB+E+FULL STOP+perk  | -460/s | 1.5 s | 67% | 1.4 s | -628/s | 1.9 s | 69% | 1.6 s | -321/s | 9.3 s | 26% | 1.0 s
+boost only                | -280/s | 3.5 s | 49% | 1.0 s | -215/s | 5.9 s | 33% | 1.0 s | -225/s | 4.3 s | 32% | 0.6 s
+
+--- Special cases ---
+kit            | class | case                                                  | net/s (2 s) | first brownout | duty (30 s)
+---------------|-------|-------------------------------------------------------|-------------|----------------|------------
+Hero Kits      | Arti  | Phaser + Repair Ray (RMB hold), L2                    | 3/s         | never          | 0%         
+Hero Kits      | Arti  | Phaser feathered + Repair Ray                         | 3/s         | never          | 0%         
+Arcade Kit     | Arti  | Phaser + Ray (E hold) + Sentry spam (RMB)             | -386/s      | 2.7 s          | 41%        
+Arcade Kit     | Arti  | Phaser + Ray (E hold), no RMB                         | -22/s       | never          | 0%         
+Sortie Loadout | Arti  | Phaser + Repair Ray (E1 hold), no RMB                 | -22/s       | never          | 0%         
+Hero Kits      | Jugg  | MD + Polarize sustain, under 300 dps fire             | -88/s       | 5.2 s          | 13%        
+Arcade Kit     | Jugg  | MD + Polarize sustain, under 300 dps fire             | -88/s       | 5.2 s          | 13%        
+Sortie Loadout | Jugg  | MD + Polarize sustain + Event Horizon (60/s, +1 load) | -175/s      | 4.3 s          | 37%        
+Sortie Loadout | Jugg  | MD + RMB + Siege Mode (E2, 50/s, no load)             | -362/s      | 2.8 s          | 72%        
+Arcade Kit     | Arti  | boost + Overdrive (free boost 3 s / 14 s)             | 340/s       | 7.3 s          | 20%        
+Hero Kits      | Arca  | boost + Overdrive perk (free 3 s / 16 s)              | 301/s       | 8.9 s          | 20%        
+Sortie Loadout | Arca  | boost + Overdrive perk (free 3 s / 14 s)              | 271/s       | 8.9 s          | 20%        

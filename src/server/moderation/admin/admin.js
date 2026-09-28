@@ -43,9 +43,13 @@ export function durationLabel(id) {
   return p ? p.label : String(id ?? '');
 }
 
-/** Chat filter outcomes (adminApi.md `Action`). `hidden` = other players did not see the line. */
+/**
+ * Chat filter outcomes (adminApi.md `Action`). `hidden` = other players did not see the line. 'flag' = shown as
+ * typed, but a review-only custom term matched (never a strike).
+ */
 export const CHAT_ACTIONS = Object.freeze({
   pass: Object.freeze({ label: 'Passed', hidden: false }),
+  flag: Object.freeze({ label: 'For review', hidden: false }),
   mask: Object.freeze({ label: 'Masked', hidden: false }),
   block: Object.freeze({ label: 'Blocked', hidden: true }),
   spam: Object.freeze({ label: 'Spam', hidden: true }),
@@ -59,10 +63,11 @@ export function chatActionInfo(action) {
     : { id: 'unknown', label: String(action || '?'), hidden: false };
 }
 
-/** Table-row class for a chat line: blocked lines are highlighted red, masked yellow, spam/muted dimmed. */
+/** Table-row class for a chat line: blocked lines are highlighted red, masked yellow, for review cyan, spam/muted dimmed. */
 export function chatRowClass(action) {
   if (action === 'block') return 'row-block';
   if (action === 'mask') return 'row-mask';
+  if (action === 'flag') return 'row-flag';
   if (action === 'spam' || action === 'muted') return 'row-spam';
   return '';
 }

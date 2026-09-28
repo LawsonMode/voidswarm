@@ -1,0 +1,35 @@
+
+--- spec (skill average) ---
+  n6       : 5✗ 19m lost 0,0,-1,5,9,1      | 5✗ 16m lost 0,0,-2,5,10,1     | 5✗ 18m lost 1,0,-2,5,8,2       | f1 intake 3% maxI/min
+  n4       : 5✗ 18m lost 0,0,-2,5,5,2      | 4✗ 15m lost 0,0,-2,6,6        | 5✗ 18m lost 0,0,-1,6,5,0       | f1 intake 0% maxI/min
+  solo Jugg: 6✓ 25m lost 0,0,-2,0,0,-1     | 6✓ 25m lost 0,0,-2,2,2,-1     | 5✗ 24m lost 0,0,0,0,3,1        | f1 intake 0% maxI/min
+  solo Arca: 4✗ 18m lost 0,0,2,0,2         | 4✗ 19m lost 0,0,-1,3,2        | 4✗ 18m lost 0,0,0,2,2          | f1 intake 1% maxI/min
+  solo Arti: 2✗ 17m lost 0,0,4             | 3✗ 17m lost 1,0,0,3           | 4✗ 25m lost 0,0,-1,3,2         | f1 intake 14% maxI/min
+
+--- A: tierHp .08, perFloor .15, 4 pulses from f5 (skill average) ---
+  n6       : 6✓ 18m lost 0,0,-2,0,7,7      | 6✓ 18m lost 0,0,-2,1,2,3      | 6✓ 18m lost 1,0,-2,0,8,5       | f1 intake 3% maxI/min
+  n4       : 6✓ 18m lost 0,0,-1,0,4,5      | 6✓ 19m lost 0,0,-2,0,5,4      | 6✓ 18m lost 0,0,-2,0,0,1       | f1 intake 0% maxI/min
+  solo Jugg: 6✓ 24m lost 0,0,-2,1,0,0      | 5✗ 19m lost 0,1,0,0,3,0       | 6✓ 22m lost 0,0,0,0,1,-2       | f1 intake 0% maxI/min
+  solo Arca: 5✗ 22m lost 0,0,0,0,0,4       | 5✗ 20m lost 0,0,-2,1,3,2      | 5✗ 20m lost 0,0,-2,1,3,2       | f1 intake 1% maxI/min
+  solo Arti: 4✗ 24m lost 0,0,0,0,4         | 5✗ 27m lost 1,0,-2,1,4,0      | 5✗ 32m lost 0,0,-1,0,2,3       | f1 intake 14% maxI/min
+
+--- B: A + base heat 1.3 (skill average) ---
+  n6       : 5✗ 17m lost 0,0,-2,2,5,9      | 6✓ 18m lost 0,1,-2,1,3,8      | 6✓ 18m lost 0,0,-1,1,2,3       | f1 intake 0% maxI/min
+  n4       : 5✗ 18m lost 0,0,-1,1,5,5      | 6✓ 19m lost 0,1,-1,2,4,2      | 5✗ 18m lost 0,0,-1,1,6,4       | f1 intake 0% maxI/min
+  solo Jugg: 6✓ 25m lost 0,0,-1,1,2,-1     | 6✓ 24m lost 0,0,-2,2,1,-1     | 6✓ 23m lost 0,0,-2,0,2,-1      | f1 intake 11% maxI/min
+  solo Arca: 4✗ 19m lost 1,0,0,1,2         | 5✗ 20m lost 1,1,-2,1,3,0      | 5✗ 19m lost 0,0,-2,1,5,0       | f1 intake 28% maxI/min
+  solo Arti: 2✗ 14m lost 0,1,3             | 5✗ 32m lost 0,0,-2,1,2,3      | 5✗ 29m lost 0,0,-2,1,3,2       | f1 intake 0% maxI/min
+
+--- C: B + party count .20 / hp .15 (skill average) ---
+  n6       : 6✓ 17m lost 0,1,-1,0,2,0      | 6✓ 17m lost 0,0,-2,0,3,6      | 6✓ 16m lost 0,0,-2,0,1,10      | f1 intake 0% maxI/min
+  n4       : 6✓ 19m lost 0,0,-1,0,6,2      | 6✓ 18m lost 0,0,-2,0,3,4      | 6✓ 18m lost 0,1,-2,1,3,2       | f1 intake 1% maxI/min
+  solo Jugg: 6✓ 25m lost 0,0,-1,1,2,-1     | 6✓ 24m lost 0,0,-2,2,1,-1     | 6✓ 23m lost 0,0,-2,0,2,-1      | f1 intake 11% maxI/min
+  solo Arca: 4✗ 19m lost 1,0,0,1,2         | 5✗ 20m lost 1,1,-2,1,3,0      | 5✗ 19m lost 0,0,-2,1,5,0       | f1 intake 28% maxI/min
+  solo Arti: 2✗ 14m lost 0,1,3             | 5✗ 32m lost 0,0,-2,1,2,3      | 5✗ 29m lost 0,0,-2,1,3,2       | f1 intake 0% maxI/min
+
+--- D: C + Drive crushes (1500 dps, no insta-kill) (skill average) ---
+  n6       : 6✓ 17m lost 0,1,-2,0,5,4      | 6✓ 17m lost 0,0,-2,0,3,4      | 5✗ 16m lost 0,0,1,1,5,7        | f1 intake 0% maxI/min
+  n4       : 6✓ 19m lost 0,0,-1,0,6,3      | 6✓ 18m lost 0,0,-2,0,3,0      | 5✗ 19m lost 0,1,-2,2,3,6       | f1 intake 1% maxI/min
+  solo Jugg: 5✗ 23m lost 0,0,-1,1,3,1      | 6✓ 25m lost 0,0,-2,1,1,1      | 6✓ 25m lost 0,0,-1,0,2,1       | f1 intake 11% maxI/min
+  solo Arca: 3✗ 14m lost 0,0,2,2           | 4✗ 17m lost 1,1,-1,2,1        | 4✗ 17m lost 0,0,-2,1,5         | f1 intake 17% maxI/min
+  solo Arti: 4✗ 26m lost 0,1,0,1,2         | 5✗ 32m lost 0,0,-2,1,2,3      | 4✗ 23m lost 0,0,-2,4,2         | f1 intake 0% maxI/min

@@ -3,9 +3,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { BOT_CALLSIGNS } from '../room/util';
-import { compiled, type TermInfo } from './engine';
+import { builtinDiagnostics, compiled, mergeTermGroups, type TermInfo } from './engine';
 import { FilterHit, checkName, filterChat, foldText, listStats, parseStrictness } from './filter';
-import { ALLOW_WORDS, NUMERIC_TERMS, rot13, rot5 } from './lists';
+import { ALLOW_WORDS, NUMERIC_TERMS, rot13, rot5, type TermGroup } from './lists';
 
 // Offensive test inputs are never spelled out here: they are generated from the (ROT13) list itself, or written
 // ROT13-encoded and decoded with R().
@@ -258,7 +258,9 @@ describe('bypass corpus: leet digits combined with separators, heavy leet, more 
 
   it('number codes: starred and logged in chat (no strike: mask tier), refused in names', () => {
     const code = rot5(NUMERIC_TERMS[0].code);
-    for (const s of [code, `${code.slice(0, 2)} ${code.slice(2)}`, `${code.slice(0, 2)}.${code.slice(2)}`, `gg ${code} lol`]) {
+    const [a, b] = [code.slice(0, 2), code.slice(2)];
+    const wide = [...code].map((d) => String.fromCharCode(0xFF10 + Number(d))).join(''); // fullwidth digits
+    for (const s of [code, `${a} ${b}`, `${a}.${b}`, `${a}/${b}`, `gg ${code} lol`, `${a}​${b}`, wide, `(${code})`]) {
       const r = filterChat(s);
       expect(r.action, s).toBe('mask');
       expect(r.text).not.toContain(code.slice(1));
@@ -267,8 +269,122 @@ describe('bypass corpus: leet digits combined with separators, heavy leet, more 
     expect(filterChat(`2${code}`).action).toBe('pass'); // a longer number
     expect(filterChat(`${code}0 points`).action).toBe('pass');
     expect(checkName(`Pilot${code}`).ok).toBe(false);
-    expect(checkName(`${code.slice(0, 2)}Ace${code.slice(2)}`).ok).toBe(false);
     expect(checkName('Pilot2024').ok).toBe(true);
+  });
+
+  it('number codes match STANDALONE, WHOLE digit runs only (regression: long runs, digit groups in callsigns)', () => {
+    const code = rot5(NUMERIC_TERMS[0].code); // kept encoded in lists.ts; decoded only in memory here
+    const [a, b] = [code.slice(0, 2), code.slice(2)];
+    // chat: a run longer than the 16-digit compare cap is ONE number — the old scan restarted mid-run and found
+    // the code at its tail; one separator joins, two separators / other punctuation split
+    for (const s of [`${'1'.repeat(17)}${code}`, `${'9'.repeat(40)}${code}`, `${'7'.repeat(16)}.${code}`, `3${a} ${b}`, `${a}.${b}.5`]) {
+      expect(filterChat(s).action, `len ${s.length}`).toBe('pass');
+    }
+    for (const s of [`x ${a}.. ${code}`, `9..${code}`, `score: ${code}!`, `${'1'.repeat(20)} ${'2'.repeat(3)}, ${code}`]) {
+      expect(filterChat(s).action).toBe('mask');
+    }
+    // names: the same whole runs as chat (one separator between digits joins them, like "14 88" in chat)
+    for (const n of [`Pilot${code}`, `${code}Ace`, `Ace_${a}_${b}`, `Ace${a}.${b}`, `Sn1per_${code}`, `${a}​${b}Ace`]) {
+      const r = checkName(n);
+      expect(r.ok, 'refused').toBe(false);
+      expect(r.hits?.[0].category).toBe('hate');
+    }
+    // ...but digit groups that merely CONTAIN the code when concatenated are separate numbers: these used to be
+    // refused WITH A STRIKE (every digit of the name was concatenated and searched)
+    for (const n of [`${a}Ace${b}`, `Jet${a}_Wing${b}`, `Pilot${code}7`, `R2${code}`, `Sq${a}d${b}`, `L${a}x${b}`, `${a}_Ace_${b}`]) {
+      expect(checkName(n).ok, 'allowed').toBe(true);
+    }
+  });
+
+  it('a code that is its own group next to another number counts (regression: groups joined by one separator were missed)', () => {
+    const code = rot5(NUMERIC_TERMS[0].code); // kept encoded in lists.ts; decoded only in memory here
+    const [a, b] = [code.slice(0, 2), code.slice(2)];
+    const stars = `${code[0]}${'*'.repeat(code.length - 1)}`;
+    // chat: only the code's own group is starred
+    for (const [s, shown] of [[`${code} ${code}`, `${stars} ${stars}`], [`wave 3 ${code}`, `wave 3 ${stars}`], [`${code} 2`, `${stars} 2`],
+      [`gg ${code} 42`, `gg ${stars} 42`], [`1-${code}`, `1-${stars}`], [`7 ${a}.${b}`, `7 ${stars}`]] as const) {
+      const r = filterChat(s);
+      expect(r.action, 'masked').toBe('mask');
+      expect(r.text, 'only the group').toBe(shown);
+    }
+    // names: refused, the code as a group of its own
+    for (const n of [`Ace_${code}_2`, `Pilot_1_${code}`, `Pilot${code}_7`, `${code}_${code}`, `Ace ${code} 9`]) {
+      const r = checkName(n);
+      expect(r.ok, 'refused').toBe(false);
+      expect(r.hits?.[0].category).toBe('hate');
+    }
+    // still never a longer number, groups that only line up into the code, a decimal, or digits split by letters
+    for (const s of [`3${a} ${b}`, `${a}.${b}.5`, `${code}.5`, `3.${code}`, `${a} ${b} 2`, `2 ${a} ${b}0`]) expect(filterChat(s).action, 'pass').toBe('pass');
+    for (const n of [`Pilot${code}7`, `3${a}_${b}`, `${a}Ace${b}`, `Ace_${a}_${b}_2`]) expect(checkName(n).ok, 'allowed').toBe(true);
+  });
+
+  it('zero-width characters on either side of a separator do not hide a code (regression)', () => {
+    const code = rot5(NUMERIC_TERMS[0].code);
+    const [a, b] = [code.slice(0, 2), code.slice(2)];
+    for (const s of [`${a}\u200b.${b}`, `${a}.\u200b${b}`, `${a}\u200b ${b}`, `${a} \u2060${b}`, `${a}\u200b\u200c/${b}`]) {
+      expect(filterChat(s).action, JSON.stringify(s.replace(/\d/g, '#'))).toBe('mask');
+      expect(checkName(`Ace${s}`).ok).toBe(false);
+    }
+    expect(filterChat(`${a}\u200b..${b}`).action).toBe('pass'); // two separators still split
+  });
+});
+
+describe('names: a callsign number is a number, not leet letters (regression)', () => {
+  /** the digit that reads as a letter (the normalizer's leet table) */
+  const DIGIT_OF: Readonly<Record<string, string>> = { o: '0', i: '1', l: '1', e: '3', a: '4', s: '5', t: '7', b: '8', g: '9' };
+  // the terms that count inside a word in names (4+ letters, not mild, not a phrase)
+  const inWord = chatTerms.filter((t) => !t.term.includes(' ') && t.tier !== 'mild' && t.key.length >= 4);
+
+  it('a trailing number after a match that starts mid-word is a number ("Juliana1"); the letters and a word-start match still count', () => {
+    const wrong: string[] = [];
+    let cases = 0;
+    for (const t of inWord) {
+      const last = t.key[t.key.length - 1];
+      const d = DIGIT_OF[last];
+      if (!d) continue;
+      const stem = t.key.slice(0, -1);
+      if (!checkName(`Qz${stem}`).ok || !checkName(`Qz${stem}7`).ok || spellsAllowed(`qz${t.key}`)) continue; // the stem alone matches
+      cases++;
+      if (checkName(`Qz${t.key}`).ok) wrong.push(`#${t.rank}: the letters inside a word are allowed`);
+      // (after a '5' read as s, the "s" of "st" would join the run of s: that is "5t", not an ordinal)
+      for (const tail of [d, `${d}7`, `${d}_Ace`, ...(d === '5' ? [] : [`${d}st`]), `${d}${d}`]) {
+        if (!checkName(`Qz${stem}${tail}`).ok) wrong.push(`#${t.rank}: mid-word + trailing number "${tail.replace(/\d/g, '#')}" refused`);
+      }
+      // a word-start match that ends in a digit is still the evasion, and mid-word leet too
+      if (checkName(`${cap(stem)}${d}`).ok) wrong.push(`#${t.rank}: word start + digit allowed`);
+      if (checkName(`${cap(stem)}${d}Qz`).ok) wrong.push(`#${t.rank}: word start + digit + letters allowed`);
+    }
+    expect(cases).toBeGreaterThan(20);
+    expect(wrong).toEqual([]);
+  });
+
+  it('a leading number read into a word it does not finish is a number ("5Picasso"); reaching the word end still counts', () => {
+    const wrong: string[] = [];
+    let cases = 0;
+    for (const t of inWord) {
+      const d = DIGIT_OF[t.key[0]];
+      if (!d) continue;
+      const rest = t.key.slice(1);
+      if (!checkName(`${rest}qzx`).ok || !checkName(`${rest}`).ok || spellsAllowed(t.key)) continue;
+      cases++;
+      if (!checkName(`${d}${cap(rest)}qzx`).ok) wrong.push(`#${t.rank}: leading number + a longer word refused`);
+      if (checkName(`${d}${cap(rest)}`).ok) wrong.push(`#${t.rank}: leading number reaching the word end allowed`);
+      if (checkName(`${d}${rest}_Ace`).ok) wrong.push(`#${t.rank}: leading number reaching a boundary allowed`);
+    }
+    expect(cases).toBeGreaterThan(5);
+    expect(wrong).toEqual([]);
+  });
+
+  it('ordinary name + number callsigns pass in both strictness modes (they used to be refused, many WITH A STRIKE)', () => {
+    const names = ['Juliana1', 'Ariana10', 'Liliana12', 'Eliana1', 'Diana1', 'Svetlana1', 'Makana1', 'Montana1', 'Texarkana1', 'Oreana1',
+      'Owyhee8', 'Owyhee11', 'Deepak1', 'Deepak1st', 'Ethan41', 'Ryan41', 'Logan41', 'Dylan41', 'Evan41', 'Sebastian41', 'Ada60',
+      'Fukuda90', 'Charles60', 'Miles80', 'Apache11', 'Avalanche11', 'SalvageCache11', 'RiftCache11', 'SwarmCache11', 'GladiatorCache11',
+      'Clapped0', 'Sniped0', 'Dropped0', 'Zapped0', '5Picasso', 'Hiroshi7', 'Keanu5', 'Seth007', 'Keith007', 'Smith007', 'Siddharth007',
+      'StarWars3', 'Cars3', 'Cougars3', 'Aspen1st', 'Aspen15', 'Essex7', 'Skylar53', 'Omar53', 'Kash17', 'Xochitl3rd', 'Juliana1_Ace'];
+    const bad = names.filter((n) => !checkName(n).ok || !checkName(n, { strictness: 'standard' }).ok);
+    expect(bad).toEqual([]);
+    // ...and quoted in chat they are shown as typed
+    expect(names.filter((n) => filterChat(`gg ${n}, heal me`).action !== 'pass')).toEqual([]);
   });
 });
 
@@ -290,12 +406,39 @@ describe('clean corpus: zero false positives', () => {
   it('real given names and surnames from class rosters are legal callsigns and pass in chat', () => {
     const names = ['Harshit', 'Harshita', 'Kshitij', 'Yamashita', 'Kinoshita', 'Matsushita', 'Morishita', 'Shittu', 'Dikshit',
       'Hiscock', 'Alcock', 'Adcock', 'Laycock', 'Glasscock', 'Cockburn', 'Cockrell', 'Kuntz', 'Analise', 'Analiese', 'Anneliese',
-      'Annaliese', 'Hancock', 'Dickens', 'Dickinson', 'Cassandra', 'Vanessa', 'Scunthorpe', 'Penistone'];
+      'Annaliese', 'Hancock', 'Dickens', 'Dickinson', 'Cassandra', 'Vanessa', 'Scunthorpe', 'Penistone',
+      // found in review: two of these were refused WITH A STRIKE, the others starred in chat too
+      'Kuntal', 'Analisa', 'Anusha', 'Anushka', 'Shital', 'Ashit', 'Ashita', 'Ashitaka', 'Shitij', 'Riddick', 'Farseer'];
     for (const n of names) {
-      expect(checkName(n).ok, n).toBe(true);
-      expect(filterChat(`hi ${n}, gg`).action, n).toBe('pass');
+      for (const strictness of ['strict', 'standard'] as const) {
+        expect(checkName(n, { strictness }).ok, n).toBe(true);
+        expect(checkName(`${n}13`, { strictness }).ok, n).toBe(true);
+        expect(filterChat(`hi ${n}, gg`, { strictness }).action, n).toBe('pass');
+      }
     }
     expect(filterChat('the buttes of Utah').action).toBe('pass');
+  });
+
+  it('Idaho landmarks, a local fish and a few ordinary place names / phrases pass (strict mode too)', () => {
+    // clean text, but each contains a listed word, so it is written ROT13 like the other inputs here
+    const lines = ['jr uvxrq Uryyf Pnalba', 'Uryyf Pnalba Qnz', 'Uryyf Tngr Fgngr Cnex va Yrjvfgba', "Uryy'f Unys Nper arne Vqnub Snyyf",
+      "Uryy'f Pnalba vf qrrc", 'pnhtug n penccvr ng Ynxr Ybjryy', 'penccvrf ner ovgvat', 'jrag gb Pbba Encvqf bire gur jrrxraq',
+      'zl pbba ubhaq', 'gvg sbe gng', 'vg jnf gvg-sbe-gng nyy tnzr'].map(R);
+    lines.forEach((l, i) => {
+      for (const strictness of ['strict', 'standard'] as const) expect(filterChat(l, { strictness }), `line ${i}`).toMatchObject({ action: 'pass', hits: [] });
+    });
+    ['UryyfPnalba', 'UryyfTngr', 'Uryyf_Unys_Nper', 'PenccvrXvat', 'PbbaEncvqf', 'Pbba_Ubhaq', 'GvgSbeGng'].map(R).forEach((n, i) => {
+      expect(checkName(n).ok, `name ${i}`).toBe(true);
+    });
+    // the allow phrases rescue only themselves: a first word that is read on its own is still read before another word
+    let checked = 0;
+    for (const phrase of ['uryyf pnalba', 'uryyf tngr', 'pbba encvqf', 'pbba ubhaq', 'gvg sbe gng'].map(R)) {
+      const first = phrase.split(' ')[0];
+      if (!filterChat(first).hits.length) continue;
+      checked++;
+      expect(filterChat(`${first} zorblax`).hits.length, phrase).toBeGreaterThan(0);
+    }
+    expect(checked).toBeGreaterThanOrEqual(3);
   });
 
   const docs = ['ARCHITECTURE.md', 'docs/v0.3-proposal.md', 'docs/v0.3-critique.md']
@@ -429,6 +572,52 @@ describe('checkName', () => {
   it('empty / junk input is ok (the sanitizer supplies a fallback)', () => {
     expect(checkName('')).toEqual({ ok: true });
     expect(checkName(null)).toEqual({ ok: true });
+  });
+});
+
+describe('compile: explicit, deterministic collisions (engine.ts mergeTermGroups)', () => {
+  it('the built-in lists have no letter-key collisions (a new one must be merged on purpose and listed here)', () => {
+    expect(builtinDiagnostics()).toEqual([]);
+    expect(new Set(terms.map((t) => t.key)).size).toBe(terms.length);
+  });
+
+  // made-up neutral tokens, ROT13-encoded like the real lists
+  const mask: TermGroup = { tier: 'mask', category: 'profanity', mode: 'strong', terms: [R('zorblax'), R('quenth')] };
+  const block: TermGroup = { tier: 'block', category: 'hate', mode: 'word', terms: [R('zor blax')] };
+  const namesOnly: TermGroup = { tier: 'block', category: 'hate', mode: 'strong', terms: [R('quenth'), R('vorpik')] };
+  const parts = [
+    { label: 'A', groups: [mask, block], nameOnly: false },
+    { label: 'N', groups: [namesOnly], nameOnly: true },
+  ];
+
+  it('keeps the strictest tier (with its spelling, category and mode), merges scopes, and reports it by position', () => {
+    const { terms: t, diagnostics } = mergeTermGroups(parts);
+    const by = new Map(t.map((x) => [x.key, x]));
+    expect(by.get('zorblax')).toMatchObject({ tier: 'block', category: 'hate', mode: 'word', term: 'zor blax', chat: true, names: true, nameOnly: false, rank: 0 });
+    // the old compile let a later names-only entry silently take a chat term out of chat: scopes now merge
+    expect(by.get('quenth')).toMatchObject({ tier: 'block', category: 'hate', mode: 'strong', chat: true, names: true, nameOnly: false, rank: 1 });
+    expect(by.get('vorpik')).toMatchObject({ chat: false, nameOnly: true });
+    expect(diagnostics.map((d) => d.message)).toEqual([
+      'A[0] #0 and A[1] #0 have the same letters: kept tier block / category hate / mode word from A[1] #0 (dropped tier mask, category profanity, mode strong); scopes merged (chat + names)',
+      'A[0] #1 and N[0] #0 have the same letters: kept tier block / category hate / mode strong from N[0] #0 (dropped tier mask, category profanity); scopes merged (chat + names)',
+    ]);
+    expect(diagnostics.every((d) => d.code === 'builtin-collision' && !/zorblax|quenth|vorpik/.test(d.message))).toBe(true);
+  });
+
+  it('is order-independent for tier and scope; on a tier tie the entry listed first wins', () => {
+    const rev = mergeTermGroups([...parts].reverse()).terms;
+    const fwd = mergeTermGroups(parts).terms;
+    for (const k of ['zorblax', 'quenth', 'vorpik']) {
+      const a = fwd.find((x) => x.key === k)!;
+      const b = rev.find((x) => x.key === k)!;
+      expect([b.tier, b.chat, b.names], k).toEqual([a.tier, a.chat, a.names]);
+    }
+    const tie = mergeTermGroups([{ label: 'T', groups: [
+      { tier: 'mask', category: 'profanity', mode: 'word', terms: [R('drellik')] },
+      { tier: 'mask', category: 'mild', mode: 'strong', terms: [R('drellik')] },
+    ], nameOnly: false }]);
+    expect(tie.terms[0]).toMatchObject({ category: 'profanity', mode: 'word' });
+    expect(tie.diagnostics[0].message).toContain('from T[0] #0 (dropped category mild, mode strong)');
   });
 });
 

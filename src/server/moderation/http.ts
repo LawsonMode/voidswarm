@@ -88,7 +88,7 @@ const routes: Record<string, Handler> = {
     q.grep = str(b.grep, 100);
     q.roomId = str(b.roomId, 32);
     if (b.action !== undefined) {
-      if (b.action !== 'flagged' && !(CHAT_ACTIONS as readonly unknown[]).includes(b.action)) throw bad('action must be pass, mask, block, spam, muted or flagged');
+      if (b.action !== 'flagged' && !(CHAT_ACTIONS as readonly unknown[]).includes(b.action)) throw bad('action must be pass, flag, mask, block, spam, muted or flagged');
       q.action = b.action as LogQuery['action'];
     }
     if (b.since !== undefined) {

@@ -1,0 +1,283 @@
+
+==============================================================================================================
+== S1. Ultimate uptime (cast count per player per 10 min; charge kept on death; no gain while an ult runs where the kit says so)
+==============================================================================================================
+PvP model: fights ~3/min (4-10 s each), rates below are per alive-minute; 16-ship Arena DM at 16 takedowns/min total (gate >= 15).
+PvE model: pve_profiles.json = recorded 0.1 s activity of each pilot in the CR swarm harness (variant C ramp, n=6 2/2/2, Veteran, 3 seeds).
+policy "smart" = cast when full AND in a fight (bots/humans do not waste it in travel); "ready" = the instant it is full (upper bound).
+Uptime = share of alive time the pilot has an ult active. Map-wide = 16 pilots (Arena/Warzone) or party of 6 (Dungeon).
+
+--- Hero Kits ---
+scenario                   | class    | ult           | ults/10 min smart (ready) | mean gap smart (ready) | first ult | uptime
+---------------------------|----------|---------------|---------------------------|------------------------|-----------|-------
+Arena avg                  | brute    | Wrecking Run  | 6.7 (7.0)                 | 90 s (85 s)            | 83 s      | 4%    
+Arena avg                  | brute    | Carpet Bomb   | 6.8 (7.5)                 | 87 s (79 s)            | 78 s      | 4%    
+Arena avg                  | brute    | EMP Pulse     | 6.7 (7.0)                 | 90 s (85 s)            | 83 s      | 0%    
+Arena avg                  | tech     | Ion Storm     | 6.3 (6.8)                 | 95 s (87 s)            | 83 s      | 7%    
+Arena avg                  | tech     | Event Horizon | 5.8 (6.2)                 | 102 s (96 s)           | 84 s      | 5%    
+Arena avg                  | tech     | Hyperlance    | 6.7 (7.0)                 | 90 s (85 s)            | 83 s      | 4%    
+Arena avg                  | engineer | Drone Carrier | 6.5 (6.8)                 | 92 s (87 s)            | 78 s      | 11%   
+Arena avg                  | engineer | Lifeline      | 5.8 (6.2)                 | 102 s (96 s)           | 84 s      | 5%    
+Arena avg                  | engineer | Citadel       | 6.2 (6.8)                 | 96 s (88 s)            | 83 s      | 9%    
+Arena top 25%              | brute    | Wrecking Run  | 8.3 (8.7)                 | 72 s (69 s)            | 64 s      | 5%    
+Arena top 25%              | brute    | Carpet Bomb   | 8.7 (9.0)                 | 69 s (66 s)            | 62 s      | 5%    
+Arena top 25%              | brute    | EMP Pulse     | 8.5 (8.7)                 | 70 s (69 s)            | 69 s      | 0%    
+Arena top 25%              | tech     | Ion Storm     | 7.8 (8.3)                 | 76 s (72 s)            | 64 s      | 8%    
+Arena top 25%              | tech     | Event Horizon | 7.5 (7.7)                 | 79 s (77 s)            | 71 s      | 7%    
+Arena top 25%              | tech     | Hyperlance    | 8.0 (8.7)                 | 74 s (69 s)            | 64 s      | 5%    
+Arena top 25%              | engineer | Drone Carrier | 7.7 (8.2)                 | 77 s (72 s)            | 62 s      | 13%   
+Arena top 25%              | engineer | Lifeline      | 7.5 (7.7)                 | 79 s (77 s)            | 71 s      | 6%    
+Arena top 25%              | engineer | Citadel       | 7.7 (7.8)                 | 78 s (76 s)            | 64 s      | 11%   
+Arena weak                 | brute    | Wrecking Run  | 5.5 (5.8)                 | 108 s (102 s)          | 115 s     | 3%    
+Arena weak                 | brute    | Carpet Bomb   | 5.8 (6.0)                 | 102 s (99 s)           | 91 s      | 3%    
+Arena weak                 | brute    | EMP Pulse     | 5.2 (5.7)                 | 114 s (106 s)          | 120 s     | 0%    
+Arena weak                 | tech     | Ion Storm     | 5.2 (5.5)                 | 113 s (109 s)          | 115 s     | 6%    
+Arena weak                 | tech     | Event Horizon | 4.8 (5.0)                 | 122 s (118 s)          | 125 s     | 4%    
+Arena weak                 | tech     | Hyperlance    | 5.5 (5.8)                 | 108 s (102 s)          | 115 s     | 4%    
+Arena weak                 | engineer | Drone Carrier | 5.2 (5.7)                 | 117 s (106 s)          | 91 s      | 9%    
+Arena weak                 | engineer | Lifeline      | 4.8 (5.0)                 | 122 s (118 s)          | 125 s     | 4%    
+Arena weak                 | engineer | Citadel       | 5.0 (5.3)                 | 118 s (113 s)          | 115 s     | 7%    
+Arena tank (Polarize)      | brute    | Wrecking Run  | 6.7 (7.0)                 | 89 s (84 s)            | 83 s      | 4%    
+Arena tank (Polarize)      | brute    | Carpet Bomb   | 6.8 (7.3)                 | 86 s (81 s)            | 77 s      | 4%    
+Arena tank (Polarize)      | brute    | EMP Pulse     | 6.7 (7.0)                 | 89 s (84 s)            | 83 s      | 0%    
+Arena healer (Artificer)   | engineer | Drone Carrier | 8.2 (9.0)                 | 73 s (66 s)            | 70 s      | 14%   
+Arena healer (Artificer)   | engineer | Lifeline      | 7.8 (8.5)                 | 75 s (70 s)            | 70 s      | 7%    
+Arena healer (Artificer)   | engineer | Citadel       | 8.2 (8.8)                 | 73 s (67 s)            | 70 s      | 11%   
+Arena FFA avg (no assists) | brute    | Wrecking Run  | 6.5 (7.0)                 | 92 s (85 s)            | 98 s      | 4%    
+Arena FFA avg (no assists) | brute    | Carpet Bomb   | 6.7 (7.2)                 | 89 s (84 s)            | 93 s      | 4%    
+Arena FFA avg (no assists) | brute    | EMP Pulse     | 6.5 (7.0)                 | 92 s (85 s)            | 103 s     | 0%    
+Arena FFA avg (no assists) | tech     | Ion Storm     | 6.2 (6.8)                 | 97 s (88 s)            | 98 s      | 7%    
+Arena FFA avg (no assists) | tech     | Event Horizon | 5.8 (6.0)                 | 102 s (99 s)           | 104 s     | 5%    
+Arena FFA avg (no assists) | tech     | Hyperlance    | 6.3 (7.0)                 | 94 s (85 s)            | 98 s      | 4%    
+Arena FFA avg (no assists) | engineer | Drone Carrier | 6.3 (7.0)                 | 94 s (85 s)            | 93 s      | 11%   
+Arena FFA avg (no assists) | engineer | Lifeline      | 5.8 (6.0)                 | 102 s (99 s)           | 104 s     | 5%    
+Arena FFA avg (no assists) | engineer | Citadel       | 6.2 (6.7)                 | 97 s (90 s)            | 98 s      | 9%    
+Warzone avg (PvPvE)        | brute    | Wrecking Run  | 6.2 (6.3)                 | 96 s (95 s)            | 101 s     | 3%    
+Warzone avg (PvPvE)        | brute    | Carpet Bomb   | 6.3 (7.0)                 | 94 s (85 s)            | 81 s      | 3%    
+Warzone avg (PvPvE)        | brute    | EMP Pulse     | 6.0 (6.3)                 | 98 s (95 s)            | 101 s     | 0%    
+Warzone avg (PvPvE)        | tech     | Ion Storm     | 5.7 (6.2)                 | 104 s (96 s)           | 101 s     | 6%    
+Warzone avg (PvPvE)        | tech     | Event Horizon | 5.2 (6.0)                 | 113 s (99 s)           | 101 s     | 5%    
+Warzone avg (PvPvE)        | tech     | Hyperlance    | 6.2 (6.3)                 | 96 s (95 s)            | 101 s     | 4%    
+Warzone avg (PvPvE)        | engineer | Drone Carrier | 6.0 (6.2)                 | 99 s (96 s)            | 81 s      | 10%   
+Warzone avg (PvPvE)        | engineer | Lifeline      | 5.2 (6.0)                 | 113 s (99 s)           | 101 s     | 4%    
+Warzone avg (PvPvE)        | engineer | Citadel       | 5.5 (6.0)                 | 108 s (99 s)           | 101 s     | 8%    
+Warzone Zones holder       | brute    | Wrecking Run  | 6.8 (7.0)                 | 85 s (84 s)            | 86 s      | 4%    
+Warzone Zones holder       | brute    | Carpet Bomb   | 7.2 (7.5)                 | 82 s (78 s)            | 83 s      | 4%    
+Warzone Zones holder       | brute    | EMP Pulse     | 6.5 (7.0)                 | 90 s (84 s)            | 89 s      | 0%    
+Warzone Zones holder       | tech     | Ion Storm     | 6.3 (7.0)                 | 92 s (85 s)            | 86 s      | 7%    
+Warzone Zones holder       | tech     | Event Horizon | 6.0 (6.2)                 | 99 s (95 s)            | 92 s      | 5%    
+Warzone Zones holder       | tech     | Hyperlance    | 6.7 (7.0)                 | 88 s (84 s)            | 86 s      | 4%    
+Warzone Zones holder       | engineer | Drone Carrier | 6.3 (7.0)                 | 92 s (85 s)            | 83 s      | 11%   
+Warzone Zones holder       | engineer | Lifeline      | 6.0 (6.2)                 | 99 s (95 s)            | 92 s      | 5%    
+Warzone Zones holder       | engineer | Citadel       | 6.0 (6.8)                 | 98 s (87 s)            | 86 s      | 8%    
+Dungeon f1 (n6)            | brute    | Wrecking Run  | 7.2 (7.8)                 | 83 s (77 s)            | 77 s      | 4%    
+Dungeon f1 (n6)            | brute    | Carpet Bomb   | 8.0 (8.0)                 | 75 s (74 s)            | 77 s      | 4%    
+Dungeon f1 (n6)            | brute    | EMP Pulse     | 7.2 (7.3)                 | 83 s (80 s)            | 77 s      | 0%    
+Dungeon f1 (n6)            | tech     | Ion Storm     | 7.0 (7.0)                 | 86 s (85 s)            | 77 s      | 8%    
+Dungeon f1 (n6)            | tech     | Event Horizon | 6.0 (6.0)                 | 99 s (98 s)            | 82 s      | 5%    
+Dungeon f1 (n6)            | tech     | Hyperlance    | 7.0 (7.0)                 | 85 s (85 s)            | 77 s      | 5%    
+Dungeon f1 (n6)            | engineer | Drone Carrier | 6.0 (6.5)                 | 99 s (90 s)            | 77 s      | 10%   
+Dungeon f1 (n6)            | engineer | Lifeline      | 6.0 (6.0)                 | 99 s (99 s)            | 89 s      | 5%    
+Dungeon f1 (n6)            | engineer | Citadel       | 6.0 (6.0)                 | 99 s (98 s)            | 81 s      | 8%    
+Dungeon f3 (n6)            | brute    | Wrecking Run  | 7.5 (7.8)                 | 80 s (77 s)            | 66 s      | 4%    
+Dungeon f3 (n6)            | brute    | Carpet Bomb   | 8.0 (8.0)                 | 75 s (75 s)            | 64 s      | 4%    
+Dungeon f3 (n6)            | brute    | EMP Pulse     | 7.3 (7.8)                 | 81 s (77 s)            | 69 s      | 0%    
+Dungeon f3 (n6)            | tech     | Ion Storm     | 7.0 (7.0)                 | 86 s (85 s)            | 69 s      | 8%    
+Dungeon f3 (n6)            | tech     | Event Horizon | 6.0 (6.0)                 | 98 s (99 s)            | 84 s      | 5%    
+Dungeon f3 (n6)            | tech     | Hyperlance    | 7.0 (7.0)                 | 85 s (85 s)            | 69 s      | 5%    
+Dungeon f3 (n6)            | engineer | Drone Carrier | 6.8 (7.0)                 | 88 s (85 s)            | 69 s      | 12%   
+Dungeon f3 (n6)            | engineer | Lifeline      | 6.0 (6.0)                 | 99 s (98 s)            | 84 s      | 5%    
+Dungeon f3 (n6)            | engineer | Citadel       | 6.7 (6.8)                 | 90 s (88 s)            | 84 s      | 9%    
+Dungeon f6 (n6)            | brute    | Wrecking Run  | 8.5 (8.7)                 | 70 s (68 s)            | 71 s      | 5%    
+Dungeon f6 (n6)            | brute    | Carpet Bomb   | 9.0 (9.0)                 | 67 s (67 s)            | 56 s      | 5%    
+Dungeon f6 (n6)            | brute    | EMP Pulse     | 8.7 (8.7)                 | 68 s (68 s)            | 71 s      | 1%    
+Dungeon f6 (n6)            | tech     | Ion Storm     | 7.5 (7.8)                 | 80 s (77 s)            | 73 s      | 8%    
+Dungeon f6 (n6)            | tech     | Event Horizon | 7.0 (7.0)                 | 85 s (85 s)            | 77 s      | 6%    
+Dungeon f6 (n6)            | tech     | Hyperlance    | 8.0 (8.0)                 | 75 s (74 s)            | 73 s      | 5%    
+Dungeon f6 (n6)            | engineer | Drone Carrier | 7.3 (7.7)                 | 81 s (77 s)            | 71 s      | 13%   
+Dungeon f6 (n6)            | engineer | Lifeline      | 7.0 (7.0)                 | 85 s (85 s)            | 81 s      | 6%    
+Dungeon f6 (n6)            | engineer | Citadel       | 7.2 (7.3)                 | 83 s (81 s)            | 75 s      | 10%   
+Dungeon run f1-f6 (n6)     | brute    | Wrecking Run  | 8.2 (8.5)                 | 73 s (71 s)            | 77 s      | 5%    
+Dungeon run f1-f6 (n6)     | brute    | Carpet Bomb   | 8.5 (9.0)                 | 70 s (66 s)            | 77 s      | 5%    
+Dungeon run f1-f6 (n6)     | brute    | EMP Pulse     | 8.3 (8.5)                 | 72 s (71 s)            | 77 s      | 0%    
+Dungeon run f1-f6 (n6)     | tech     | Ion Storm     | 7.3 (7.5)                 | 82 s (80 s)            | 77 s      | 8%    
+Dungeon run f1-f6 (n6)     | tech     | Event Horizon | 6.9 (7.2)                 | 87 s (83 s)            | 82 s      | 6%    
+Dungeon run f1-f6 (n6)     | tech     | Hyperlance    | 7.5 (7.9)                 | 80 s (76 s)            | 77 s      | 5%    
+Dungeon run f1-f6 (n6)     | engineer | Drone Carrier | 7.1 (7.3)                 | 84 s (82 s)            | 77 s      | 12%   
+Dungeon run f1-f6 (n6)     | engineer | Lifeline      | 6.7 (6.9)                 | 90 s (87 s)            | 89 s      | 6%    
+Dungeon run f1-f6 (n6)     | engineer | Citadel       | 7.1 (7.3)                 | 84 s (83 s)            | 81 s      | 10%   
+
+--- Arcade Kit ---
+scenario                   | class    | ult            | ults/10 min smart (ready) | mean gap smart (ready) | first ult | uptime
+---------------------------|----------|----------------|---------------------------|------------------------|-----------|-------
+Arena avg                  | brute    | Event Horizon  | 7.3 (7.8)                 | 81 s (75 s)            | 70 s      | 6%    
+Arena avg                  | tech     | Ion Storm      | 7.2 (7.8)                 | 83 s (76 s)            | 70 s      | 7%    
+Arena avg                  | engineer | Overload Pulse | 7.8 (8.8)                 | 76 s (67 s)            | 70 s      | 0%    
+Arena top 25%              | brute    | Event Horizon  | 8.8 (9.5)                 | 68 s (62 s)            | 58 s      | 8%    
+Arena top 25%              | tech     | Ion Storm      | 8.5 (9.3)                 | 70 s (63 s)            | 58 s      | 9%    
+Arena top 25%              | engineer | Overload Pulse | 9.3 (10.2)                | 63 s (58 s)            | 58 s      | 1%    
+Arena weak                 | brute    | Event Horizon  | 5.7 (6.0)                 | 105 s (98 s)           | 89 s      | 5%    
+Arena weak                 | tech     | Ion Storm      | 5.7 (5.8)                 | 106 s (102 s)          | 89 s      | 6%    
+Arena weak                 | engineer | Overload Pulse | 5.8 (6.3)                 | 101 s (95 s)           | 89 s      | 0%    
+Arena tank (Polarize)      | brute    | Event Horizon  | 7.0 (7.8)                 | 85 s (76 s)            | 73 s      | 6%    
+Arena healer (Artificer)   | engineer | Overload Pulse | 8.3 (9.2)                 | 71 s (64 s)            | 70 s      | 0%    
+Arena FFA avg (no assists) | brute    | Event Horizon  | 7.2 (8.0)                 | 82 s (74 s)            | 82 s      | 6%    
+Arena FFA avg (no assists) | tech     | Ion Storm      | 7.0 (7.8)                 | 84 s (76 s)            | 82 s      | 7%    
+Arena FFA avg (no assists) | engineer | Overload Pulse | 7.8 (8.7)                 | 76 s (69 s)            | 82 s      | 0%    
+Warzone avg (PvPvE)        | brute    | Event Horizon  | 6.7 (7.2)                 | 88 s (83 s)            | 73 s      | 6%    
+Warzone avg (PvPvE)        | tech     | Ion Storm      | 6.7 (7.2)                 | 89 s (84 s)            | 73 s      | 7%    
+Warzone avg (PvPvE)        | engineer | Overload Pulse | 7.5 (8.2)                 | 79 s (73 s)            | 73 s      | 0%    
+Warzone Zones holder       | brute    | Event Horizon  | 7.2 (7.5)                 | 82 s (79 s)            | 83 s      | 6%    
+Warzone Zones holder       | tech     | Ion Storm      | 7.2 (7.3)                 | 82 s (81 s)            | 83 s      | 7%    
+Warzone Zones holder       | engineer | Overload Pulse | 7.7 (8.2)                 | 78 s (72 s)            | 83 s      | 0%    
+Dungeon f1 (n6)            | brute    | Event Horizon  | 8.0 (8.2)                 | 75 s (73 s)            | 77 s      | 7%    
+Dungeon f1 (n6)            | tech     | Ion Storm      | 7.0 (7.7)                 | 85 s (78 s)            | 77 s      | 7%    
+Dungeon f1 (n6)            | engineer | Overload Pulse | 7.0 (7.2)                 | 85 s (83 s)            | 82 s      | 0%    
+Dungeon f3 (n6)            | brute    | Event Horizon  | 8.3 (8.7)                 | 72 s (69 s)            | 64 s      | 7%    
+Dungeon f3 (n6)            | tech     | Ion Storm      | 8.0 (8.2)                 | 74 s (72 s)            | 62 s      | 8%    
+Dungeon f3 (n6)            | engineer | Overload Pulse | 8.3 (8.5)                 | 71 s (71 s)            | 70 s      | 0%    
+Dungeon f6 (n6)            | brute    | Event Horizon  | 9.2 (9.7)                 | 65 s (62 s)            | 55 s      | 8%    
+Dungeon f6 (n6)            | tech     | Ion Storm      | 9.0 (9.2)                 | 67 s (65 s)            | 55 s      | 9%    
+Dungeon f6 (n6)            | engineer | Overload Pulse | 9.0 (9.3)                 | 66 s (64 s)            | 71 s      | 1%    
+Dungeon run f1-f6 (n6)     | brute    | Event Horizon  | 8.9 (9.4)                 | 67 s (64 s)            | 77 s      | 8%    
+Dungeon run f1-f6 (n6)     | tech     | Ion Storm      | 8.4 (8.8)                 | 71 s (68 s)            | 77 s      | 8%    
+Dungeon run f1-f6 (n6)     | engineer | Overload Pulse | 8.6 (9.0)                 | 70 s (66 s)            | 82 s      | 0%    
+
+--- Sortie Loadout ---
+scenario                   | class    | ult           | ults/10 min smart (ready) | mean gap smart (ready) | first ult | uptime
+---------------------------|----------|---------------|---------------------------|------------------------|-----------|-------
+Arena avg                  | brute    | Event Horizon | 7.5 (7.8)                 | 80 s (76 s)            | 77 s      | 6%    
+Arena avg                  | brute    | Carpet Bomb   | 7.5 (7.8)                 | 80 s (76 s)            | 77 s      | 4%    
+Arena avg                  | brute    | Rampage       | 7.5 (7.8)                 | 80 s (76 s)            | 77 s      | 6%    
+Arena avg                  | tech     | Ion Storm     | 7.5 (7.7)                 | 80 s (78 s)            | 77 s      | 8%    
+Arena avg                  | tech     | Hyperlance    | 7.5 (7.8)                 | 80 s (76 s)            | 77 s      | 1%    
+Arena avg                  | tech     | Black Star    | 7.5 (7.7)                 | 80 s (78 s)            | 77 s      | 7%    
+Arena avg                  | engineer | Nanite Surge  | 7.5 (7.7)                 | 80 s (78 s)            | 77 s      | 8%    
+Arena avg                  | engineer | EMP Pulse     | 7.7 (8.0)                 | 78 s (74 s)            | 77 s      | 0%    
+Arena avg                  | engineer | Drone Carrier | 7.0 (7.3)                 | 84 s (80 s)            | 77 s      | 14%   
+Arena top 25%              | brute    | Event Horizon | 9.0 (9.5)                 | 67 s (63 s)            | 57 s      | 8%    
+Arena top 25%              | brute    | Carpet Bomb   | 9.0 (9.5)                 | 67 s (63 s)            | 57 s      | 5%    
+Arena top 25%              | brute    | Rampage       | 9.0 (9.3)                 | 67 s (64 s)            | 57 s      | 8%    
+Arena top 25%              | tech     | Ion Storm     | 8.8 (9.0)                 | 68 s (66 s)            | 57 s      | 9%    
+Arena top 25%              | tech     | Hyperlance    | 9.2 (9.5)                 | 65 s (63 s)            | 57 s      | 2%    
+Arena top 25%              | tech     | Black Star    | 8.8 (9.2)                 | 67 s (65 s)            | 57 s      | 9%    
+Arena top 25%              | engineer | Nanite Surge  | 8.8 (9.0)                 | 68 s (66 s)            | 57 s      | 9%    
+Arena top 25%              | engineer | EMP Pulse     | 9.3 (9.5)                 | 64 s (63 s)            | 57 s      | 1%    
+Arena top 25%              | engineer | Drone Carrier | 8.5 (8.8)                 | 70 s (68 s)            | 57 s      | 17%   
+Arena weak                 | brute    | Event Horizon | 5.7 (5.8)                 | 105 s (102 s)          | 115 s     | 5%    
+Arena weak                 | brute    | Carpet Bomb   | 5.7 (5.8)                 | 105 s (102 s)          | 115 s     | 3%    
+Arena weak                 | brute    | Rampage       | 5.7 (5.8)                 | 105 s (102 s)          | 115 s     | 5%    
+Arena weak                 | tech     | Ion Storm     | 5.5 (5.7)                 | 108 s (105 s)          | 115 s     | 6%    
+Arena weak                 | tech     | Hyperlance    | 5.7 (5.8)                 | 104 s (102 s)          | 115 s     | 1%    
+Arena weak                 | tech     | Black Star    | 5.5 (5.7)                 | 108 s (105 s)          | 115 s     | 5%    
+Arena weak                 | engineer | Nanite Surge  | 5.5 (5.7)                 | 108 s (105 s)          | 115 s     | 6%    
+Arena weak                 | engineer | EMP Pulse     | 5.7 (5.8)                 | 104 s (102 s)          | 115 s     | 0%    
+Arena weak                 | engineer | Drone Carrier | 5.2 (5.3)                 | 114 s (113 s)          | 115 s     | 10%   
+Arena tank (Polarize)      | brute    | Event Horizon | 7.5 (7.7)                 | 79 s (77 s)            | 77 s      | 6%    
+Arena tank (Polarize)      | brute    | Carpet Bomb   | 7.5 (7.8)                 | 79 s (75 s)            | 77 s      | 4%    
+Arena tank (Polarize)      | brute    | Rampage       | 7.5 (7.7)                 | 80 s (77 s)            | 77 s      | 6%    
+Arena healer (Artificer)   | engineer | Nanite Surge  | 8.3 (8.3)                 | 71 s (71 s)            | 70 s      | 8%    
+Arena healer (Artificer)   | engineer | EMP Pulse     | 8.3 (9.2)                 | 71 s (65 s)            | 70 s      | 0%    
+Arena healer (Artificer)   | engineer | Drone Carrier | 8.0 (8.3)                 | 75 s (72 s)            | 70 s      | 16%   
+Arena FFA avg (no assists) | brute    | Event Horizon | 6.8 (7.3)                 | 87 s (81 s)            | 90 s      | 6%    
+Arena FFA avg (no assists) | brute    | Carpet Bomb   | 6.8 (7.3)                 | 86 s (81 s)            | 90 s      | 4%    
+Arena FFA avg (no assists) | brute    | Rampage       | 6.8 (7.3)                 | 87 s (81 s)            | 90 s      | 6%    
+Arena FFA avg (no assists) | tech     | Ion Storm     | 6.8 (7.3)                 | 87 s (81 s)            | 90 s      | 7%    
+Arena FFA avg (no assists) | tech     | Hyperlance    | 7.2 (7.5)                 | 82 s (80 s)            | 90 s      | 1%    
+Arena FFA avg (no assists) | tech     | Black Star    | 6.8 (7.3)                 | 87 s (81 s)            | 90 s      | 7%    
+Arena FFA avg (no assists) | engineer | Nanite Surge  | 6.8 (7.3)                 | 87 s (81 s)            | 90 s      | 7%    
+Arena FFA avg (no assists) | engineer | EMP Pulse     | 7.2 (7.5)                 | 82 s (80 s)            | 90 s      | 0%    
+Arena FFA avg (no assists) | engineer | Drone Carrier | 6.7 (6.8)                 | 89 s (87 s)            | 90 s      | 13%   
+Warzone avg (PvPvE)        | brute    | Event Horizon | 6.3 (6.7)                 | 94 s (89 s)            | 101 s     | 5%    
+Warzone avg (PvPvE)        | brute    | Carpet Bomb   | 6.3 (6.7)                 | 94 s (89 s)            | 101 s     | 3%    
+Warzone avg (PvPvE)        | brute    | Rampage       | 6.3 (6.7)                 | 94 s (89 s)            | 101 s     | 5%    
+Warzone avg (PvPvE)        | tech     | Ion Storm     | 6.3 (6.5)                 | 94 s (92 s)            | 101 s     | 6%    
+Warzone avg (PvPvE)        | tech     | Hyperlance    | 6.3 (6.8)                 | 94 s (87 s)            | 101 s     | 1%    
+Warzone avg (PvPvE)        | tech     | Black Star    | 6.3 (6.5)                 | 94 s (92 s)            | 101 s     | 6%    
+Warzone avg (PvPvE)        | engineer | Nanite Surge  | 6.3 (6.5)                 | 94 s (92 s)            | 101 s     | 6%    
+Warzone avg (PvPvE)        | engineer | EMP Pulse     | 6.3 (7.0)                 | 94 s (85 s)            | 101 s     | 0%    
+Warzone avg (PvPvE)        | engineer | Drone Carrier | 6.2 (6.3)                 | 96 s (95 s)            | 101 s     | 12%   
+Warzone Zones holder       | brute    | Event Horizon | 6.7 (7.0)                 | 88 s (84 s)            | 90 s      | 6%    
+Warzone Zones holder       | brute    | Carpet Bomb   | 6.7 (7.0)                 | 88 s (84 s)            | 90 s      | 4%    
+Warzone Zones holder       | brute    | Rampage       | 6.7 (7.0)                 | 88 s (84 s)            | 90 s      | 6%    
+Warzone Zones holder       | tech     | Ion Storm     | 6.7 (6.8)                 | 88 s (86 s)            | 90 s      | 7%    
+Warzone Zones holder       | tech     | Hyperlance    | 6.8 (7.2)                 | 85 s (82 s)            | 90 s      | 1%    
+Warzone Zones holder       | tech     | Black Star    | 6.7 (7.0)                 | 88 s (84 s)            | 90 s      | 6%    
+Warzone Zones holder       | engineer | Nanite Surge  | 6.7 (6.8)                 | 88 s (86 s)            | 90 s      | 7%    
+Warzone Zones holder       | engineer | EMP Pulse     | 7.0 (7.2)                 | 83 s (82 s)            | 90 s      | 0%    
+Warzone Zones holder       | engineer | Drone Carrier | 6.3 (6.8)                 | 93 s (88 s)            | 90 s      | 13%   
+Dungeon f1 (n6)            | brute    | Event Horizon | 8.0 (8.0)                 | 74 s (74 s)            | 77 s      | 7%    
+Dungeon f1 (n6)            | brute    | Carpet Bomb   | 8.0 (8.0)                 | 74 s (74 s)            | 77 s      | 4%    
+Dungeon f1 (n6)            | brute    | Rampage       | 8.0 (8.0)                 | 74 s (74 s)            | 77 s      | 7%    
+Dungeon f1 (n6)            | tech     | Ion Storm     | 7.5 (7.8)                 | 80 s (76 s)            | 77 s      | 8%    
+Dungeon f1 (n6)            | tech     | Hyperlance    | 7.8 (8.0)                 | 76 s (74 s)            | 77 s      | 1%    
+Dungeon f1 (n6)            | tech     | Black Star    | 7.5 (7.8)                 | 79 s (76 s)            | 77 s      | 7%    
+Dungeon f1 (n6)            | engineer | Nanite Surge  | 6.7 (7.0)                 | 90 s (85 s)            | 82 s      | 7%    
+Dungeon f1 (n6)            | engineer | EMP Pulse     | 7.0 (7.2)                 | 85 s (82 s)            | 82 s      | 0%    
+Dungeon f1 (n6)            | engineer | Drone Carrier | 6.3 (6.3)                 | 95 s (95 s)            | 82 s      | 13%   
+Dungeon f3 (n6)            | brute    | Event Horizon | 9.0 (9.0)                 | 66 s (66 s)            | 62 s      | 8%    
+Dungeon f3 (n6)            | brute    | Carpet Bomb   | 9.0 (9.0)                 | 66 s (66 s)            | 62 s      | 5%    
+Dungeon f3 (n6)            | brute    | Rampage       | 9.0 (9.0)                 | 66 s (66 s)            | 62 s      | 8%    
+Dungeon f3 (n6)            | tech     | Ion Storm     | 8.7 (9.0)                 | 69 s (66 s)            | 60 s      | 9%    
+Dungeon f3 (n6)            | tech     | Hyperlance    | 9.0 (9.0)                 | 66 s (66 s)            | 60 s      | 2%    
+Dungeon f3 (n6)            | tech     | Black Star    | 8.7 (9.0)                 | 69 s (66 s)            | 60 s      | 8%    
+Dungeon f3 (n6)            | engineer | Nanite Surge  | 8.0 (8.0)                 | 75 s (74 s)            | 70 s      | 8%    
+Dungeon f3 (n6)            | engineer | EMP Pulse     | 8.5 (8.7)                 | 71 s (69 s)            | 70 s      | 0%    
+Dungeon f3 (n6)            | engineer | Drone Carrier | 7.8 (7.8)                 | 76 s (76 s)            | 70 s      | 16%   
+Dungeon f6 (n6)            | brute    | Event Horizon | 9.0 (9.0)                 | 67 s (67 s)            | 71 s      | 8%    
+Dungeon f6 (n6)            | brute    | Carpet Bomb   | 9.0 (9.0)                 | 67 s (66 s)            | 71 s      | 5%    
+Dungeon f6 (n6)            | brute    | Rampage       | 9.0 (9.0)                 | 67 s (67 s)            | 71 s      | 8%    
+Dungeon f6 (n6)            | tech     | Ion Storm     | 9.0 (9.0)                 | 66 s (66 s)            | 57 s      | 9%    
+Dungeon f6 (n6)            | tech     | Hyperlance    | 9.0 (9.2)                 | 66 s (65 s)            | 57 s      | 2%    
+Dungeon f6 (n6)            | tech     | Black Star    | 9.0 (9.0)                 | 66 s (66 s)            | 57 s      | 9%    
+Dungeon f6 (n6)            | engineer | Nanite Surge  | 8.5 (8.7)                 | 69 s (69 s)            | 71 s      | 9%    
+Dungeon f6 (n6)            | engineer | EMP Pulse     | 8.7 (9.0)                 | 68 s (66 s)            | 71 s      | 1%    
+Dungeon f6 (n6)            | engineer | Drone Carrier | 8.2 (8.3)                 | 73 s (71 s)            | 71 s      | 16%   
+Dungeon run f1-f6 (n6)     | brute    | Event Horizon | 8.6 (9.0)                 | 70 s (67 s)            | 77 s      | 7%    
+Dungeon run f1-f6 (n6)     | brute    | Carpet Bomb   | 8.6 (9.0)                 | 70 s (67 s)            | 77 s      | 5%    
+Dungeon run f1-f6 (n6)     | brute    | Rampage       | 8.6 (9.0)                 | 70 s (67 s)            | 77 s      | 7%    
+Dungeon run f1-f6 (n6)     | tech     | Ion Storm     | 8.5 (8.9)                 | 70 s (67 s)            | 77 s      | 8%    
+Dungeon run f1-f6 (n6)     | tech     | Hyperlance    | 8.8 (9.1)                 | 68 s (66 s)            | 77 s      | 1%    
+Dungeon run f1-f6 (n6)     | tech     | Black Star    | 8.5 (8.9)                 | 70 s (67 s)            | 77 s      | 8%    
+Dungeon run f1-f6 (n6)     | engineer | Nanite Surge  | 8.0 (8.5)                 | 75 s (71 s)            | 82 s      | 8%    
+Dungeon run f1-f6 (n6)     | engineer | EMP Pulse     | 8.5 (8.8)                 | 70 s (68 s)            | 82 s      | 0%    
+Dungeon run f1-f6 (n6)     | engineer | Drone Carrier | 7.9 (8.0)                 | 76 s (75 s)            | 82 s      | 16%   
+
+--- Map-wide ult density (cast-on-need, averaged over the three classes and their ults) ---
+kit            | scenario               | ults/pilot/10 min | ults/min (map or party) | one ult every | ults active at once
+---------------|------------------------|-------------------|-------------------------|---------------|--------------------
+Hero Kits      | Arena avg              | 6.4 (6.8)         | 10.2                    | 5.9 s         | 0.9                
+Hero Kits      | Warzone avg (PvPvE)    | 5.8 (6.3)         | 9.3                     | 6.5 s         | 0.8                
+Hero Kits      | Dungeon f1 (n6)        | 6.7 (6.9)         | 4.0                     | 14.9 s        | 0.3                
+Hero Kits      | Dungeon f3 (n6)        | 6.9 (7.1)         | 4.2                     | 14.4 s        | 0.4                
+Hero Kits      | Dungeon f6 (n6)        | 7.8 (7.9)         | 4.7                     | 12.8 s        | 0.4                
+Hero Kits      | Dungeon run f1-f6 (n6) | 7.5 (7.7)         | 4.5                     | 13.4 s        | 0.4                
+Arcade Kit     | Arena avg              | 7.4 (8.2)         | 11.9                    | 5.0 s         | 0.8                
+Arcade Kit     | Warzone avg (PvPvE)    | 6.9 (7.5)         | 11.1                    | 5.4 s         | 0.7                
+Arcade Kit     | Dungeon f1 (n6)        | 7.3 (7.7)         | 4.4                     | 13.6 s        | 0.3                
+Arcade Kit     | Dungeon f3 (n6)        | 8.2 (8.4)         | 4.9                     | 12.2 s        | 0.3                
+Arcade Kit     | Dungeon f6 (n6)        | 9.1 (9.4)         | 5.4                     | 11.0 s        | 0.4                
+Arcade Kit     | Dungeon run f1-f6 (n6) | 8.6 (9.0)         | 5.2                     | 11.6 s        | 0.3                
+Sortie Loadout | Arena avg              | 7.5 (7.7)         | 11.9                    | 5.0 s         | 1.0                
+Sortie Loadout | Warzone avg (PvPvE)    | 6.3 (6.6)         | 10.1                    | 5.9 s         | 0.8                
+Sortie Loadout | Dungeon f1 (n6)        | 7.4 (7.6)         | 4.5                     | 13.5 s        | 0.4                
+Sortie Loadout | Dungeon f3 (n6)        | 8.6 (8.7)         | 5.2                     | 11.6 s        | 0.4                
+Sortie Loadout | Dungeon f6 (n6)        | 8.8 (8.9)         | 5.3                     | 11.3 s        | 0.4                
+Sortie Loadout | Dungeon run f1-f6 (n6) | 8.4 (8.8)         | 5.0                     | 11.9 s        | 0.4                
+
+--- Sensitivity to spec ambiguities ---
+Arcade "rift room cleared: +6% for each live party pilot": read as +6% each -> 8.0 ults/10 min (Jugg, f1); read as +6% x 6 pilots -> 11.0 ults/10 min.
+Sortie Hyperlance: pending keeps draining while the ult runs -> 8.0 ults/10 min; blocked -> 8.0 (spec is silent; ult damage also feeds pending).
+Sortie Drone Carrier: pending keeps draining while the ult runs -> 7.3 ults/10 min; blocked -> 6.8 (spec is silent; ult damage also feeds pending).
+Charge cards (top-25% Arena pilot, shortest gap between two casts): Arcade Flux Core L4 (all gains x1.2): 51 s -> 39 s; Sortie Ultimate Core L3 (x1.3 on passive + points): 49 s -> 44 s (the spec's hard floor is 49 s in Arena).
+
+--- Checks against each spec's own claims ---
+Hero Kits: avg PvP pilot ~65-74 s -> model mean gap 90 s smart / 85 s cast-on-ready (claim 55-80 s) DIFFERS
+Hero Kits: rift floor 1 ~72-82 s -> model mean gap 83 s smart / 77 s cast-on-ready (claim 64-82 s) OK
+Hero Kits: floor 6 ~55-64 s -> model mean gap 80 s smart / 77 s cast-on-ready (claim 50-64 s) DIFFERS
+Arcade Kit: avg PvP 61 s -> model mean gap 81 s smart / 75 s cast-on-ready (claim 55-70 s) DIFFERS
+Arcade Kit: rift f1 73 s -> model mean gap 75 s smart / 73 s cast-on-ready (claim 60-80 s) OK
+Arcade Kit: rift f6 55 s -> model mean gap 65 s smart / 62 s cast-on-ready (claim 50-60 s) DIFFERS
+Sortie Loadout: Arena avg bot 70 s -> model mean gap 80 s smart / 76 s cast-on-ready (claim 55-80 s) OK
+Sortie Loadout: rift f1 78 s -> model mean gap 74 s smart / 74 s cast-on-ready (claim 65-90 s) OK
+Sortie Loadout: rift f6 58 s (at the floor) -> model mean gap 67 s smart / 66 s cast-on-ready (claim 55-62 s) DIFFERS

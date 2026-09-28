@@ -1,0 +1,120 @@
+=== Inertia (spec §6.1 model, 60 Hz) ===
+  v0.5 reference (MOVE_DRAG 1.2, no brake) from 470: to < 20 px/s in 2.62 s, 368 px (never exactly 0)
+  class | stop from max (t / px) | from AB | 0→90% max | 0→max | reversal: v=0 at / 90% back at / overshoot | 90° strafe: heading ≥80° at / 90% speed at / drift px | turn 180°
+  Jugg  | 2.68 s / 435 px      | 2.82 s / 505 | 0.63 s   | 0.70 s | 0.67 s / 1.30 s / 138 px            | 1.60 s / 0.98 s / 395 px                   | 0.31 s
+  Arca  | 0.23 s /  46 px      | 0.28 s /  84 | 0.42 s   | 0.47 s | 0.15 s / 0.57 s /  31 px            | 0.20 s / 0.42 s /  46 px                   | 0.20 s
+  Arti  | 0.88 s / 166 px      | 0.98 s / 226 | 0.48 s   | 0.53 s | 0.40 s / 0.88 s /  86 px            | 0.85 s / 0.58 s / 234 px                   | 0.24 s
+  strain / brownout: effective top speed ×STRAIN_SPEED[L] × 0.7 in brownout (L3 + brownout = ×0.525):
+   Jugg: L0 430, L2 387, L3 323, brownout 301, L3+brownout 226 px/s (drone 175 → 254 at H5; splitling 265 → 384; weaver 215 → 312)
+   Arca: L0 500, L2 450, L3 375, brownout 350, L3+brownout 263 px/s (drone 175 → 254 at H5; splitling 265 → 384; weaver 215 → 312)
+   Arti: L0 470, L2 423, L3 353, brownout 329, L3+brownout 247 px/s (drone 175 → 254 at H5; splitling 265 → 384; weaver 215 → 312)
+
+  capitals (host penalty max(0.5, 1−0.07n) on thrust & top speed; mass 1 + 0.25n divides thrust, drag, brake, knockback)
+   Jugg → Dreadnought:
+      n1: stop 3.23 s/493 px, 0→max 0.88 s, reverse 1.62 s (overshoot 161 px)
+      n2: stop 3.72 s/531 px, 0→max 1.05 s, reverse 1.93 s (overshoot 179 px)
+      n3: stop 4.13 s/550 px, 0→max 1.22 s, reverse 2.25 s (overshoot 192 px)
+      n4: stop 4.48 s/551 px, 0→max 1.40 s, reverse 2.58 s (overshoot 200 px)
+      n5: stop 4.75 s/535 px, 0→max 1.57 s, reverse 2.90 s (overshoot 203 px)
+   Arca → Spire:
+      n1: stop 0.27 s/52 px, 0→max 0.58 s, reverse 0.70 s (overshoot 35 px)
+      n2: stop 0.30 s/55 px, 0→max 0.68 s, reverse 0.83 s (overshoot 38 px)
+      n3: stop 0.32 s/55 px, 0→max 0.80 s, reverse 0.95 s (overshoot 39 px)
+      n4: stop 0.35 s/54 px, 0→max 0.92 s, reverse 1.08 s (overshoot 39 px)
+      n5: stop 0.35 s/50 px, 0→max 1.03 s, reverse 1.20 s (overshoot 38 px)
+   Arti → Foundry:
+      n1: stop 1.05 s/187 px, 0→max 0.67 s, reverse 1.08 s (overshoot 100 px)
+      n2: stop 1.20 s/200 px, 0→max 0.78 s, reverse 1.30 s (overshoot 110 px)
+      n3: stop 1.33 s/205 px, 0→max 0.92 s, reverse 1.50 s (overshoot 117 px)
+      n4: stop 1.43 s/204 px, 0→max 1.05 s, reverse 1.70 s (overshoot 120 px)
+      n5: stop 1.50 s/195 px, 0→max 1.18 s, reverse 1.90 s (overshoot 120 px)
+
+  knockback slide (impulse × knockTaken / mass, then coasting):
+   brute contact   520: Jugg 260 px/s → 212 px in 2.02 s | Arca 520 px/s → 50 px in 0.23 s | Arti 416 px/s → 138 px in 0.82 s | Dreadnought n5 135 px
+   splitter        220: Jugg 110 px/s → 55 px in 1.13 s | Arca 220 px/s → 10 px in 0.12 s | Arti 176 px/s → 34 px in 0.45 s | Dreadnought n5 30 px
+   Polarize shell  350: Jugg 175 px/s → 116 px in 1.57 s | Arca 350 px/s → 24 px in 0.17 s | Arti 280 px/s → 74 px in 0.63 s | Dreadnought n5 69 px
+   Hive/Matriarch  700: Jugg 350 px/s → 326 px in 2.40 s | Arca 700 px/s → 74 px in 0.28 s | Arti 560 px/s → 190 px in 0.93 s | Dreadnought n5 219 px
+  v0.5 comparison: brute contact knockback 520 px/s with MOVE_DRAG 1.2 slid ≈ 433 px (asymptotic).
+=== 0. Enemy numbers the design produces (Veteran, H at minute 3 with 2 rooms cleared) ===
+  floor tier H    | drone HP n1/n4/n6      | drone contact | brute HP n6 | pulse budget k0 n1/n4/n6
+  f 1    1 2.18 | 188/301/377            |   129 (×1.18) |   5650      | 14/25/32
+  f 2    3 2.43 | 241/386/482            |   144 (×1.31) |   7229      | 18/32/41
+  f 3    5 2.68 | 296/474/593            |   160 (×1.45) |   8894      | 22/39/50
+  f 4    7 2.93 | 355/568/710            |   176 (×1.60) |  10646      | 27/47/60
+  f 5    9 3.18 | 416/666/832            |   193 (×1.75) |  12484      | 32/56/71
+  f 6   11 3.43 | 480/768/961            |   210 (×1.91) |  14409      | 37/65/83
+  f 7   13 3.68 | 547/876/1095           |   228 (×2.07) |  16420      | 43/75/96
+  f 8   15 3.93 | 617/988/1235           |   247 (×2.25) |  18518      | 49/85/109
+  f 9   17 4.09 | 684/1094/1367          |   264 (×2.40) |  20512      | 54/95/122
+  f10   19 4.21 | 749/1199/1499          |   280 (×2.55) |  22483      | 60/104/134
+  NOTE: the spec quotes "a drone lands 110 × the heat damage multiplier", but the live code also scales contact by tier: ×(1 + 0.04·(tier − 1)) = ×1.4 on floor 6, ×1.72 on floor 9.
+
+=== 1. Singularity Drive (PvE: pull 520 px @1200 px/s² + 30 px/s nudge, horizon r+70, kamikaze crushed, 600 crush dps) ===
+  A pulse of 1.3 × pulse-budget bodies spawned 250–600 px around an anchored ship (worst case: all of them target it).
+  swarm f1 n1 H2.2: 19 bodies | Drive 5 s: 19 killed (19 kamikaze), 0 left, Artificer took 0 (S 450 I 600) | no Drive: Artificer took 1147 → DEAD (0 left)
+  swarm f1 n6 H2.2: 42 bodies | Drive 5 s: 42 killed (42 kamikaze), 0 left, Artificer took 0 (S 450 I 600) | no Drive: Artificer took 1210 → DEAD (0 left)
+  swarm f3 n6 H2.7: 66 bodies | Drive 5 s: 66 killed (66 kamikaze), 0 left, Artificer took 0 (S 450 I 600) | no Drive: Artificer took 1104 → DEAD (0 left)
+  swarm f6 n6 H3.4: 109 bodies | Drive 5 s: 109 killed (109 kamikaze), 0 left, Artificer took 0 (S 450 I 600) | no Drive: Artificer took 1059 → DEAD (0 left)
+  swarm f9 n6 H4.1: 159 bodies | Drive 5 s: 159 killed (159 kamikaze), 0 left, Artificer took 0 (S 450 I 600) | no Drive: Artificer took 1082 → DEAD (0 left)
+  mixed f1 n1 H2.2: 10 bodies | Drive 5 s: 8 killed (4 kamikaze), 2 left, Artificer took 1168 (S 0 I -118) | no Drive: Artificer took 1073 → DEAD (6 left)
+  mixed f1 n6 H2.2: 20 bodies | Drive 5 s: 16 killed (8 kamikaze), 4 left, Artificer took 1051 (S 0 I -1) | no Drive: Artificer took 1073 → DEAD (12 left)
+  mixed f3 n6 H2.7: 30 bodies | Drive 5 s: 24 killed (12 kamikaze), 6 left, Artificer took 1071 (S 0 I -21) | no Drive: Artificer took 1078 → DEAD (18 left)
+  mixed f6 n6 H3.4: 50 bodies | Drive 5 s: 33 killed (20 kamikaze), 17 left, Artificer took 1085 (S 0 I -35) | no Drive: Artificer took 1077 → DEAD (30 left)
+  mixed f9 n6 H4.1: 74 bodies | Drive 5 s: 30 killed (30 kamikaze), 44 left, Artificer took 1093 (S 0 I -43) | no Drive: Artificer took 1082 → DEAD (44 left)
+
+=== 2. Singularity Drive vs players: thrusting straight out from 250 px (at rest), pull 450 px/s² ===
+  class n | L0 | L0+AB | L3 | L3+AB | brownout(L3) | crush damage taken if caught (4 s)
+  Jugg n0 | out 1.78 s | out 1.07 s | STUCK      | out 1.48 s | STUCK      | horizon 2.4 s, S 62/500 I 900/900
+  Jugg n1 | STUCK      | out 1.50 s | STUCK      | out 2.80 s | STUCK      | horizon 2.9 s, S 37/550 I 900/900
+  Jugg n2 | STUCK      | out 2.55 s | STUCK      | STUCK      | STUCK      | horizon 3.0 s, S 66/600 I 900/900
+  Jugg n3 | STUCK      | STUCK      | STUCK      | STUCK      | STUCK      | horizon 3.0 s, S 110/650 I 900/900
+  Jugg n5 | STUCK      | STUCK      | STUCK      | STUCK      | STUCK      | horizon 3.0 s, S 216/750 I 900/900
+  Arca n0 | out 0.92 s | out 0.67 s | out 1.22 s | out 0.83 s | out 2.05 s | horizon 0.0 s, S 380/380 I 420/420
+  Arca n1 | out 1.22 s | out 0.83 s | out 1.82 s | out 1.07 s | STUCK      | horizon 0.0 s, S 418/418 I 420/420
+  Arca n2 | out 1.73 s | out 1.05 s | STUCK      | out 1.45 s | STUCK      | horizon 0.0 s, S 456/456 I 420/420
+  Arca n3 | out 3.40 s | out 1.35 s | STUCK      | out 2.23 s | STUCK      | horizon 0.0 s, S 494/494 I 420/420
+  Arca n5 | STUCK      | STUCK      | STUCK      | STUCK      | STUCK      | horizon 0.0 s, S 570/570 I 420/420
+  Arti n0 | out 1.10 s | out 0.77 s | out 1.55 s | out 0.98 s | STUCK      | horizon 0.0 s, S 450/450 I 600/600
+  Arti n1 | out 1.57 s | out 0.98 s | out 3.22 s | out 1.33 s | STUCK      | horizon 0.0 s, S 495/495 I 600/600
+  Arti n2 | out 2.87 s | out 1.28 s | STUCK      | out 2.03 s | STUCK      | horizon 1.9 s, S 198/540 I 600/600
+  Arti n3 | STUCK      | out 1.83 s | STUCK      | STUCK      | STUCK      | horizon 2.6 s, S 120/585 I 600/600
+  Arti n5 | STUCK      | STUCK      | STUCK      | STUCK      | STUCK      | horizon 2.9 s, S 159/675 I 600/600
+  net escape accel = thrust × penalty × strain × (AB 1.5) / mass − 450 (plus the grip brake, which also resists being pulled backward):
+   Jugg: thrust 620, grip brake 11 px/s² → n0 L0 170, n5 AB -181 px/s²
+   Arca: thrust 1100, grip brake 1800 px/s² → n0 L0 650, n5 AB 27 px/s²
+   Arti: thrust 900, grip brake 150 px/s² → n0 L0 450, n5 AB -60 px/s²
+
+=== 3. EMP Pulse vs shields (PvP: 600 emp shield-only, −40% current power, reactor offline 1.5 s, shield delay → break + 1 s) ===
+  Jugg base             shield  500: removes 500 (100%), shield regen restarts after 4.4 s, refill done at 6.2 s (L0) | polarized: 300 removed (60%), drain 20%, offline 0.75 s
+  Jugg shieldcap×5      shield  800: removes 600 ( 75%), shield regen restarts after 4.4 s, refill done at 7.3 s (L0) | polarized: 300 removed (38%), drain 20%, offline 0.75 s
+  Jugg capital n5       shield  750: removes 600 ( 80%), shield regen restarts after 4.4 s, refill done at 7.2 s (L0) | polarized: 300 removed (40%), drain 20%, offline 0.75 s
+  Jugg Bulwark+cap5+n5  shield 1440: removes 600 ( 42%), shield regen restarts after 4.4 s, refill done at 9.7 s (L0) | polarized: 300 removed (21%), drain 20%, offline 0.75 s
+  Arca base             shield  380: removes 380 (100%), shield regen restarts after 3.4 s, refill done at 4.4 s (L0)
+  Arca shieldcap×5      shield  608: removes 600 ( 99%), shield regen restarts after 3.4 s, refill done at 5.0 s (L0)
+  Arca capital n5       shield  570: removes 570 (100%), shield regen restarts after 3.4 s, refill done at 4.9 s (L0)
+  Arti base             shield  450: removes 450 (100%), shield regen restarts after 3.8 s, refill done at 5.2 s (L0)
+  Arti shieldcap×5      shield  720: removes 600 ( 83%), shield regen restarts after 3.8 s, refill done at 6.0 s (L0)
+  Arti capital n5       shield  675: removes 600 ( 89%), shield regen restarts after 3.8 s, refill done at 5.9 s (L0)
+  PvE EMP: 150 flat + 1.5 s stun in 300 px and deletes hostile projectiles; stunned kamikaze do no contact.
+
+=== 4. Ion Storm (240 px, 6 s, every 0.25 s arcs to ≤ 4 targets × 70 PvE; PvP ≤ 3 targets × 40 ion + 25 power/arc) ===
+  PvE f1 n1: drone HP 188 → each arc target dies in 0.67 s; ≈ 36 drone kills max over 6 s (6720 dmg total, 1120 dps cap), brute HP 2825 takes 1680 over 6 s
+  PvE f1 n6: drone HP 377 → each arc target dies in 1.35 s; ≈ 18 drone kills max over 6 s (6720 dmg total, 1120 dps cap), brute HP 5650 takes 1680 over 6 s
+  PvE f3 n6: drone HP 593 → each arc target dies in 2.12 s; ≈ 11 drone kills max over 6 s (6720 dmg total, 1120 dps cap), brute HP 8894 takes 1680 over 6 s
+  PvE f6 n6: drone HP 961 → each arc target dies in 3.43 s; ≈ 7 drone kills max over 6 s (6720 dmg total, 1120 dps cap), brute HP 14409 takes 1680 over 6 s
+  PvE f9 n6: drone HP 1367 → each arc target dies in 4.88 s; ≈ 5 drone kills max over 6 s (6720 dmg total, 1120 dps cap), brute HP 20512 takes 1680 over 6 s
+  PvP sit-in Jugg: shield stripped at 2.00 s; after 6 s S 0 I 712/900 P 1000 (spec also says ion drains 0.5 × amount power — with both, 45 power per arc)
+  PvP sit-in Arca: shield stripped at 1.50 s; after 6 s S 0 I 67/420 P 1300 (spec also says ion drains 0.5 × amount power — with both, 45 power per arc)
+  PvP sit-in Arti: shield stripped at 1.75 s; after 6 s S 0 I 303/600 P 1000 (spec also says ion drains 0.5 × amount power — with both, 45 power per arc)
+
+=== 5. Bomb (420 kinetic, splash 150 px falling to 40% at the edge; PvE ×1.5 = 630) ===
+  PvE f1 n1: drone HP 188 → one bomb kills drones within 150 px (area 100% of the blast)
+  PvE f1 n6: drone HP 377 → one bomb kills drones within 101 px (area 45% of the blast)
+  PvE f3 n6: drone HP 593 → one bomb kills drones within 15 px (area 1% of the blast)
+  PvE f6 n6: drone HP 961 → one bomb kills drones within 0 px (none)
+  PvE f9 n6: drone HP 1367 → one bomb kills drones within 0 px (none)
+  PvE f10 n6: drone HP 1499 → one bomb kills drones within 0 px (none)
+  PvP Jugg: 1 bomb → S 164 I 900 | 2 bombs → S 0 I 745 | 1 bomb, shield down → I 598
+  PvP Arca: 1 bomb → S 44 I 420 | 2 bombs → S 0 I -18 DEAD | 1 bomb, shield down → I -84 DEAD
+  PvP Arti: 1 bomb → S 114 I 600 | 2 bombs → S 0 I 300 | 1 bomb, shield down → I 146
+  Bomb economy: 2 at spawn + 1 per 18 s (cap 2): 3.3 free bombs/min = 2100 PvE splash dmg/min, cost 120 power each.

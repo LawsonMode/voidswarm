@@ -189,14 +189,22 @@ export const ALLOW_WORDS: readonly string[] = [
   // real given names and surnames seen on class rosters (a student must be able to use their own name)
   'harshit', 'kshitij', 'yamashita', 'kinoshita', 'matsushita', 'morishita', 'shittu', 'dikshit', 'hiscock',
   'alcock', 'adcock', 'laycock', 'glasscock', 'cockburn', 'cockrell', 'kuntz', 'analise', 'analiese', 'anneliese',
-  'annaliese',
+  'annaliese', 'kuntal', 'analisa', 'anusha', 'anushka', 'shital', 'shitij', 'ashit', // ashit also covers Ashita / Ashitaka
+  'riddick', 'farseer',
+  // US / Idaho place names and surnames found by the false-positive corpus (fpCorpus.test.ts): Bonner County and
+  // Bonners Ferry, Idaho (a repeated letter is absorbed, so the double-n spelling read as a masked word); three
+  // Idaho landmarks and a Lake Lowell fish (starred in strict mode; multi-word entries also read across an
+  // apostrophe, for a possessive); a Minnesota city, a hound breed written as two words and an everyday phrase
+  'bonner', 'hells canyon', 'hells gate', 'hells half acre', 'crappie', 'coon rapids', 'coon hound', 'tit for tat',
 ];
 
 /**
  * Number codes (hate symbols written in digits). Digits don't change under ROT13, so these are stored ROT5 (each
  * digit + 5, mod 10) for the same no-grep reason; see rot5(). Chat: the code standing on its own (a digit run,
  * optionally split by single separators such as a space or a dot) is starred out and logged — mask tier, so an
- * innocent number costs no strike. Names: refused when the name's digits contain the code.
+ * innocent number costs no strike. Names: refused when one whole digit run of the name, or one group of it between
+ * separators (not a decimal point), spells the code (the same runs as chat, engine.ts digitRuns; digit groups split
+ * by letters are separate numbers).
  */
 export const NUMERIC_TERMS: readonly { code: string; category: Category }[] = [
   { code: '6933', category: 'hate' },

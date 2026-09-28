@@ -1,0 +1,45 @@
+
+==============================================================================================================
+== S4. FULL STOP (Space held, no direction) vs coast vs counter-thrust; time and distance to < 5 px/s
+==============================================================================================================
+CR movement: coast |v| <- |v|(1 - drag/m dt) - brake/m dt; FULL STOP adds stopBrake/m; counter-thrust = reverse thrust + grip-scaled drag/brake. m = 1 + 0.25n, speed x max(0.5, 1 - 0.07n).
+kit            | class | coast from cruise | FULL STOP from cruise | faster | counter-thrust  | from boost: coast / STOP | STOP in brownout | brake power | spec claim        
+---------------|-------|-------------------|-----------------------|--------|-----------------|--------------------------|------------------|-------------|-------------------
+Hero Kits      | Jugg  | 2.62 s / 434 px   | 0.48 s / 96 px        | 5.4x   | 0.67 s / 138 px | 2.70 / 0.55 s            | 0.48 s           | 29          | 0.5 s / 96 px OK  
+Hero Kits      | Arca  | 0.22 s / 46 px    | 0.10 s / 18 px        | 2.2x   | 0.15 s / 31 px  | 0.27 / 0.13 s            | 0.10 s           | 3           | 0.1 s / 18 px OK  
+Hero Kits      | Arti  | 0.87 s / 166 px   | 0.23 s / 47 px        | 3.7x   | 0.40 s / 86 px  | 0.93 / 0.28 s            | 0.23 s           | 11          | 0.23 s / 47 px OK 
+Arcade Kit     | Jugg  | 2.62 s / 434 px   | 0.77 s / 149 px       | 3.4x   | 0.67 s / 138 px | 2.70 / 0.83 s            | 1.17 s           | 69          | 0.77 s / 149 px OK
+Arcade Kit     | Arca  | 0.22 s / 46 px    | 0.10 s / 20 px        | 2.2x   | 0.15 s / 31 px  | 0.27 / 0.13 s            | 0.15 s           | 3           | 0.12 s / 20 px OK 
+Arcade Kit     | Arti  | 0.87 s / 166 px   | 0.28 s / 58 px        | 3.1x   | 0.40 s / 86 px  | 0.93 / 0.33 s            | 0.42 s           | 14          | 0.28 s / 58 px OK 
+Sortie Loadout | Jugg  | 2.62 s / 434 px   | 0.53 s / 105 px       | 4.9x   | 0.67 s / 138 px | 2.70 / 0.60 s            | 0.53 s           | 48          | 0.53 s / 105 px OK
+Sortie Loadout | Arca  | 0.32 s / 67 px    | 0.10 s / 20 px        | 3.2x   | 0.20 s / 39 px  | 0.38 / 0.13 s            | 0.10 s           | 5           | 0.1 s / 20 px OK  
+Sortie Loadout | Arti  | 0.87 s / 166 px   | 0.25 s / 50 px        | 3.5x   | 0.40 s / 86 px  | 0.93 / 0.30 s            | 0.25 s           | 15          | 0.25 s / 50 px OK 
+
+Capitals (host = the class; coast -> FULL STOP from the host's capped cruise speed):
+kit            | capital     | n=1                                 | n=3                                 | n=5                                
+---------------|-------------|-------------------------------------|-------------------------------------|------------------------------------
+Hero Kits      | Dreadnought | 3.13 s/492 -> 0.57 s/106 (rev 0.83) | 4.02 s/550 -> 0.68 s/110 (rev 1.15) | 4.60 s/535 -> 0.73 s/98 (rev 1.47) 
+Hero Kits      | Spire       | 0.27 s/52 -> 0.12 s/20 (rev 0.18)   | 0.32 s/55 -> 0.13 s/21 (rev 0.23)   | 0.35 s/50 -> 0.15 s/19 (rev 0.27)  
+Hero Kits      | Foundry     | 1.03 s/187 -> 0.27 s/52 (rev 0.50)  | 1.30 s/205 -> 0.32 s/54 (rev 0.67)  | 1.47 s/195 -> 0.35 s/49 (rev 0.83) 
+Arcade Kit     | Dreadnought | 3.13 s/492 -> 0.90 s/165 (rev 0.83) | 4.02 s/550 -> 1.08 s/174 (rev 1.15) | 4.60 s/535 -> 1.18 s/157 (rev 1.47)
+Arcade Kit     | Spire       | 0.27 s/52 -> 0.13 s/23 (rev 0.18)   | 0.32 s/55 -> 0.15 s/24 (rev 0.23)   | 0.35 s/50 -> 0.17 s/22 (rev 0.27)  
+Arcade Kit     | Foundry     | 1.03 s/187 -> 0.33 s/64 (rev 0.50)  | 1.30 s/205 -> 0.40 s/68 (rev 0.67)  | 1.47 s/195 -> 0.43 s/61 (rev 0.83) 
+Sortie Loadout | Dreadnought | 3.13 s/492 -> 0.63 s/116 (rev 0.83) | 4.02 s/550 -> 0.75 s/121 (rev 1.15) | 4.60 s/535 -> 0.82 s/109 (rev 1.47)
+Sortie Loadout | Spire       | 0.38 s/75 -> 0.12 s/22 (rev 0.23)   | 0.47 s/81 -> 0.15 s/24 (rev 0.30)   | 0.52 s/75 -> 0.15 s/21 (rev 0.35)  
+Sortie Loadout | Foundry     | 1.03 s/187 -> 0.28 s/56 (rev 0.50)  | 1.30 s/205 -> 0.35 s/59 (rev 0.67)  | 1.47 s/195 -> 0.38 s/53 (rev 0.83) 
+
+Shove (500 px/s x knock factor, / mass): slide while coasting vs while holding FULL STOP:
+kit            | Jugg            | Arca           | Arti            | Dreadnought n5
+---------------|-----------------|----------------|-----------------|---------------
+Hero Kits      | 200 px -> 34 px | 46 px -> 18 px | 130 px -> 34 px | 126 -> 16 px  
+Arcade Kit     | 200 px -> 56 px | 46 px -> 20 px | 130 px -> 43 px | 126 -> 27 px  
+Sortie Loadout | 200 px -> 38 px | 67 px -> 20 px | 130 px -> 37 px | 126 -> 18 px  
+
+Stop-and-pop cycle (cruise -> FULL STOP -> 0.5 s of fire -> back to 90% cruise), seconds; and a Laser Arcanist's effective uptime at range:
+kit            | Jugg                                  | Arca                                  | Arti                                 
+---------------|---------------------------------------|---------------------------------------|--------------------------------------
+Hero Kits      | 1.62 s (stop 0.48 + 0.5 + accel 0.63) | 1.02 s (stop 0.10 + 0.5 + accel 0.42) | 1.22 s (stop 0.23 + 0.5 + accel 0.48)
+Arcade Kit     | 1.90 s (stop 0.77 + 0.5 + accel 0.63) | 1.02 s (stop 0.10 + 0.5 + accel 0.42) | 1.27 s (stop 0.28 + 0.5 + accel 0.48)
+Sortie Loadout | 1.67 s (stop 0.53 + 0.5 + accel 0.63) | 1.02 s (stop 0.10 + 0.5 + accel 0.42) | 1.23 s (stop 0.25 + 0.5 + accel 0.48)
+
+Note (Sortie): Arcanist coast brake 1800 -> 1100 makes the Arcanist coast 0.33 s instead of 0.23 s, i.e. the change makes its no-input slide LONGER to give FULL STOP a job; the Arcanist's identity ("stops almost instantly") now requires holding Space (+1 load).

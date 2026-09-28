@@ -1,0 +1,207 @@
+
+==============================================================================================================
+== S5. Maneuver perks: escape value in an 8 s chase (target flees with boost from 300 px; pursuer boosts when > 70% of its range and fires in range)
+==============================================================================================================
+cells: share of the target's EHP taken (DOWN@t if taken down) | seconds inside the pursuer's weapon range. Baseline "boost only" = no perk.
+Weapon ranges: Jugg MD 468 px, Arca Laser 1265 px, Arti Phaser 700 px. The pursuer is always L2 while chasing and firing (x0.9 speed).
+
+--- Hero Kits ---
+target | perk                  | cd / power  | vs Jugg MD  | vs Arca Laser    | vs Arti Phaser  
+-------|-----------------------|-------------|-------------|------------------|-----------------
+Jugg   | boost only (baseline) | -           | 32% | 1.9 s | DOWN@7.9 | 7.9 s | DOWN@7.3 | 7.2 s
+Jugg   | Ram Charge            | 6 s / 120   | 2% | 0.2 s  | 98% | 8.0 s      | 73% | 4.7 s     
+Jugg   | Strafe Dodge          | 4 s x2 / 50 | 6% | 0.2 s  | 73% | 5.4 s      | 65% | 2.0 s     
+Jugg   | Overdrive             | 16 s / 0    | 19% | 1.2 s | DOWN@7.9 | 7.9 s | 90% | 5.7 s     
+Jugg   | Hyperspace Jump       | 22 s / 150  | 21% | 0.9 s | 81% | 6.2 s      | DOWN@7.2 | 7.2 s
+Arca   | boost only (baseline) | -           | 26% | 0.8 s | DOWN@3.2 | 3.2 s | 97% | 2.2 s     
+Arca   | Warp                  | 5 s / 120   | 0% | 0.0 s  | 112% | 3.8 s     | 0% | 0.0 s      
+Arca   | Strafe Dodge          | 4 s x2 / 50 | 7% | 0.2 s  | 22% | 0.7 s      | 37% | 0.4 s     
+Arca   | Overdrive             | 16 s / 0    | 20% | 0.6 s | DOWN@3.2 | 3.2 s | 123% | 2.3 s    
+Arca   | Hyperspace Jump       | 22 s / 150  | 33% | 0.9 s | 28% | 0.9 s      | DOWN@2.3 | 2.3 s
+Arti   | boost only (baseline) | -           | 27% | 1.2 s | DOWN@4.4 | 4.4 s | 107% | 3.2 s    
+Arti   | Pulse Boost           | 9 s / 80    | 13% | 0.6 s | DOWN@4.4 | 4.4 s | 77% | 1.9 s     
+Arti   | Strafe Dodge          | 4 s x2 / 50 | 6% | 0.2 s  | 18% | 0.7 s      | 28% | 0.4 s     
+Arti   | Overdrive             | 16 s / 0    | 18% | 0.8 s | DOWN@4.4 | 4.4 s | DOWN@4.9 | 3.4 s
+Arti   | Hyperspace Jump       | 22 s / 150  | 26% | 0.9 s | 51% | 2.1 s      | DOWN@3.5 | 3.5 s
+
+--- Arcade Kit ---
+target | perk                  | cd / power | vs Jugg MD  | vs Arca Laser    | vs Arti Phaser  
+-------|-----------------------|------------|-------------|------------------|-----------------
+Jugg   | boost only (baseline) | -          | 32% | 1.9 s | DOWN@7.9 | 7.9 s | DOWN@7.3 | 7.2 s
+Jugg   | Ram Charge            | 6 s / 120  | 2% | 0.2 s  | 98% | 8.0 s      | 73% | 4.7 s     
+Jugg   | Warp                  | 6 s / 120  | 0% | 0.0 s  | 97% | 8.0 s      | 92% | 6.3 s     
+Jugg   | Strafe Dodge          | 3 s / 60   | 3% | 0.3 s  | 99% | 8.0 s      | 99% | 7.3 s     
+Jugg   | Overdrive             | 14 s / 100 | 17% | 1.1 s | DOWN@7.9 | 7.9 s | 76% | 3.9 s     
+Jugg   | Hyperspace Jump       | 22 s / 200 | 23% | 0.8 s | 95% | 7.8 s      | 76% | 4.0 s     
+Arca   | boost only (baseline) | -          | 23% | 0.8 s | DOWN@3.5 | 3.5 s | 88% | 2.2 s     
+Arca   | Ram Charge            | 6 s / 120  | 3% | 0.2 s  | 90% | 3.4 s      | 14% | 0.4 s     
+Arca   | Warp                  | 5 s / 120  | 0% | 0.0 s  | 102% | 3.8 s     | 0% | 0.0 s      
+Arca   | Strafe Dodge          | 3 s / 60   | 3% | 0.2 s  | DOWN@3.6 | 3.6 s | 34% | 0.5 s     
+Arca   | Overdrive             | 14 s / 100 | 18% | 0.6 s | DOWN@3.5 | 3.5 s | 64% | 1.4 s     
+Arca   | Hyperspace Jump       | 22 s / 200 | 35% | 0.8 s | 43% | 1.8 s      | 52% | 0.8 s     
+Arti   | boost only (baseline) | -          | 27% | 1.2 s | DOWN@4.4 | 4.4 s | 107% | 3.2 s    
+Arti   | Ram Charge            | 6 s / 120  | 2% | 0.2 s  | DOWN@7.2 | 4.6 s | 11% | 0.4 s     
+Arti   | Warp                  | 6 s / 120  | 0% | 0.0 s  | DOWN@5.8 | 4.7 s | 0% | 0.0 s      
+Arti   | Strafe Dodge          | 3 s / 60   | 3% | 0.2 s  | DOWN@4.5 | 4.6 s | 70% | 1.5 s     
+Arti   | Overdrive             | 14 s / 100 | 18% | 0.8 s | DOWN@4.4 | 4.4 s | 66% | 1.8 s     
+Arti   | Hyperspace Jump       | 22 s / 200 | 30% | 0.8 s | 87% | 4.1 s      | 47% | 0.8 s     
+
+--- Sortie Loadout ---
+target | perk                  | cd / power  | vs Jugg MD  | vs Arca Laser    | vs Arti Phaser  
+-------|-----------------------|-------------|-------------|------------------|-----------------
+Jugg   | boost only (baseline) | -           | 32% | 1.9 s | DOWN@7.9 | 7.9 s | DOWN@7.3 | 7.2 s
+Jugg   | Warp                  | 7 s / 120   | 0% | 0.0 s  | 97% | 8.0 s      | 92% | 6.6 s     
+Jugg   | Hyperspace Jump       | 15 s / 180  | 23% | 0.8 s | DOWN@7.9 | 7.9 s | DOWN@7.2 | 7.2 s
+Jugg   | Ram Charge            | 8 s / 120   | 2% | 0.3 s  | 98% | 8.0 s      | DOWN@8.0 | 7.5 s
+Jugg   | Strafe Dodge          | 4 s x2 / 45 | 16% | 1.6 s | 97% | 8.0 s      | DOWN@7.7 | 7.7 s
+Jugg   | Grapple (tile reel)   | 8 s / 90    | 24% | 1.6 s | DOWN@7.9 | 7.9 s | DOWN@7.2 | 7.2 s
+Jugg   | Overdrive             | 14 s / 60   | 15% | 0.9 s | DOWN@7.9 | 7.9 s | 78% | 4.8 s     
+Arca   | boost only (baseline) | -           | 23% | 0.8 s | DOWN@3.5 | 3.5 s | 88% | 2.2 s     
+Arca   | Warp                  | 7 s / 120   | 0% | 0.0 s  | 102% | 3.8 s     | 0% | 0.0 s      
+Arca   | Hyperspace Jump       | 15 s / 180  | 35% | 0.8 s | DOWN@3.5 | 3.5 s | DOWN@2.6 | 2.6 s
+Arca   | Ram Charge            | 8 s / 120   | 3% | 0.2 s  | DOWN@3.7 | 3.7 s | 45% | 0.9 s     
+Arca   | Strafe Dodge          | 4 s x2 / 45 | 3% | 0.4 s  | DOWN@3.9 | 3.9 s | 64% | 1.7 s     
+Arca   | Grapple (tile reel)   | 8 s / 90    | 12% | 0.4 s | DOWN@3.5 | 3.5 s | 76% | 1.6 s     
+Arca   | Overdrive             | 14 s / 60   | 13% | 0.4 s | 44% | 1.5 s      | 52% | 0.8 s     
+Arti   | boost only (baseline) | -           | 27% | 1.2 s | DOWN@4.4 | 4.4 s | 107% | 3.2 s    
+Arti   | Warp                  | 7 s / 120   | 0% | 0.0 s  | DOWN@4.7 | 4.7 s | 0% | 0.0 s      
+Arti   | Hyperspace Jump       | 15 s / 180  | 30% | 0.8 s | DOWN@4.4 | 4.4 s | DOWN@3.5 | 3.5 s
+Arti   | Ram Charge            | 8 s / 120   | 2% | 0.2 s  | DOWN@4.6 | 4.6 s | 84% | 2.3 s     
+Arti   | Strafe Dodge          | 4 s x2 / 45 | 4% | 0.5 s  | DOWN@5.0 | 5.0 s | 89% | 2.8 s     
+Arti   | Grapple (tile reel)   | 8 s / 90    | 12% | 0.5 s | DOWN@4.4 | 4.4 s | 98% | 2.8 s     
+Arti   | Overdrive             | 14 s / 60   | 15% | 0.6 s | DOWN@4.4 | 4.4 s | 89% | 2.7 s     
+
+Reference TTK (held weapon, 100% hits, target not regenerating) at 150 / 300 / 600 px, and how many perk uses fit inside it:
+kit            | attacker | vs Jugg (s)        | vs Arca (s)        | vs Arti (s)       
+---------------|----------|--------------------|--------------------|-------------------
+Hero Kits      | Jugg MD  | 3.62 / 5.02 / inf  | 1.52 / 2.22 / inf  | 2.10 / 3.03 / inf 
+Hero Kits      | Arca LZ  | 7.93 / 7.93 / 7.93 | 3.17 / 3.17 / 3.17 | 4.42 / 4.42 / 4.42
+Hero Kits      | Arti PH  | 8.43 / 8.43 / 8.43 | 2.33 / 2.33 / 2.33 | 3.63 / 3.63 / 3.63
+Arcade Kit     | Jugg MD  | 3.62 / 5.02 / inf  | 1.75 / 2.33 / inf  | 2.10 / 3.03 / inf 
+Arcade Kit     | Arca LZ  | 7.93 / 7.93 / 7.93 | 3.48 / 3.48 / 3.48 | 4.42 / 4.42 / 4.42
+Arcade Kit     | Arti PH  | 8.43 / 8.43 / 8.43 | 2.57 / 2.57 / 2.57 | 3.63 / 3.63 / 3.63
+Sortie Loadout | Jugg MD  | 3.62 / 5.02 / inf  | 1.75 / 2.33 / inf  | 2.10 / 3.03 / inf 
+Sortie Loadout | Arca LZ  | 7.93 / 7.93 / 7.93 | 3.48 / 3.48 / 3.48 | 4.42 / 4.42 / 4.42
+Sortie Loadout | Arti PH  | 8.43 / 8.43 / 8.43 | 2.57 / 2.57 / 2.57 | 3.63 / 3.63 / 3.63
+
+Engage: attacker boosts (+ perk on cooldown once within 1.6x its range) after a target cruising away from 800 px; seconds to first in-range | damage dealt in 6 s (share of target EHP):
+kit            | attacker | perk                | vs Jugg       | vs Arca       | vs Arti      
+---------------|----------|---------------------|---------------|---------------|--------------
+Hero Kits      | Jugg MD  | boost only          | 1.68 s | DOWN | 2.52 s | DOWN | 2.07 s | DOWN
+Hero Kits      | Jugg MD  | Ram Charge          | 0.60 s | DOWN | 0.80 s | DOWN | 0.70 s | DOWN
+Hero Kits      | Jugg MD  | Strafe Dodge        | 0.68 s | DOWN | 0.90 s | DOWN | 0.78 s | DOWN
+Hero Kits      | Jugg MD  | Overdrive           | 1.33 s | DOWN | 1.83 s | DOWN | 1.57 s | DOWN
+Hero Kits      | Jugg MD  | Hyperspace Jump     | 1.25 s | 91%  | 3.27 s | 20%  | 2.73 s | 79% 
+Hero Kits      | Arca LZ  | boost only          | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Hero Kits      | Arca LZ  | Warp                | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Hero Kits      | Arca LZ  | Strafe Dodge        | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Hero Kits      | Arca LZ  | Overdrive           | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Hero Kits      | Arca LZ  | Hyperspace Jump     | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Hero Kits      | Arti PH  | boost only          | 0.43 s | 83%  | 0.58 s | DOWN | 0.50 s | DOWN
+Hero Kits      | Arti PH  | Pulse Boost         | 0.35 s | 85%  | 0.40 s | DOWN | 0.37 s | DOWN
+Hero Kits      | Arti PH  | Strafe Dodge        | 0.13 s | 88%  | 0.15 s | DOWN | 0.15 s | DOWN
+Hero Kits      | Arti PH  | Overdrive           | 0.37 s | 85%  | 0.47 s | DOWN | 0.42 s | DOWN
+Hero Kits      | Arti PH  | Hyperspace Jump     | 0.90 s | 78%  | 0.90 s | DOWN | 0.90 s | DOWN
+Arcade Kit     | Jugg MD  | boost only          | 1.68 s | DOWN | 2.52 s | DOWN | 2.07 s | DOWN
+Arcade Kit     | Jugg MD  | Ram Charge          | 0.60 s | DOWN | 0.80 s | DOWN | 0.70 s | DOWN
+Arcade Kit     | Jugg MD  | Warp                | 0.35 s | DOWN | 0.53 s | DOWN | 0.43 s | DOWN
+Arcade Kit     | Jugg MD  | Strafe Dodge        | 0.70 s | DOWN | 0.93 s | DOWN | 0.82 s | DOWN
+Arcade Kit     | Jugg MD  | Overdrive           | 1.27 s | DOWN | 1.73 s | DOWN | 1.50 s | DOWN
+Arcade Kit     | Jugg MD  | Hyperspace Jump     | 1.10 s | DOWN | 1.28 s | 64%  | 1.18 s | DOWN
+Arcade Kit     | Arca LZ  | boost only          | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Arcade Kit     | Arca LZ  | Ram Charge          | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Arcade Kit     | Arca LZ  | Warp                | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Arcade Kit     | Arca LZ  | Strafe Dodge        | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Arcade Kit     | Arca LZ  | Overdrive           | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Arcade Kit     | Arca LZ  | Hyperspace Jump     | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Arcade Kit     | Arti PH  | boost only          | 0.43 s | 83%  | 0.58 s | DOWN | 0.50 s | DOWN
+Arcade Kit     | Arti PH  | Ram Charge          | 0.08 s | 88%  | 0.10 s | DOWN | 0.08 s | DOWN
+Arcade Kit     | Arti PH  | Warp                | 0.00 s | 88%  | 0.00 s | DOWN | 0.00 s | DOWN
+Arcade Kit     | Arti PH  | Strafe Dodge        | 0.12 s | 88%  | 0.13 s | DOWN | 0.12 s | DOWN
+Arcade Kit     | Arti PH  | Overdrive           | 0.37 s | 85%  | 0.45 s | DOWN | 0.40 s | DOWN
+Arcade Kit     | Arti PH  | Hyperspace Jump     | 0.75 s | 81%  | 0.75 s | DOWN | 0.75 s | DOWN
+Sortie Loadout | Jugg MD  | boost only          | 1.68 s | DOWN | 2.52 s | DOWN | 2.07 s | DOWN
+Sortie Loadout | Jugg MD  | Warp                | 0.35 s | DOWN | 0.53 s | DOWN | 0.43 s | DOWN
+Sortie Loadout | Jugg MD  | Hyperspace Jump     | 1.15 s | DOWN | 2.88 s | 36%  | 1.23 s | DOWN
+Sortie Loadout | Jugg MD  | Ram Charge          | 0.75 s | DOWN | 0.98 s | DOWN | 0.87 s | DOWN
+Sortie Loadout | Jugg MD  | Strafe Dodge        | 1.42 s | DOWN | 2.13 s | DOWN | 1.75 s | DOWN
+Sortie Loadout | Jugg MD  | Grapple (tile reel) | 1.37 s | DOWN | 2.05 s | DOWN | 1.68 s | DOWN
+Sortie Loadout | Jugg MD  | Overdrive           | 1.20 s | DOWN | 1.60 s | DOWN | 1.40 s | DOWN
+Sortie Loadout | Arca LZ  | boost only          | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Sortie Loadout | Arca LZ  | Warp                | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Sortie Loadout | Arca LZ  | Hyperspace Jump     | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Sortie Loadout | Arca LZ  | Ram Charge          | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Sortie Loadout | Arca LZ  | Strafe Dodge        | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Sortie Loadout | Arca LZ  | Grapple (tile reel) | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Sortie Loadout | Arca LZ  | Overdrive           | 0.00 s | 79%  | 0.00 s | DOWN | 0.00 s | DOWN
+Sortie Loadout | Arti PH  | boost only          | 0.43 s | 83%  | 0.58 s | DOWN | 0.50 s | DOWN
+Sortie Loadout | Arti PH  | Warp                | 0.00 s | 88%  | 0.00 s | DOWN | 0.00 s | DOWN
+Sortie Loadout | Arti PH  | Hyperspace Jump     | 0.80 s | 81%  | 0.80 s | DOWN | 0.80 s | DOWN
+Sortie Loadout | Arti PH  | Ram Charge          | 0.10 s | 88%  | 0.12 s | DOWN | 0.12 s | DOWN
+Sortie Loadout | Arti PH  | Strafe Dodge        | 0.17 s | 85%  | 0.18 s | DOWN | 0.18 s | DOWN
+Sortie Loadout | Arti PH  | Grapple (tile reel) | 0.22 s | 85%  | 0.27 s | DOWN | 0.23 s | DOWN
+Sortie Loadout | Arti PH  | Overdrive           | 0.35 s | 85%  | 0.43 s | DOWN | 0.38 s | DOWN
+
+Perk budget per cooldown second (1st-second displacement over plain boost, i-frame seconds, damage-taken reduction):
+kit            | perk                | class | cooldown | displacement | per cd-second | i-frames/use | i-frame uptime | damage taken   
+---------------|---------------------|-------|----------|--------------|---------------|--------------|----------------|----------------
+Hero Kits      | Ram Charge          | Jugg  | 6 s      | 375 px       | 62 px/s       | 0.00 s       | 0%             | x0.4 for 0.35 s
+Hero Kits      | Warp                | Arca  | 5 s      | 480 px       | 96 px/s       | 0.30 s       | 6%             | -              
+Hero Kits      | Pulse Boost         | Arti  | 9 s      | 210 px       | 23 px/s       | 0.00 s       | 0%             | -              
+Hero Kits      | Strafe Dodge        | Jugg  | 4 s x2   | 247 px       | 62 px/s       | 0.00 s       | 0%             | -              
+Hero Kits      | Strafe Dodge        | Arca  | 4 s x2   | 247 px       | 62 px/s       | 0.00 s       | 0%             | -              
+Hero Kits      | Strafe Dodge        | Arti  | 4 s x2   | 247 px       | 62 px/s       | 0.00 s       | 0%             | -              
+Hero Kits      | Overdrive           | Jugg  | 16 s     | 77 px        | 5 px/s        | 0.00 s       | 0%             | -              
+Hero Kits      | Overdrive           | Arca  | 16 s     | 91 px        | 6 px/s        | 0.00 s       | 0%             | -              
+Hero Kits      | Overdrive           | Arti  | 16 s     | 84 px        | 5 px/s        | 0.00 s       | 0%             | -              
+Hero Kits      | Hyperspace Jump     | Jugg  | 22 s     | 1070 px      | 49 px/s       | 0.25 s       | 1%             | -              
+Hero Kits      | Hyperspace Jump     | Arca  | 22 s     | 1026 px      | 47 px/s       | 0.25 s       | 1%             | -              
+Hero Kits      | Hyperspace Jump     | Arti  | 22 s     | 1048 px      | 48 px/s       | 0.25 s       | 1%             | -              
+Arcade Kit     | Ram Charge          | Jugg  | 6 s      | 375 px       | 62 px/s       | 0.00 s       | 0%             | x0.4 for 0.35 s
+Arcade Kit     | Ram Charge          | Arca  | 6 s      | 350 px       | 58 px/s       | 0.00 s       | 0%             | x0.4 for 0.35 s
+Arcade Kit     | Ram Charge          | Arti  | 6 s      | 361 px       | 60 px/s       | 0.00 s       | 0%             | x0.4 for 0.35 s
+Arcade Kit     | Warp                | Jugg  | 6 s      | 380 px       | 63 px/s       | 0.30 s       | 5%             | -              
+Arcade Kit     | Warp                | Arca  | 5 s      | 480 px       | 96 px/s       | 0.30 s       | 6%             | -              
+Arcade Kit     | Warp                | Arti  | 6 s      | 430 px       | 72 px/s       | 0.30 s       | 5%             | -              
+Arcade Kit     | Strafe Dodge        | Jugg  | 3 s      | 150 px       | 50 px/s       | 0.00 s       | 0%             | x0.5 for 0.25 s
+Arcade Kit     | Strafe Dodge        | Arca  | 3 s      | 220 px       | 73 px/s       | 0.00 s       | 0%             | x0.5 for 0.25 s
+Arcade Kit     | Strafe Dodge        | Arti  | 3 s      | 190 px       | 63 px/s       | 0.00 s       | 0%             | x0.5 for 0.25 s
+Arcade Kit     | Overdrive           | Jugg  | 14 s     | 96 px        | 7 px/s        | 0.00 s       | 0%             | -              
+Arcade Kit     | Overdrive           | Arca  | 14 s     | 114 px       | 8 px/s        | 0.00 s       | 0%             | -              
+Arcade Kit     | Overdrive           | Arti  | 14 s     | 105 px       | 7 px/s        | 0.00 s       | 0%             | -              
+Arcade Kit     | Hyperspace Jump     | Jugg  | 22 s     | 920 px       | 42 px/s       | 0.50 s       | 2%             | -              
+Arcade Kit     | Hyperspace Jump     | Arca  | 22 s     | 830 px       | 38 px/s       | 0.50 s       | 2%             | -              
+Arcade Kit     | Hyperspace Jump     | Arti  | 22 s     | 875 px       | 40 px/s       | 0.50 s       | 2%             | -              
+Sortie Loadout | Warp                | Jugg  | 7 s      | 360 px       | 51 px/s       | 0.30 s       | 4%             | -              
+Sortie Loadout | Warp                | Arca  | 7 s      | 480 px       | 69 px/s       | 0.30 s       | 4%             | -              
+Sortie Loadout | Warp                | Arti  | 7 s      | 420 px       | 60 px/s       | 0.30 s       | 4%             | -              
+Sortie Loadout | Hyperspace Jump     | Jugg  | 15 s     | 313 px       | 21 px/s       | 0.00 s       | 0%             | -              
+Sortie Loadout | Hyperspace Jump     | Arca  | 15 s     | 492 px       | 33 px/s       | 0.00 s       | 0%             | -              
+Sortie Loadout | Hyperspace Jump     | Arti  | 15 s     | 403 px       | 27 px/s       | 0.00 s       | 0%             | -              
+Sortie Loadout | Ram Charge          | Jugg  | 8 s      | 243 px       | 30 px/s       | 0.00 s       | 0%             | x0.4 for 0.35 s
+Sortie Loadout | Ram Charge          | Arca  | 8 s      | 350 px       | 44 px/s       | 0.00 s       | 0%             | x0.4 for 0.35 s
+Sortie Loadout | Ram Charge          | Arti  | 8 s      | 295 px       | 37 px/s       | 0.00 s       | 0%             | x0.4 for 0.35 s
+Sortie Loadout | Strafe Dodge        | Jugg  | 4 s x2   | 78 px        | 19 px/s       | 0.36 s       | 9%             | -              
+Sortie Loadout | Strafe Dodge        | Arca  | 4 s x2   | 117 px       | 29 px/s       | 0.36 s       | 9%             | -              
+Sortie Loadout | Strafe Dodge        | Arti  | 4 s x2   | 97 px        | 24 px/s       | 0.36 s       | 9%             | -              
+Sortie Loadout | Grapple (tile reel) | Jugg  | 8 s      | 179 px       | 22 px/s       | 0.00 s       | 0%             | -              
+Sortie Loadout | Grapple (tile reel) | Arca  | 8 s      | 280 px       | 35 px/s       | 0.00 s       | 0%             | -              
+Sortie Loadout | Grapple (tile reel) | Arti  | 8 s      | 227 px       | 28 px/s       | 0.00 s       | 0%             | -              
+Sortie Loadout | Overdrive           | Jugg  | 14 s     | 128 px       | 9 px/s        | 0.00 s       | 0%             | -              
+Sortie Loadout | Overdrive           | Arca  | 14 s     | 152 px       | 11 px/s       | 0.00 s       | 0%             | -              
+Sortie Loadout | Overdrive           | Arti  | 14 s     | 140 px       | 10 px/s       | 0.00 s       | 0%             | -              
+
+Escape ranking (mean EHP share taken in the 8 s chase over the three pursuers; lower = better escape; DOWN = 100%):
+kit            | target | perks ranked (mean EHP taken)                                                                                              
+---------------|--------|----------------------------------------------------------------------------------------------------------------------------
+Hero Kits      | Jugg   | Strafe Dodge 48% < Ram Charge 58% < Hyperspace Jump 67% < Overdrive 70% < baseline 77%                                     
+Hero Kits      | Arca   | Strafe Dodge 22% < Warp 33% < Hyperspace Jump 54% < Overdrive 73% < baseline 74%                                           
+Hero Kits      | Arti   | Strafe Dodge 17% < Hyperspace Jump 59% < Pulse Boost 64% < Overdrive 73% < baseline 76%                                    
+Arcade Kit     | Jugg   | Ram Charge 58% < Warp 63% < Overdrive 65% < Hyperspace Jump 65% < Strafe Dodge 67% < baseline 77%                          
+Arcade Kit     | Arca   | Warp 33% < Ram Charge 35% < Hyperspace Jump 43% < Strafe Dodge 46% < Overdrive 61% < baseline 71%                          
+Arcade Kit     | Arti   | Warp 33% < Ram Charge 38% < Hyperspace Jump 55% < Strafe Dodge 58% < Overdrive 61% < baseline 76%                          
+Sortie Loadout | Jugg   | Warp 63% < Overdrive 64% < Ram Charge 67% < Strafe Dodge 71% < Hyperspace Jump 74% < Grapple (tile reel) 75% < baseline 77%
+Sortie Loadout | Arca   | Warp 33% < Overdrive 36% < Ram Charge 49% < Strafe Dodge 56% < Grapple (tile reel) 63% < baseline 71% < Hyperspace Jump 78%
+Sortie Loadout | Arti   | Warp 33% < Ram Charge 62% < Strafe Dodge 64% < Overdrive 68% < Grapple (tile reel) 70% < baseline 76% < Hyperspace Jump 77%
+
+Note: a pursuer that fires while boosting is L2 (x0.9 speed). Jugg MD vs fleeing Arcanist, no perk: 26% EHP in 8 s, 0.8 s in range.

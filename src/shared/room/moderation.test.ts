@@ -19,13 +19,20 @@ vi.mock('../moderation/filter', () => ({
     if (/threatword/i.test(text)) return { text: '', action: 'block', hits: [{ term: 'threatword', tier: 'block', category: 'threat' }] };
     if (/badword/i.test(text)) return { text: '', action: 'block', hits: ['test:block'] };
     if (/darn/i.test(text)) return { text: text.replace(/darn/gi, '****'), action: 'mask', hits: ['test:mask'] };
+    // a host's review-only custom term: shown as typed, reported with tier 'flag'
+    if (/zorblax/i.test(text)) return { text, action: 'flag', hits: [{ term: 'zorblax', tier: 'flag', category: 'crew', source: 'custom' }] };
     return { text, action: 'pass', hits: [] };
   },
-  // 'badword' in a name is a block-tier hit (a strike); 'darn' only profanity (refused, logged, but no strike)
+  // 'badword' in a name is a block-tier hit (a strike); 'darn' only profanity (refused, logged, but no strike);
+  // 'zorblax' a review-only custom term (allowed, logged as 'flag')
   checkName: (name: string) => (/badword/i.test(name)
     ? { ok: false, reason: 'test:name', hits: [{ term: 'badword', tier: 'block', category: 'slur' }] }
+    // a custom mask term refuses the name; a review-only term in the same name is reported next to it
+    : /quenth/i.test(name) ? { ok: false, reason: 'test:name', hits: [{ term: 'quenth', tier: 'mask', category: 'crew', source: 'custom' },
+      ...(/zorblax/i.test(name) ? [{ term: 'zorblax', tier: 'flag', category: 'watch', source: 'custom' }] : [])] }
     : /darn/i.test(name) ? { ok: false, reason: 'test:name', hits: [{ term: 'darn', tier: 'mask', category: 'profanity' }] }
-      : { ok: true }),
+      : /zorblax/i.test(name) ? { ok: true, action: 'flag', hits: [{ term: 'zorblax', tier: 'flag', category: 'crew', source: 'custom' }] }
+        : { ok: true }),
   // Third identical line within the recent window is spam.
   isSpam: (recent: { text: string; time: number }[], text: string) => recent.filter((r) => r.text === text).length >= 2,
   tameText: (text: string) => text.replace(/!{4,}/g, '!!!'),
@@ -268,6 +275,62 @@ describe('moderation hook', () => {
     chat(d, '/name Darnell');
     expect(d.systemTexts()).toContain(MSG_NAME_REFUSED);
     expect(h.strikes.length).toBe(before);
+  });
+
+  it("review-only 'flag' hits: the line / name is allowed and shown unchanged, logged as 'flag', never a strike", () => {
+    const h = fakeHook();
+    const zone = mkZone({ hook: h });
+    const a = join(zone, 'Ace');
+    const b = join(zone, 'Bee');
+    chat(a, 'meet at zorblax');
+    expect(b.said('meet at zorblax')).toBe(true);
+    expect(a.systemTexts()).not.toContain(MSG_BLOCKED);
+    expect(h.entries.at(-1)).toMatchObject({ channel: 'all', original: 'meet at zorblax', shown: 'meet at zorblax', action: 'flag', hits: ['flag:crew:zorblax'] });
+    // callsign at hello: kept, logged on the 'name' channel for review
+    const g = join(zone, 'Zorblax_Ace');
+    expect(g.name).toBe('Zorblax_Ace');
+    expect(g.systemTexts().some((t) => t.includes("isn't allowed"))).toBe(false);
+    expect(h.entries.at(-1)).toMatchObject({ channel: 'name', original: 'Zorblax_Ace', shown: 'Zorblax_Ace', action: 'flag', hits: ['flag:crew:zorblax'] });
+    // /name and room names too
+    chat(b, '/name BeeZorblax');
+    expect(b.name).toBe('BeeZorblax');
+    expect(h.entries.at(-1)).toMatchObject({ channel: 'name', original: 'BeeZorblax', action: 'flag' });
+    b.send({ type: 'createRoom', settings: { name: 'Zorblax Den', botFill: 0 } });
+    expect(b.last('roomState').settings.name).toBe('Zorblax Den');
+    expect(h.entries.at(-1)).toMatchObject({ channel: 'room', original: 'Zorblax Den', shown: 'Zorblax Den', action: 'flag' });
+    expect(h.strikes).toEqual([]);
+    // a refused name logs one label per hit, so a review-only hit next to the refusing one is found by the review filter
+    chat(b, '/name QuenthZorblax');
+    expect(b.name).toBe('BeeZorblax');
+    expect(h.entries.at(-1)).toMatchObject({ channel: 'name', original: 'QuenthZorblax', action: 'block', hits: ['custom:crew:quenth', 'flag:watch:zorblax'] });
+    // offline (no hook): simply allowed
+    const off = mkZone({ local: true });
+    const o = join(off, 'Zorblax');
+    expect(o.name).toBe('Zorblax');
+    chat(o, 'zorblax zorblax');
+    expect(o.said('zorblax zorblax')).toBe(true);
+  });
+
+  it("an account username the CURRENT lists match is logged for review ('flag') on join: kept, never renamed, never a strike", () => {
+    const h = fakeHook();
+    const zone = mkZone({ hook: h });
+    // a review-only custom term (registration never refuses it)
+    const a = join(zone, 'ignored', acct('Zorblax_Ace'));
+    expect(a.name).toBe('Zorblax_Ace');
+    expect(h.entries.at(-1)).toMatchObject({ channel: 'name', original: 'Zorblax_Ace', shown: 'Zorblax_Ace', action: 'flag', accountId: 'acc-Zorblax_Ace', hits: ['flag:crew:zorblax'] });
+    // a term the host added after the account was registered: the account keeps its name, a moderator gets the log line
+    const b = join(zone, 'ignored', acct('Darnell'));
+    expect(b.name).toBe('Darnell');
+    expect(b.systemTexts().some((t) => t.includes("isn't allowed"))).toBe(false);
+    expect(h.entries.at(-1)).toMatchObject({ channel: 'name', original: 'Darnell', action: 'flag', accountId: 'acc-Darnell', hits: ['profanity:darn'] });
+    const c = join(zone, 'ignored', acct('badwordy'));
+    expect(c.name).toBe('badwordy');
+    expect(h.entries.at(-1)).toMatchObject({ original: 'badwordy', action: 'flag', hits: ['slur:badword'] });
+    expect(h.strikes).toEqual([]);
+    // a clean account username logs nothing
+    const before = h.entries.length;
+    join(zone, 'ignored', acct('Cleanname'));
+    expect(h.entries.length).toBe(before);
   });
 
   it('withheld lines (muted / repeat flood) are still read: hits logged, self-harm and threats alert the moderators, no strike', () => {

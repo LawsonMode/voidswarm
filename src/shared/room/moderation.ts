@@ -15,6 +15,11 @@ import type { PlayerId } from '../types';
 export type ChatAction =
   /** shown as typed */
   | 'pass'
+  /**
+   * shown as typed (a name: allowed), but a host's review-only custom term matched: logged for a moderator to look
+   * at (hits "flag:<category>:<term>"), with no strike and no mute
+   */
+  | 'flag'
   /** shown with the offending words starred out */
   | 'mask'
   /** not shown: language (the sender gets a private notice and a strike) */
@@ -26,7 +31,8 @@ export type ChatAction =
 
 /**
  * Log channel: the chat channel of a line, or 'name' / 'room' for a refused callsign / room name attempt
- * (original = the attempted name, shown = '').
+ * (original = the attempted name, shown = '') — or an ALLOWED one that a review-only custom term flagged
+ * (action 'flag', shown = the name).
  */
 export type LogChannel = 'all' | 'team' | 'name' | 'room';
 
@@ -138,11 +144,25 @@ export const SPAM_RECENT_MAX = 8;
 /** ...and for how long (ms). */
 export const SPAM_RECENT_MS = 60_000;
 
-/** One filter hit as a log label: "category:term" (a plain string hit is kept as is). */
+/** Log-label prefix of a host custom term's block / mask hit: "custom:<category>:<term>". */
+export const CUSTOM_HIT_PREFIX = 'custom:';
+/** Log-label prefix of a review-only ('flag') hit: "flag:<category>:<term>" (custom terms only). */
+export const FLAG_HIT_PREFIX = 'flag:';
+
+/**
+ * One filter hit as a log label: "category:term" for the built-in lists; "custom:category:term" for a host custom
+ * term's block / mask hit and "flag:category:term" for a review-only hit (FilterHit.source === 'custom'). Built-in
+ * categories are never 'custom' or 'flag', so the first segment tells the three apart. A plain string hit is kept
+ * as is.
+ */
 export function hitLabel(h: unknown): string {
   if (h && typeof h === 'object') {
-    const o = h as { category?: unknown; term?: unknown };
-    if (typeof o.term === 'string') return typeof o.category === 'string' ? `${o.category}:${o.term}` : o.term;
+    const o = h as { category?: unknown; term?: unknown; source?: unknown; tier?: unknown };
+    if (typeof o.term === 'string') {
+      const base = typeof o.category === 'string' ? `${o.category}:${o.term}` : o.term;
+      if (o.tier === 'flag') return `${FLAG_HIT_PREFIX}${base}`;
+      return o.source === 'custom' ? `${CUSTOM_HIT_PREFIX}${base}` : base;
+    }
   }
   return String(h);
 }

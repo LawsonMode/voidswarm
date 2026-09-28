@@ -1,0 +1,44 @@
+[
+ {
+  "kit": "hero",
+  "sev": "MED",
+  "what": "Polarize sustain alone is power-positive",
+  "detail": "L1 sustain (no gun): 280 regen - 40 thrust - 200 = +40/s (+80 parked), so it never ends off-fire; under sustained fire the free shield regen (170/s x 0.6 power) makes it -62/s -> 16.1 s of 0.5 hardening, kamikaze-proof shell and shield regen while tanking. The judge's 140 -> 200 fix only bites while shooting; count the sustain as 2 load or 260/s."
+ },
+ {
+  "kit": "hero",
+  "sev": "MED",
+  "what": "Permanent Gravity Well",
+  "detail": "Void path (cd 6.5 s) + voi_horizon (+2 s) + Flux Core 4: 1.2 wells alive on average (100% uptime) - a standing 280-360 px pull zone; cap wells at 1 alive or make Deep Well +1 s."
+ },
+ {
+  "kit": "arcade",
+  "sev": "MED",
+  "what": "Polarize sustain alone is power-positive",
+  "detail": "L1 sustain (no gun): 280 regen - 40 thrust - 200 = +40/s (+80 parked), so it never ends off-fire; under sustained fire the free shield regen (170/s x 0.6 power) makes it -62/s -> 16.1 s of 0.5 hardening, kamikaze-proof shell and shield regen while tanking. The judge's 140 -> 200 fix only bites while shooting; count the sustain as 2 load or 260/s."
+ },
+ {
+  "kit": "arcade",
+  "sev": "MED",
+  "what": "Permanent Gravity Well",
+  "detail": "Void path (cd 6.5 s) + voi_horizon (+2 s) + Flux Core 4: 1.2 wells alive on average (100% uptime) - a standing 280-360 px pull zone; cap wells at 1 alive or make Deep Well +1 s."
+ },
+ {
+  "kit": "sortie",
+  "sev": "MED",
+  "what": "Polarize sustain alone is power-positive",
+  "detail": "L1 sustain (no gun): 280 regen - 40 thrust - 200 = +40/s (+80 parked), so it never ends off-fire; under sustained fire the free shield regen (170/s x 0.6 power) makes it -62/s -> 16.1 s of 0.5 hardening, kamikaze-proof shell and shield regen while tanking. The judge's 140 -> 200 fix only bites while shooting; count the sustain as 2 load or 260/s."
+ },
+ {
+  "kit": "sortie",
+  "sev": "MED",
+  "what": "Permanent Gravity Well",
+  "detail": "Void path (cd 6.5 s) + voi_horizon (+2 s) + Flux Core 4: 1.2 wells alive on average (100% uptime) - a standing 280-360 px pull zone; cap wells at 1 alive or make Deep Well +1 s."
+ },
+ {
+  "kit": "arcade",
+  "sev": "MED",
+  "what": "Permanent Shield Wall (Architect)",
+  "detail": "2 charges at 7 s each + Flux Core 4 -> 1.3 walls standing on average (100% of the time at least one 2400-hp wall, Reinforced ones reflect lasers). Hero/Sortie walls sit at 57% / 50% base."
+ }
+]

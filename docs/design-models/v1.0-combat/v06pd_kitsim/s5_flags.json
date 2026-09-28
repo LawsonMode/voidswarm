@@ -1,0 +1,56 @@
+[
+ {
+  "kit": "hero",
+  "sev": "LOW",
+  "what": "Warp is a total escape from MD/Phaser pursuers",
+  "detail": "the Arcanist takes 0% from a chasing Jugg MD or Arti Phaser after one Warp (cd 5 s < every MD/Phaser TTK); only Lasers (1265 px) punish it. Intended class identity, but combine with the shield-delay trim and the loop is: Warp, stop boosting, full shield in ~2.2 s."
+ },
+ {
+  "kit": "hero",
+  "sev": "MED",
+  "what": "Strafe Dodge dominates Arti's signature Pulse Boost as an escape",
+  "detail": "mean EHP taken in the 8 s chase 17% vs 64% and no worse against any pursuer: the \"sidegrade\" is a strict escape upgrade on this hull (the signature keeps only its damage/heal)."
+ },
+ {
+  "kit": "arcade",
+  "sev": "LOW",
+  "what": "Warp is a total escape from MD/Phaser pursuers",
+  "detail": "the Arcanist takes 0% from a chasing Jugg MD or Arti Phaser after one Warp (cd 5 s < every MD/Phaser TTK); only Lasers (1265 px) punish it. Intended class identity, but combine with the shield-delay trim and the loop is: Warp, stop boosting, full shield in ~2.2 s."
+ },
+ {
+  "kit": "arcade",
+  "sev": "MED",
+  "what": "Ram Charge dominates Arti's signature Overdrive as an escape",
+  "detail": "mean EHP taken in the 8 s chase 38% vs 61% and no worse against any pursuer: the \"sidegrade\" is a strict escape upgrade on this hull (the signature keeps only its damage/heal)."
+ },
+ {
+  "kit": "arcade",
+  "sev": "MED",
+  "what": "Warp dominates Arti's signature Overdrive as an escape",
+  "detail": "mean EHP taken in the 8 s chase 33% vs 61% and no worse against any pursuer: the \"sidegrade\" is a strict escape upgrade on this hull (the signature keeps only its damage/heal)."
+ },
+ {
+  "kit": "sortie",
+  "sev": "LOW",
+  "what": "Warp is a total escape from MD/Phaser pursuers",
+  "detail": "the Arcanist takes 0% from a chasing Jugg MD or Arti Phaser after one Warp (cd 7 s < every MD/Phaser TTK); only Lasers (1265 px) punish it. Intended class identity, but combine with the shield-delay trim and the loop is: Warp, stop boosting, full shield in ~2.2 s."
+ },
+ {
+  "kit": "sortie",
+  "sev": "MED",
+  "what": "Warp dominates Arti's signature Grapple (tile reel) as an escape",
+  "detail": "mean EHP taken in the 8 s chase 33% vs 70% and no worse against any pursuer: the \"sidegrade\" is a strict escape upgrade on this hull (the signature keeps only its damage/heal)."
+ },
+ {
+  "kit": "arcade",
+  "sev": "LOW",
+  "what": "Warp cycles inside a Laser TTK (Jugg)",
+  "detail": "effective cd 6.0 s vs Laser TTK 7.9 s at 600 px: 1.3 i-frame uses per duel."
+ },
+ {
+  "kit": "sortie",
+  "sev": "LOW",
+  "what": "Strafe Dodge cycles inside a Laser TTK (Jugg)",
+  "detail": "effective cd 4.0 s vs Laser TTK 7.9 s at 600 px: 2.0 i-frame uses per duel."
+ }
+]

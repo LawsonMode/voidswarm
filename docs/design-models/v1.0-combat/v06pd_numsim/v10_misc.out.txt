@@ -1,0 +1,16 @@
+=== U. In-combat sustain: max drone-hit rate (110 kinetic) with zero net shield loss, holding LMB+RMB (strain 2, not calm) ===
+  Jugg: one hit per 3.71 s (0.27 hits/s) firing; calm 0.36 hits/s.  v0.4 energy model: 230/110 = 2.1 hits/s → ×8 less forgiving
+  Arca: one hit per 2.25 s (0.44 hits/s) firing; calm 0.60 hits/s.  v0.4 energy model: 290/110 = 2.6 hits/s → ×6 less forgiving
+  Arti: one hit per 2.96 s (0.34 hits/s) firing; calm 0.45 hits/s.  v0.4 energy model: 260/110 = 2.4 hits/s → ×7 less forgiving
+
+=== V. Capital turret power ===
+  Spire with 1 Laser Lance(s): host drain 90/s vs regen 242/s → sustainable
+  Spire with 2 Laser Lance(s): host drain 270/s vs regen 264/s → full resonance for 46.0 s from full, then flickers at the 20% floor at 93% duty (no resume hysteresis in spec)
+  Spire with 3 Laser Lance(s): host drain 608/s vs regen 286/s → full resonance for 2.7 s from full, then flickers at the 20% floor at 45% duty (no resume hysteresis in spec)
+  Docked Juggernaut Brace 160/s vs its own regen 170×1.5 = 255 (Clamp 382) → infinite. Docked Artificer Hull Weld 150/s vs 280×1.5 = 420 (Clamp 630) → infinite, 140 hull/s to host forever.
+
+=== W. Spec arithmetic spot-checks ===
+  §6.2 "Juggernaut falls in about 3.9 s" to Lance+Focus Laser 718 dps: 2150 EHP / 718 = 3.0 s (sim 3.0 s). 3.9 s is 2150/552 (no Lance Focus talent).
+  §2 pipeline: "If sDmg ≤ shield: shield −= sDmg" → a hit that EXACTLY empties the shield leaves shield 0 with no SHIELD BREAK (no event, no break delay, no Polarize drop). Use "<".
+  §4.2/§4.5 "Brownout entered when power reaches 0": no rule for a skill whose cost exceeds current power (fail vs partial pay) → specify "needs power ≥ cost".
+  §3 calm = LMB and RMB unheld: holding Space (Repair Ray / Siphon channel) keeps you "calm" → a channeling Artificer regenerates shield ×1.75 while healing.

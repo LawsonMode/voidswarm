@@ -19,9 +19,13 @@
 //     such as "45s" / "900k" is not leet; across a boundary a leet digit must read as a letter — see
 //     digitsReadAsLetters), then the allowlist (a third trie; a hit inside an allowlisted word such as "Scunthorpe"
 //     is dropped).
+//
+// The same walk runs over a second, host-supplied MatchSet: the runtime custom terms (custom.ts), which are
+// compiled into their own trie so they can only ADD hits — the built-in lists are scanned exactly as before.
+// Digits are not letters to the word matcher: number codes are matched on whole digit runs (digitRuns).
 import { nameKey } from '../room/util';
 import {
-  ALLOW_WORDS, COMMON_SHORT_WORDS, NAME_ONLY_GROUPS, SUFFIXES, TERM_GROUPS, rot13,
+  ALLOW_WORDS, COMMON_SHORT_WORDS, NAME_ONLY_GROUPS, NUMERIC_TERMS, SUFFIXES, TERM_GROUPS, rot13, rot5,
   type Category, type MatchMode, type TermGroup, type Tier,
 } from './lists';
 
@@ -403,7 +407,7 @@ export function buildStream(text: string): Stream {
 // Tries
 // ---------------------------------------------------------------------------------------------------------------
 
-class Trie {
+export class Trie {
   /** child[node * 26 + letter] (0 = none; the root is never a child) */
   readonly child: Int32Array;
   /** the letter on the edge into node */
@@ -461,6 +465,14 @@ const allowB = new Int32Array(MAX_STATES);
 let stamp = new Int32Array(0);
 let gen = 0;
 
+/** Make the shared stamp buffer big enough for a trie of `size` nodes (2 states per node). Never shrinks. */
+export function ensureStamp(size: number): void {
+  const need = 2 * (size + 1);
+  if (stamp.length >= need) return;
+  stamp = new Int32Array(need);
+  gen = 0;
+}
+
 /**
  * One NFA step: states cur[0..count) consume a position with candidate mask m. Writes the next states into nxt
  * and returns their count. A state is node * 2 + absorbed: besides following a child edge, a state may absorb
@@ -501,74 +513,181 @@ const MAX_WILD_PER_MATCH = 2;
 // Compiled lists
 // ---------------------------------------------------------------------------------------------------------------
 
+/** A term's tier inside the engine: the list tiers plus 'flag' (custom terms only: allowed, logged for review). */
+export type EngineTier = Tier | 'flag';
+/** Where a term comes from: the built-in lists (lists.ts) or the host's runtime custom terms (custom.ts). */
+export type TermSource = 'builtin' | 'custom';
+
 export interface TermInfo {
-  /** position in the compiled list (list order: the plain spelling comes before its variants) */
+  /** position in the compiled list (list order: the plain spelling comes before its variants); custom: 1e6 + canonical position */
   readonly rank: number;
   /** canonical spelling (decoded; phrases keep their spaces) */
   readonly term: string;
   /** letters only */
   readonly key: string;
-  readonly tier: Tier;
-  readonly category: Category;
+  readonly tier: EngineTier;
+  /** a lists.ts Category for built-ins; the host's (sanitized) label for custom terms */
+  readonly category: string;
   readonly mode: MatchMode;
+  /** names only (never chat): the built-in NAME_ONLY_GROUPS, custom scope 'names' */
   readonly nameOnly: boolean;
+  /** applies to chat lines */
+  readonly chat: boolean;
+  /** applies to names (callsigns, usernames, room names, bot names) */
+  readonly names: boolean;
+  readonly source: TermSource;
+  /** custom: the host's id for the entry (null when none was given); built-ins: null */
+  readonly id: string | null;
+  /** custom: anchor ids of which at least one must match in the same line / name (null = not gated) */
+  readonly anchors: readonly number[] | null;
+  /** >= 0: this entry is a context ANCHOR with that id (it marks presence, it is never a hit); -1 = a term */
+  readonly anchorId: number;
+  /** built-ins: where the entry is listed ("TERM_GROUPS[3] #5"), for diagnostics — never the term itself */
+  readonly origin: string;
+}
+
+/**
+ * One compile diagnostic. Never contains a built-in term: built-in entries are named by list position, custom
+ * entries by their input index / id.
+ */
+export interface CompileDiagnostic {
+  code:
+    /** two built-in entries have the same letters (merged: strictest tier, scopes merged) */
+    | 'builtin-collision'
+    /** a custom entry has the same letters (or digits) as a built-in entry: the built-in rule stays in force */
+    | 'custom-builtin-collision'
+    /** several custom entries normalize to the same term: on a line, the strictest one that applies wins */
+    | 'duplicate-term'
+    /** a custom term occurs inside allowlisted clean words: matches inside those words are ignored */
+    | 'inside-allow-word'
+    /** a custom entry's anchor is part of its own term, so it is always present when the term is */
+    | 'anchor-inside-term';
+  message: string;
+  /** custom: input indices of the entries involved */
+  entries?: number[];
+  /** custom: their ids (when given) */
+  ids?: string[];
+}
+
+/**
+ * Terms compiled for the NFA walk: a trie over distinct letter keys, and per key the entries spelled with those
+ * letters (built-ins: exactly one, after the explicit merge; custom: every entry and anchor with that key).
+ */
+export interface MatchSet {
+  readonly trie: Trie;
+  readonly keyTerms: readonly (readonly TermInfo[])[];
+  readonly maxWalk: number;
+}
+
+/** Build a MatchSet over distinct `keys` (keyTerms[i] = the entries of keys[i]). */
+export function buildMatchSet(keys: readonly string[], keyTerms: readonly (readonly TermInfo[])[]): MatchSet {
+  const trie = new Trie(keys);
+  ensureStamp(trie.size);
+  return { trie, keyTerms, maxWalk: trie.maxLen * 2 + 2 };
 }
 
 interface Compiled {
   terms: TermInfo[];
   trie: Trie;
+  /** the built-in terms as a MatchSet (same trie) */
+  set: MatchSet;
+  /** built-in terms by letter key */
+  byKey: ReadonlyMap<string, TermInfo>;
+  /** explicit collisions found while merging the built-in lists (none expected; see filter.test.ts) */
+  diagnostics: CompileDiagnostic[];
   allow: Trie;
   /** per allow word: may it span a space? */
   allowPhrase: boolean[];
+  /** the allowlist keys (letters only), in allow-trie order */
+  allowKeys: string[];
   suffix: Trie;
   common: Set<string>;
   maxWalk: number;
 }
 
-const TIER_RANK: Readonly<Record<Tier, number>> = { mild: 0, mask: 1, block: 2 };
-const lettersOnly = (s: string): string => s.toLowerCase().replace(/[^a-z]/g, '');
+const TIER_RANK: Readonly<Record<EngineTier, number>> = { flag: -1, mild: 0, mask: 1, block: 2 };
+export const lettersOnly = (s: string): string => s.toLowerCase().replace(/[^a-z]/g, '');
 
 let COMPILED: Compiled | null = null;
 
-function compile(): Compiled {
+/** One part of the built-in lists: its groups, a label for diagnostics, and whether it is names-only. */
+export interface ListPart { label: string; groups: readonly TermGroup[]; nameOnly: boolean }
+
+/**
+ * Merge list parts into one entry per letter key, explicitly and deterministically. When two entries share a key
+ * (a collision): the STRICTEST tier wins, and with it that entry's spelling, category and mode (on a tie, the
+ * entry listed first); the scopes are MERGED (a chat + names entry and a names-only entry give a chat + names
+ * term — a names-only duplicate never takes a term out of chat); and the collision is reported in `diagnostics`
+ * (by list position, never by term).
+ */
+export function mergeTermGroups(parts: readonly ListPart[]): { terms: TermInfo[]; diagnostics: CompileDiagnostic[] } {
   const byKey = new Map<string, TermInfo>();
-  const add = (groups: readonly TermGroup[], nameOnly: boolean): void => {
-    for (const g of groups) {
-      for (const enc of g.terms) {
+  const diagnostics: CompileDiagnostic[] = [];
+  for (const part of parts) {
+    part.groups.forEach((g, gi) => {
+      g.terms.forEach((enc, ti) => {
         const term = rot13(enc).toLowerCase().trim().replace(/\s+/g, ' ');
         const key = lettersOnly(term);
-        if (!key) continue;
+        if (!key) return;
+        const origin = `${part.label}[${gi}] #${ti}`;
+        const cur: TermInfo = {
+          rank: byKey.size, term, key, tier: g.tier, category: g.category, mode: g.mode, nameOnly: part.nameOnly,
+          chat: !part.nameOnly, names: true, source: 'builtin', id: null, anchors: null, anchorId: -1, origin,
+        };
         const prev = byKey.get(key);
-        if (prev && TIER_RANK[prev.tier] >= TIER_RANK[g.tier]) continue;
-        byKey.set(key, { rank: prev?.rank ?? byKey.size, term, key, tier: g.tier, category: g.category, mode: g.mode, nameOnly });
-      }
-    }
-  };
-  add(TERM_GROUPS, false);
-  add(NAME_ONLY_GROUPS, true);
-  const terms = [...byKey.values()];
-  const trie = new Trie(terms.map((t) => t.key));
+        if (!prev) { byKey.set(key, cur); return; }
+        const win = TIER_RANK[cur.tier] > TIER_RANK[prev.tier] ? cur : prev;
+        const lose = win === cur ? prev : cur;
+        const chat = prev.chat || cur.chat;
+        byKey.set(key, { ...win, rank: prev.rank, chat, nameOnly: !chat, origin: prev.origin });
+        const dropped: string[] = [];
+        if (lose.tier !== win.tier) dropped.push(`tier ${lose.tier}`);
+        if (lose.category !== win.category) dropped.push(`category ${lose.category}`);
+        if (lose.mode !== win.mode) dropped.push(`mode ${lose.mode}`);
+        diagnostics.push({
+          code: 'builtin-collision',
+          message: `${prev.origin} and ${origin} have the same letters: kept tier ${win.tier} / category ${win.category} / `
+            + `mode ${win.mode} from ${win === cur ? origin : prev.origin}${dropped.length ? ` (dropped ${dropped.join(', ')})` : ''}; `
+            + `scopes merged (${chat ? 'chat + names' : 'names only'})`,
+        });
+      });
+    });
+  }
+  return { terms: [...byKey.values()], diagnostics };
+}
+
+function compile(): Compiled {
+  const { terms, diagnostics } = mergeTermGroups([
+    { label: 'TERM_GROUPS', groups: TERM_GROUPS, nameOnly: false },
+    { label: 'NAME_ONLY_GROUPS', groups: NAME_ONLY_GROUPS, nameOnly: true },
+  ]);
+  const set = buildMatchSet(terms.map((t) => t.key), terms.map((t) => [t]));
   // allowlist keyed by letters; an entry may span a space if any spelling of it has one ("honky tonk")
   const allowPhraseByKey = new Map<string, boolean>();
   for (const w of ALLOW_WORDS) {
     const key = lettersOnly(w);
     if (key) allowPhraseByKey.set(key, (allowPhraseByKey.get(key) ?? false) || /\s/.test(w.trim()));
   }
-  const allow = new Trie([...allowPhraseByKey.keys()]);
+  const allowKeys = [...allowPhraseByKey.keys()];
+  const allow = new Trie(allowKeys);
   const suffix = new Trie(SUFFIXES.map(lettersOnly));
-  stamp = new Int32Array(2 * (Math.max(trie.size, allow.size, suffix.size) + 1));
-  gen = 0;
+  ensureStamp(Math.max(set.trie.size, allow.size, suffix.size));
   return {
-    terms, trie, allow, suffix,
+    terms, trie: set.trie, set, byKey: new Map(terms.map((t) => [t.key, t])), diagnostics, allow, allowKeys, suffix,
     allowPhrase: [...allowPhraseByKey.values()],
     common: new Set(COMMON_SHORT_WORDS.map(lettersOnly)),
-    maxWalk: trie.maxLen * 2 + 2,
+    maxWalk: set.maxWalk,
   };
 }
 
 /** The decoded, compiled lists (built once, on first use). */
 export function compiled(): Compiled {
   return (COMPILED ??= compile());
+}
+
+/** Collisions found while merging the built-in lists (by list position; expected empty). */
+export function builtinDiagnostics(): readonly CompileDiagnostic[] {
+  return compiled().diagnostics;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -703,13 +822,48 @@ function digitsReadAsLetters(st: Stream, info: TermInfo, s: number, e: number, l
   return true;
 }
 
+const ORD_S = bit('s');
+const ORD_T = bit('t');
+const ORD_D = bit('d');
+const ORD_H = bit('h');
+/** n or r (the first letter of "nd" / "rd") */
+const ORD_NR = bit('n') | bit('r');
+
+/** Is position p the start of an ordinal ending attached to a number: st / nd / rd / th, then the word ends? */
+function ordinalAt(st: Stream, p: number): boolean {
+  if (p + 2 > st.n || st.bnd[p] !== 0 || st.bnd[p + 1] !== 0 || (p + 2 < st.n && st.bnd[p + 2] === 0)) return false;
+  if (st.kind[p] !== K_LETTER || st.kind[p + 1] !== K_LETTER) return false;
+  const a = st.mask[p];
+  const b = st.mask[p + 1];
+  return ((a & ORD_S) !== 0 && (b & ORD_T) !== 0) || ((a & ORD_NR) !== 0 && (b & ORD_D) !== 0) || ((a & ORD_T) !== 0 && (b & ORD_H) !== 0);
+}
+
+/**
+ * Does the in-word match [s, e) read a callsign's trailing NUMBER as leet letters? That is a run of digits
+ * that starts inside the match, after one of its letters, and runs on to the end of the word, optionally followed
+ * by st / nd / rd / th ("Diana1", "Owyhee11", "Aspen1st": a name + a number, the most common callsign shape).
+ */
+function trailingNumber(st: Stream, s: number, e: number): boolean {
+  for (let p = s + 1; p < e; p++) {
+    if (st.kind[p] !== K_DIGIT || st.kind[p - 1] === K_DIGIT) continue;
+    let q = p + 1;
+    while (q < st.n && st.kind[q] === K_DIGIT && st.bnd[q] === 0) q++;
+    if (q >= st.n || st.bnd[q] !== 0 || ordinalAt(st, q)) return true;
+    p = q - 1;
+  }
+  return false;
+}
+
 /**
  * Is the raw match [s, e) of `info` (the walk crossed the boundary flags `crossed`) a hit? Returns the end to
  * mask up to (e, or past a suffix), or -1.
  */
 function accept(c: Compiled, st: Stream, info: TermInfo, s: number, e: number, crossed: number, opt: ScanOptions): number {
-  if (info.nameOnly && !opt.name) return -1;
+  if (opt.name ? !info.names : !info.chat) return -1;
   if (info.tier === 'mild' && !opt.strict) return -1;
+  // a host's short custom term (2-3 letters: initials, abbreviations) only counts typed as ONE piece: spelled out
+  // across spaces / punctuation it is ordinary letters ("hold A B C", "pad D, A, B", "B.C.", "Ace_B_C")
+  if (crossed !== 0 && info.source === 'custom' && info.key.length < 4 && info.mode !== 'phrase') return -1;
   const letters = st.letterPre[e] - st.letterPre[s];
   const digits = st.digitPre[e] - st.digitPre[s];
   // "455", "$5", "13580": a span of digits with no real letter is a number, not a word (symbol leet alone, "@$$", is)
@@ -727,7 +881,19 @@ function accept(c: Compiled, st: Stream, info: TermInfo, s: number, e: number, c
   // names: longer word terms count anywhere inside a word too ("xxbigdickxx"); mild ones never do
   const inWord = mode === 'strong' || mode === 'compound'
     || (opt.name && mode !== 'phrase' && info.tier !== 'mild' && info.key.length >= 4);
-  if (inWord && crossed === 0) return Math.max(e, suffixEnd(c, st, e, false));
+  if (inWord && crossed === 0) {
+    const end = Math.max(e, suffixEnd(c, st, e, false));
+    // a callsign's number is a number, not leet letters that complete a term inside a word: a trailing number after
+    // a match that starts mid-word ("Juliana1", "Deepak1st"; chat too, where a callsign is quoted: "gg Hiroshi7"),
+    // and in names a leading number that the match reads into a word it doesn't finish ("5Picasso"). The
+    // letters-only spelling inside a word, a match from a word start that ends in digits ("Xyz1" for a listed
+    // "xyzl") and mid-word leet ("W0rdHead") still count.
+    if (digits > 0) {
+      if (!st.wStart[s] && trailingNumber(st, s, e)) return -1;
+      if (opt.name && st.kind[s] === K_DIGIT && st.wStart[s] && !st.wEnd[end]) return -1;
+    }
+    return end;
+  }
   // split by punctuation / spaces, or a word-mode term: must run boundary to boundary
   if (spaced ? !st.spaceStart(s) : !st.wStart[s]) return -1;
   let end = st.wEnd[e] && (!spaced || st.spaceEnd(e)) ? e : -1;
@@ -741,7 +907,8 @@ function accept(c: Compiled, st: Stream, info: TermInfo, s: number, e: number, c
 
 /**
  * Allowlist occurrences in the current stream, as flat triples [start, end, isPhrase, ...]. A span may cross a
- * space only for the multi-word entries ("moby dick", "honky tonk").
+ * space or an apostrophe only for the multi-word entries ("moby dick", "honky tonk"; a possessive spelling of a
+ * multi-word place name, "x's y", too).
  */
 function allowSpans(c: Compiled, st: Stream): number[] {
   const t = c.allow;
@@ -754,33 +921,58 @@ function allowSpans(c: Compiled, st: Stream): number[] {
     let count = 1;
     let crossed = 0;
     for (let p = s; p < st.n && p - s <= t.maxLen * 2; p++) {
-      if (p > s) { const b = st.bnd[p]; if (b & B_HARD) break; crossed |= b; }
+      if (p > s) crossed |= st.bnd[p];
       count = step(t, cur, count, st.mask[p], nxt);
       if (!count) break;
       const tmp = cur; cur = nxt; nxt = tmp;
       for (let i = 0; i < count; i++) {
         const o = t.out[cur[i] >> 1];
-        if (o >= 0 && (!(crossed & B_SPACE) || c.allowPhrase[o])) spans.push(s, p + 1, c.allowPhrase[o] ? 1 : 0);
+        if (o >= 0 && (!(crossed & (B_SPACE | B_HARD)) || c.allowPhrase[o])) spans.push(s, p + 1, c.allowPhrase[o] ? 1 : 0);
       }
     }
   }
   return spans;
 }
 
-/** All accepted hits in `st`, after the allowlist. */
-export function scanStream(st: Stream, opt: ScanOptions): RawHit[] {
-  const c = compiled();
-  const t = c.trie;
+/**
+ * Presence marks of context anchors for one scan (custom.ts): generation stamps, so starting a scan is O(1) and a
+ * mark / lookup is O(1) — the anchor post-pass stays O(hits).
+ */
+export class AnchorMarks {
+  private stamp: Int32Array;
+  private gen = 1;
+  constructor(count: number) { this.stamp = new Int32Array(Math.max(1, count)); }
+  /** Start a new line / name: forget every mark. */
+  begin(): void {
+    if (++this.gen >= 0x7FFFFFFF) { this.stamp.fill(0); this.gen = 1; }
+  }
+  mark(id: number): void { this.stamp[id] = this.gen; }
+  has(id: number): boolean { return this.stamp[id] === this.gen; }
+  /** Does at least one of `ids` carry a mark? */
+  any(ids: readonly number[]): boolean {
+    for (let i = 0; i < ids.length; i++) if (this.stamp[ids[i]] === this.gen) return true;
+    return false;
+  }
+}
+
+/**
+ * Walk `set` over the stream and append every accepted raw match to `found` (before the allowlist). Entries that
+ * are anchors (anchorId >= 0) are not hits: an accepted anchor only sets its mark in `marks`. `wordStarts`: walks
+ * start only where a word may start (st.wStart) — exact for a set with no mid-word matches (word / phrase / exact
+ * entries in chat, which accept() only takes boundary to boundary); it skips most walks on a long line.
+ */
+function walkSet(c: Compiled, set: MatchSet, st: Stream, opt: ScanOptions, marks: AnchorMarks | null, found: RawHit[], wordStarts = false): void {
+  const t = set.trie;
   const n = st.n;
-  const found: RawHit[] = [];
   for (let s = 0; s < n; s++) {
     if (!(st.mask[s] & t.rootMask) || st.kind[s] === K_WILD) continue; // a match never starts on a '*'
+    if (wordStarts && !st.wStart[s]) continue;
     let cur = termA;
     let nxt = termB;
     cur[0] = 0;
     let count = 1;
     let crossed = 0;
-    for (let p = s; p < n && p - s < c.maxWalk; p++) {
+    for (let p = s; p < n && p - s < set.maxWalk; p++) {
       if (p > s) { const b = st.bnd[p]; if (b & B_HARD) break; crossed |= b; }
       if (st.kind[p] === K_WILD && st.wildPre[p + 1] - st.wildPre[s] > MAX_WILD_PER_MATCH) break;
       count = step(t, cur, count, st.mask[p], nxt);
@@ -791,28 +983,66 @@ export function scanStream(st: Stream, opt: ScanOptions): RawHit[] {
         const o = t.out[cur[i] >> 1];
         if (o < 0 || o === lastO) continue; // (a node can be live twice: fresh and after absorbing a repeat)
         lastO = o;
-        const info = c.terms[o];
-        const end = accept(c, st, info, s, p + 1, crossed, opt);
-        if (end >= 0) found.push({ term: info, s, e: end, te: p + 1 });
+        const list = set.keyTerms[o];
+        for (let k = 0; k < list.length; k++) {
+          const info = list[k];
+          if (info.anchorId >= 0 && (!marks || marks.has(info.anchorId))) continue;
+          const end = accept(c, st, info, s, p + 1, crossed, opt);
+          if (end < 0) continue;
+          if (info.anchorId >= 0) marks!.mark(info.anchorId);
+          else found.push({ term: info, s, e: end, te: p + 1 });
+        }
       }
     }
   }
+}
+
+/** Allowlist spans of the current stream, computed at most once per scan (shared by the built-in and custom scans). */
+export interface AllowCache { spans: number[] | null }
+
+/** Drop the hits an allowlisted word covers (see rescued). */
+function rescueHits(c: Compiled, st: Stream, found: RawHit[], cache: AllowCache): RawHit[] {
   if (!found.length) return found;
-  const spans = allowSpans(c, st);
+  const spans = (cache.spans ??= allowSpans(c, st));
   if (!spans.length) return found;
   return found.filter((h) => !rescued(st, spans, h));
+}
+
+/** All accepted built-in hits in `st`, after the allowlist. */
+export function scanStream(st: Stream, opt: ScanOptions, cache: AllowCache = { spans: null }): RawHit[] {
+  const c = compiled();
+  const found: RawHit[] = [];
+  walkSet(c, c.set, st, opt, null, found);
+  return rescueHits(c, st, found, cache);
+}
+
+/** One custom MatchSet to walk, and whether its matches can only start at a word start in this scan. */
+export interface SetWalk { set: MatchSet; wordStarts: boolean }
+
+/**
+ * All accepted hits of the custom MatchSets in `st`, after the allowlist; accepted anchors set their marks (the
+ * caller gates anchored hits afterwards, see custom.ts). Call on the same stream right after scanStream.
+ */
+export function scanCustomSets(st: Stream, walks: readonly SetWalk[], opt: ScanOptions, marks: AnchorMarks | null, cache: AllowCache): RawHit[] {
+  const c = compiled();
+  const found: RawHit[] = [];
+  for (const w of walks) walkSet(c, w.set, st, opt, marks, found, w.wordStarts);
+  return rescueHits(c, st, found, cache);
 }
 
 /**
  * Does an allowlisted word cover this hit's own letters (suffix excluded)? The clean word has to be spelled the
  * way the hit is: a boundary inside the allow span but outside the hit ("Big|Rape|Guy" against "grape") means the
- * writer did not type that word, so it does not rescue the hit.
+ * writer did not type that word, so it does not rescue the hit. A custom term is rescued only by a clean word
+ * strictly LONGER than its own letters: a host who lists an allowlisted word itself means that word.
  */
 function rescued(st: Stream, spans: readonly number[], h: RawHit): boolean {
+  const custom = h.term.source === 'custom';
   outer: for (let i = 0; i < spans.length; i += 3) {
     const as = spans[i];
     const ae = spans[i + 1];
     if (as > h.s || ae < h.te) continue;
+    if (custom && as === h.s && ae === h.te) continue;
     // a multi-word entry is expected to have boundaries between its words
     if (spans[i + 2]) return true;
     for (let p = as + 1; p < ae; p++) if (st.bnd[p] !== 0 && (p <= h.s || p >= h.te)) continue outer;
@@ -832,3 +1062,160 @@ export function streamText(st: Stream): string {
   return out;
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Digit runs (number codes)
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Separators allowed (one at a time) between the digits of one code ("14 88", "14.88", "14/88"). */
+const DIGIT_SEP = new Set([' ', '.', '-', '_', '|', '/', ':', '\u00B7']);
+/** Of those, the ones that join a decimal ("7351.5" is one number): every other separator also splits GROUPS. */
+const DECIMAL_SEP = new Set(['.', '\u00B7']);
+const RE_FORMAT = /^\p{Cf}$/u;
+/** Longest digit run that is compared with the codes; a longer run is consumed whole and never matches. */
+export const MAX_RUN_DIGITS = 16;
+
+/** Non-ASCII code point → 0..9 (fullwidth, mathematical, other compatibility digits), -2 format char, -3 separator, -1 other. */
+const DIGIT_CACHE = new Map<number, number>();
+function nonAsciiDigitClass(cp: number): number {
+  let v = DIGIT_CACHE.get(cp);
+  if (v !== undefined) return v;
+  const ch = String.fromCodePoint(cp);
+  const k = ch.normalize('NFKC');
+  if (k.length === 1 && k >= '0' && k <= '9') v = k.charCodeAt(0) - 48;
+  else if (RE_FORMAT.test(ch)) v = -2;
+  else if (DIGIT_SEP.has(ch)) v = -3;
+  else v = -1;
+  if (DIGIT_CACHE.size >= CHAR_CACHE_MAX) DIGIT_CACHE.clear();
+  DIGIT_CACHE.set(cp, v);
+  return v;
+}
+
+/** Decimal value of one character (ASCII or a compatibility digit such as fullwidth '４'), else -1. */
+export function digitValue(ch: string): number {
+  const cp = ch.codePointAt(0);
+  if (cp === undefined) return -1;
+  if (cp < 128) return cp >= 48 && cp <= 57 ? cp - 48 : -1;
+  const v = nonAsciiDigitClass(cp);
+  return v >= 0 ? v : -1;
+}
+
+/**
+ * One maximal digit run of a string: UTF-16 span [o0, o1) and its digits ('' when longer than MAX_RUN_DIGITS).
+ * `groups`: when a group separator (a space, '-', '_', '/', ...: anything but a decimal point) joins digits in the
+ * run, its groups in order, each a run of its own (with groups null); null when the run is one group.
+ */
+export interface DigitRun { o0: number; o1: number; digits: string; groups: readonly DigitRun[] | null }
+
+/**
+ * Every STANDALONE digit run of `text`: a maximal sequence of digits, where one separator (DIGIT_SEP) between two
+ * digits and zero-width format characters are transparent ("14 88", "14<zero-width>.88", "14.<zero-width>88" are
+ * one run). A run is always taken whole — "21488" or a 20-digit number is one run and never spells a shorter code
+ * inside it — and runs split by anything else (letters, two separators, other punctuation) are separate numbers
+ * ("14Ace88" is "14" and "88"). Inside a run, the groups between group separators are numbers too ("wave 3 7351":
+ * the run "37351" and its groups "3", "7351"); a decimal point joins ("7351.5" is one group). Chat and names use the
+ * same runs. O(length), no allocation per character (one per group).
+ */
+export function digitRuns(text: string): DigitRun[] {
+  const out: DigitRun[] = [];
+  const len = text.length;
+  /** digit value at i (>= 0), -2 format, -3 separator, -1 other; width in W */
+  let W = 1;
+  const cls = (i: number): number => {
+    const c = text.charCodeAt(i);
+    if (c < 128) {
+      W = 1;
+      if (c >= 48 && c <= 57) return c - 48;
+      return DIGIT_SEP.has(text[i]) ? -3 : -1;
+    }
+    const cp = text.codePointAt(i) ?? 0;
+    W = cp > 0xFFFF ? 2 : 1;
+    return nonAsciiDigitClass(cp);
+  };
+  const group = (o0: number, o1: number, digits: string, count: number): DigitRun =>
+    ({ o0, o1, digits: count <= MAX_RUN_DIGITS ? digits : '', groups: null });
+  for (let i = 0; i < len;) {
+    const d0 = cls(i);
+    const w0 = W;
+    if (d0 < 0) { i += w0; continue; }
+    let digits = String(d0);
+    let count = 1;
+    let end = i + w0;
+    let j = end;
+    // the current group
+    let g0 = i;
+    let gDigits = digits;
+    let gCount = 1;
+    let groups: DigitRun[] | null = null;
+    /** since the last digit: 0 no separator, 1 a decimal point, 2 a group separator */
+    let sep = 0;
+    while (j < len) {
+      const d = cls(j);
+      const w = W;
+      if (d >= 0) {
+        if (sep === 2) {
+          (groups ??= []).push(group(g0, end, gDigits, gCount));
+          g0 = j; gDigits = ''; gCount = 0;
+        }
+        sep = 0;
+        if (++count <= MAX_RUN_DIGITS) digits += String(d);
+        if (++gCount <= MAX_RUN_DIGITS) gDigits += String(d);
+        j += w; end = j; continue;
+      }
+      if (d === -2) { j += w; continue; } // zero-width characters, on either side of a separator too
+      // one separator joins; a second one before the next digit (or no digit after it) ends the run at `end`
+      if (d === -3 && sep === 0) { sep = DECIMAL_SEP.has(text[j]) ? 1 : 2; j += w; continue; }
+      break;
+    }
+    if (groups) groups.push(group(g0, end, gDigits, gCount));
+    out.push({ o0: i, o1: end, digits: count <= MAX_RUN_DIGITS ? digits : '', groups });
+    i = end;
+  }
+  return out;
+}
+
+/**
+ * The numbers a code may match in one run: the whole run, and each of its groups (a code standing on its own
+ * next to another number: "wave 3 7351", "7351 7351", "Ace_7351_2"). Calls `f` for each (whole run first).
+ */
+export function forEachNumber(r: DigitRun, f: (n: DigitRun) => void): void {
+  f(r);
+  if (r.groups) for (const g of r.groups) f(g);
+}
+
+let BUILTIN_CODES: Map<string, Category> | null = null;
+/** The built-in number codes (lists.ts NUMERIC_TERMS, decoded once): code → category. */
+export function builtinCodes(): ReadonlyMap<string, Category> {
+  return (BUILTIN_CODES ??= new Map(NUMERIC_TERMS.map((t) => [rot5(t.code), t.category])));
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Normalizing host-supplied terms (custom.ts)
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Does the normalizer read this one code point as one or more plain letters (not leet, not a separator)? */
+export function readsAsLetter(ch: string): boolean {
+  const cp = ch.codePointAt(0);
+  if (cp === undefined) return false;
+  const ci = cp < 128 ? ASCII[cp] : charInfo(cp, ch);
+  return ci.t === T_POS && ci.kind === K_LETTER && ci.masks.length > 0;
+}
+
+/**
+ * The letter words of a term exactly as the matcher will see them: the same pipeline as chat (NFKD, look-alikes,
+ * case, zero-width characters, runs of one letter capped at 2), split into words at whitespace only (punctuation
+ * and camelCase humps join, as they do in chat). Returns null when a position is not ONE plain letter (leet, a
+ * wildcard, an ambiguous look-alike): the caller explains that the plain spelling is needed.
+ */
+export function letterWords(text: string): string[] | null {
+  const st = buildStream(text);
+  const words: string[] = [];
+  let w = '';
+  for (let i = 0; i < st.n; i++) {
+    const m = st.mask[i];
+    if (st.kind[i] !== K_LETTER || m === 0 || (m & (m - 1)) !== 0) return null;
+    if (i > 0 && (st.bnd[i] & (B_SPACE | B_HARD))) { words.push(w); w = ''; }
+    w += String.fromCharCode(97 + (31 - Math.clz32(m)));
+  }
+  if (w) words.push(w);
+  return words;
+}

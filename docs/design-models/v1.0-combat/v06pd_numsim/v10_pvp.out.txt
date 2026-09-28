@@ -1,0 +1,110 @@
+=== A. Weapon DPS vs distance (raw, 100% accuracy, cold weapon; class affinity applied) ===
+  att  wpn      0  100  160  250  350  450  560  680  900   (Laser +20% Focus when still not included)
+  Jugg MD     675  675  675  576  466  357  236    -    -
+  Jugg LZ     400  400  400  400  400  400  400  400  400
+  Jugg PH     424  424  424  424  424  424  363  296    -
+  Arca MD     587  587  587  501  406  310  205    -    -
+  Arca LZ     460  460  460  460  460  460  460  460  460
+  Arca PH     424  424  424  424  424  424  363  296    -
+  Arti MD     587  587  587  501  406  310  205    -    -
+  Arti LZ     400  400  400  400  400  400  400  400  400
+  Arti PH     424  424  424  424  424  424  363  296    -
+
+  Effective layer damage per second (vs SHIELD / vs HULL after armor), attacker default affinity, at d:
+  MD  @120 (Jugg firing): Jugg S  522 H  543 | Arca S  470 H  776 | Arti S  470 H  737
+  MD  @350 (Jugg firing): Jugg S  378 H  375 | Arca S  359 H  536 | Arti S  359 H  510
+  MD  @540 (Jugg firing): Jugg S  218 H  208 | Arca S  217 H  297 | Arti S  217 H  282
+  LZ  @600 (Arca firing): Jugg S  460 H  276 | Arca S  368 H  460 | Arti S  460 H  391
+  PH  @400 (Arti firing): Jugg S 1059 H  152 | Arca S 1059 H  254 | Arti S 1059 H  216
+  PH  @650 (Arti firing): Jugg S  783 H  113 | Arca S  783 H  188 | Arti S  783 H  160
+
+=== B. Heat: hold LMB from cold, not thrusting, no incoming damage (so own shield regen DOES run while tapping) ===
+  att wpn  | t50   t100  | tap drain/s  regen/s | shield->0 (unhit)  shield->0 (under fire) | 1st jam  jam len | dps 0-3s  dps 3-30s  disciplined(80/40) | dmg/power cold
+  Jugg MD  | 1.50  2.93 |    320     130      |    3.4 s             2.0 s              |   5.0   1.1 s |   675     367(fire)   495(unhit)    350 | 6.33
+  Jugg LZ  | 2.28  4.55 |    240     130      |    5.9 s             2.7 s              |   7.3   1.4 s |   480     300(fire)   403(unhit)    273 | 6.00
+  Jugg PH  | 1.37  2.57 |    388     130      |    2.5 s             1.7 s              |   4.3   1.0 s |   408     232(fire)   291(unhit)    224 | 3.27
+  Arca MD  | 1.50  2.93 |    320     200      |    5.0 s             1.9 s              |   4.9   1.1 s |   587     316(fire)   482(unhit)    305 | 5.50
+  Arca LZ  | 2.28  4.55 |    240     200      |   15.0 s             2.5 s              |   7.1   1.4 s |   552     345(fire)   522(unhit)    314 | 6.90
+  Arca PH  | 1.37  2.57 |    388     200      |    3.2 s             1.5 s              |   4.3   1.0 s |   408     232(fire)   320(unhit)    224 | 3.27
+  Arti MD  | 1.50  2.93 |    256     160      |    5.7 s             2.1 s              |   5.1   1.0 s |   587     334(fire)   495(unhit)    321 | 6.88
+  Arti LZ  | 2.28  4.55 |    192     160      |   17.2 s             2.9 s              |   7.4   1.2 s |   480     308(fire)   457(unhit)    278 | 7.50
+  Arti PH  | 1.37  2.57 |    311     160      |    3.7 s             1.8 s              |   4.4   0.8 s |   408     243(fire)   333(unhit)    240 | 4.09
+  note: at heat 100 the ×3 cost is paid from SHIELD, so the power cost of an overheated weapon is 0; the shield it taps is refilled
+        by regen at 0.3 power/pt, i.e. an overheated weapon costs 0.9× its COLD power (cheaper than heat 50–100 at ×1–×3).
+  Arcanist + Laser, unhit: tap 240/s vs regen 200/s → net −40/s. With Shield Harmonics ×2 (+24% regen = 248/s) the tap is FREE FOREVER:
+    harmonics 0: first jam 19.5 s; dps 3-30s 522; power left 1150
+    harmonics 1: first jam never (30 s); dps 3-30s 552; power left 1150
+    harmonics 2: first jam never (30 s); dps 3-30s 552; power left 1150
+    harmonics 5: first jam never (30 s); dps 3-30s 552; power left 1150
+
+=== C. TTK (s), one attacker, defender passive (not shooting, not dodging). Default weapons. hold = LMB held (overheat → shield tap → jam);
+       disc = bot discipline (release at heat 80, resume 40). "S up" = full shield; "S down" = shield just broken, full hull. ===
+  attacker@d            defender | prim hold 100%  60% | prim disc 60% | prim+sec 100%  60% | S down: prim 100%  60% | +sec 60%
+  Jugg MD@120      vs Jugg |   2.9 (brk  1.4)   4.8 |   7.3         |   1.6          2.9 |   1.8               2.9 |   1.6
+  Jugg MD@120      vs Arca |   1.7 (brk  1.4)   2.8 |   4.0         |   0.8          1.6 |   0.7               1.1 |   0.2
+  Jugg MD@120      vs Arti |   2.0 (brk  1.3)   3.2 |   4.4         |   1.1          1.6 |   1.0               1.6 |   0.7
+  Jugg MD@350      vs Jugg |   4.3 (brk  2.0)   8.2 |  11.9         |   1.9          3.3 |   2.7               4.3 |   1.9
+  Jugg MD@350      vs Arca |   2.6 (brk  2.0)   4.2 |   6.6         |   1.3          1.9 |   1.1               1.6 |   0.5
+  Jugg MD@350      vs Arti |   3.0 (brk  1.9)   4.8 |   7.2         |   1.6          2.1 |   1.6               2.5 |   1.1
+  Jugg MD@540      vs Jugg |   9.0 (brk  3.4)  16.2 |  22.4         |   3.0          5.0 |   4.8               8.9 |   2.9
+  Jugg MD@540      vs Arca |   4.6 (brk  3.2)   8.6 |  12.3         |   2.2          2.6 |   1.9               2.8 |   0.8
+  Jugg MD@540      vs Arti |   5.3 (brk  3.0)   9.7 |  14.5         |   2.2          3.6 |   2.8               4.3 |   1.9
+  Arca LZ@600      vs Jugg |   3.9 (brk  1.2)   6.5 |   9.4         |   2.5          4.5 |   2.7               4.5 |   3.2
+  Arca LZ@600      vs Arca |   2.1 (brk  1.4)   3.5 |   3.5         |   1.2          2.2 |   0.8               1.3 |   0.8
+  Arca LZ@600      vs Arti |   2.4 (brk  1.0)   4.0 |   5.4         |   1.5          2.6 |   1.4               2.3 |   1.4
+  Arti PH@400      vs Jugg |   7.9 (brk  1.0)  13.1 |  18.3         |   4.7          8.4 |   6.3              12.1 |   7.2
+  Arti PH@400      vs Arca |   2.7 (brk  1.0)   4.0 |   6.0         |   2.2          3.5 |   2.0               3.2 |   2.3
+  Arti PH@400      vs Arti |   3.9 (brk  1.0)   6.3 |  10.3         |   3.0          4.7 |   3.4               5.4 |   4.0
+
+  Off-class weapons (100% / 60% hold, primary only, shield up; attacker affinity only if matching kind):
+  Jugg LZ@600      Jugg  4.5/ 7.5  Arca  2.4/ 4.1  Arti  2.7/ 4.6
+  Jugg PH@400      Jugg  8.0/14.5  Arca  2.7/ 4.0  Arti  3.9/ 7.4
+  Arca MD@120      Jugg  3.3/ 5.5  Arca  2.0/ 3.2  Arti  2.3/ 3.7
+  Arca PH@400      Jugg  8.1/13.4  Arca  2.7/ 4.0  Arti  3.9/ 7.4
+  Arti MD@120      Jugg  3.3/ 5.5  Arca  2.0/ 3.2  Arti  2.3/ 3.7
+  Arti LZ@600      Jugg  4.5/ 7.5  Arca  2.4/ 4.1  Arti  2.7/ 4.6
+
+  Laser moving (no Focus) vs still, 100%: Jugg 4.7 / 3.9  Arca 2.5 / 2.1  Arti 2.9 / 2.4
+  Polarized Juggernaut defender (shield absorb 0.45 until break):
+    Jugg MD@120: 3.8 s (60%: 6.3) vs unpolarized 2.9 s; shield broke at 2.4 s; Jugg power left 900
+    Arca LZ@600: 4.9 s (60%: 8.1) vs unpolarized 3.9 s; shield broke at 2.1 s; Jugg power left 900
+    Arti PH@400: 8.4 s (60%: 14.0) vs unpolarized 7.9 s; shield broke at 1.5 s; Jugg power left 900
+
+=== D. Juggernaut vs Arcanist bursts (100% accuracy unless noted) ===
+  Jugg Ram(400 kin, bleed .25) → Rockets 3×180 → Mass Driver @100 on Arcanist: takedown 0.52 s (shield broke 0.52 s); MD 60%: 0.52 s
+  Jugg Rockets + MD @100 (no Ram): 0.77 s; 60% all: 1.57 s
+  Ram path (Ram dmg ×1.5): 0.52 s
+  Arcanist Laser(Focus, still)+Arc @550 on Juggernaut: 2.53 s (shield 0.73); laser 60%: 3.45 s
+  Arcanist Lance+Focus talent Laser only (718 dps) @550: 3.00 s (spec says ~3.9 s at 900 px)
+  ... vs POLARIZED Jugg (Laser+Arc): 3.35 s (shield 1.23)
+  Kiting Arcanist (moving, no Focus, 60%) @700 on Jugg: 7.80 s — Jugg MD cannot reply beyond 560 px
+  Kite geometry: Arcanist max 520 / AB 780 vs Jugg 420 / AB 620; Laser 900 px vs MD 560 px; Ram dash 525 px per 6 s vs Blink 480 px per 5 s.
+    Jugg afterburner chase closing 340 px vs a backing Arcanist (620−520=100 px/s): 3.4 s, 680 power of 900; Arcanist AB (780) re-opens at 160 px/s.
+
+=== E. Strain / Brownout: hold combos for 60 s, thrusting, no incoming damage, shield starts BROKEN (so regen competes for power) ===
+  Space: Jugg Ram / Arca Blink re-pressed on cooldown (spam); Arti = Repair Ray channel (blocks weapon).
+  combo       | strain | 1st brownout  count  %time | recov s | speed avg (strain×BO) | shield regen: rate mult  pts/s | weapon dps  jam%
+  Jugg MD L   |   1    |    never      0     0% |     -   |  100% (table 100%)        |        ×1.00    122  |   485    26%
+  Jugg MD LR  |   2    |    6.4 s     21    55% |  1.60   |   78% (table 88%)        |        ×0.55     28  |   345    32%
+  Jugg MD LRS |   3    |    6.4 s     19    51% |  1.60   |   65% (table 72%)        |        ×0.20     11  |   329    39%
+  Jugg MD LRSA|   4    |    1.4 s     31    81% |  1.60   |   50% (table 60%)        |        ×0.00      0  |   139     0%
+  Jugg MD RS  |   2    |    never      0     0% |     -   |   88% (table 88%)        |        ×0.55     11  |     0     0%
+  Jugg MD LA  |   2    |    2.5 s     25    67% |  1.60   |   76% (table 88%)        |        ×0.55     20  |   326     2%
+  Arca LZ L   |   1    |    never      0     0% |     -   |  100% (table 100%)        |        ×1.00    189  |   427     7%
+  Arca LZ LR  |   2    |   24.5 s      3     7% |  1.40   |   87% (table 88%)        |        ×0.55     97  |   338    26%
+  Arca LZ LRS |   3    |    never      0     0% |     -   |   72% (table 72%)        |        ×0.20     38  |   271    41%
+  Arca LZ LRSA|   4    |    2.7 s     29    67% |  1.40   |   52% (table 60%)        |        ×0.00      0  |   154     0%
+  Arca LZ RS  |   2    |    never      0     0% |     -   |   88% (table 88%)        |        ×0.55     10  |     0     0%
+  Arca LZ LA  |   2    |    3.9 s     24    55% |  1.40   |   78% (table 88%)        |        ×0.55     45  |   252    33%
+  Arti PH L   |   1    |    never      0     0% |     -   |  100% (table 100%)        |        ×1.00    152  |   328    19%
+  Arti PH LR  |   2    |    never      0     0% |     -   |   88% (table 88%)        |        ×0.55     84  |   280    28%
+  Arti PH LRS |   3    |    never      0     0% |     -   |   72% (table 72%)        |        ×0.20      9  |     0     0%
+  Arti PH LRSA|   4    |    2.8 s     38    62% |  0.97   |   53% (table 60%)        |        ×0.00      0  |     0     0%
+  Arti PH RS  |   2    |    never      0     0% |     -   |   88% (table 88%)        |        ×0.55      9  |     0     0%
+  Arti PH LA  |   2    |    3.5 s     34    55% |  0.97   |   78% (table 88%)        |        ×0.55     35  |   223    12%
+  Recovery from 0 → 25% with everything released except thrust: Jugg 1.58 s, Arca 1.40 s, Arti 0.95 s
+
+  Never-brownout check, LMB+RMB+Space held 60 s, default weapon, with cards:
+    Jugg  none: 6.4s/51% | coils (lance talent): 7.6s/11% | efficiency 4 (−40% all costs): 34.4s/7% | reactor 5 (+60% regen): 15.8s/3% | reactor 3 + efficiency 2: 21.3s/2%
+    Arca  none: NEVER | coils (lance talent): 56.7s/2% | efficiency 4 (−40% all costs): NEVER | reactor 5 (+60% regen): NEVER | reactor 3 + efficiency 2: NEVER
+    Arti  none: NEVER | coils (lance talent): NEVER | efficiency 4 (−40% all costs): NEVER | reactor 5 (+60% regen): NEVER | reactor 3 + efficiency 2: NEVER

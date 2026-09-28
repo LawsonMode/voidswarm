@@ -138,6 +138,8 @@ const ZONE_HELP = [
 
 /** Fallback when a command handler of the moderation hook throws / rejects. */
 const MOD_FAILED_MSG = 'That command failed — see the server log.';
+/** The log label of a name check whose filter threw (the name is refused; fail closed). */
+const FILTER_ERROR = 'filter-error';
 
 /** 31-bit random seed, from the platform CSPRNG when there is one (browsers, Node 19+). */
 function cryptoSeed(): number {
@@ -528,13 +530,20 @@ export class Zone {
     }
     // Moderation: a guest callsign the name filter refuses becomes a generated one (logged below; a strike only when
     // the name is hateful / sexual / a slur, see nameRefused).
-    let refused: { name: string; reason: string; severe: boolean } | null = null;
+    let refused: { name: string; labels: string[]; severe: boolean } | null = null;
+    let flagged: string[] | null = null;
     if (!account) {
       const chk = this.checkNameSafe(name);
       if (!chk.ok) {
-        refused = { name, reason: chk.reason, severe: chk.severe };
+        refused = { name, labels: chk.labels, severe: chk.severe };
         name = this.uniqueName(`Pilot${1000 + Math.floor(Math.random() * 9000)}`, pid);
-      }
+      } else if (chk.flagged) flagged = chk.flagged; // allowed, logged for review below (no strike)
+    } else {
+      // An account keeps its username (it passed the filter at registration), but the host's CURRENT lists may
+      // match it — a custom term added later, or a review-only 'flag' term (never refused at registration). Such a
+      // username is logged on every join as 'flag' for a moderator to look at: no rename, no strike.
+      const chk = this.checkNameSafe(name);
+      if (!chk.ok) { if (chk.labels[0] !== FILTER_ERROR) flagged = chk.labels; } else if (chk.flagged) flagged = chk.flagged;
     }
     const user: ZoneUser = {
       playerId: pid, name, sink, room: null, ping: 0, chatTimes: [], account, kicked: false, address, ownedRoomId: null,
@@ -550,9 +559,9 @@ export class Zone {
     sink.sendMsg(this.lobbyStateMsg()); // roomState (zone lobby) before history
     sink.sendMsg({ type: 'chatHistory', lines: this.zoneChat.slice() });
     if (refused) {
-      this.nameRefused(user, refused.name, refused.reason, refused.severe, 'name', null);
+      this.nameRefused(user, refused.name, refused.labels, refused.severe, 'name', null);
       this.tell(user, `That callsign isn't allowed here — you're flying as ${user.name}. Pick another with /name.`);
-    }
+    } else if (flagged) this.nameFlagged(user, user.name, flagged, 'name', null);
     this.presenceLine(`${user.name} entered the zone.`);
     this.log(`+ ${user.name} (#${pid}${account ? ', account' : ', guest'}) — ${this.users.size} online`);
     return user;
@@ -1020,6 +1029,8 @@ export class Zone {
     const hits = labels(r);
     const blockCats = r ? blockCategories(r.hits) : [];
     if (r && r.action === 'pass') { action = 'pass'; shown = text; }
+    // review-only custom hits: shown as typed and logged as 'flag' for a moderator — no strike, no mute
+    else if (r && r.action === 'flag') { action = 'flag'; shown = text; }
     else if (r && r.action === 'mask' && typeof r.text === 'string' && r.text) { action = 'mask'; shown = r.text; }
     if (action === 'block') {
       log('block', '', hits);
@@ -1048,20 +1059,25 @@ export class Zone {
   }
 
   /**
-   * checkName that never throws (a failing filter refuses the name). `reason` = log label(s) of the refusal;
-   * `severe` = a block-tier hit (slur, hate, sexual, threat), the only kind of refused name that is a strike.
+   * checkName that never throws (a failing filter refuses the name). `labels` = the log labels of the refusal, one
+   * per hit (so a review-only "flag:..." label among them is found by the log's review filter);
+   * `severe` = a block-tier hit (slur, hate, sexual, threat), the only kind of refused name that is a strike;
+   * `flagged` = log labels of an ALLOWED name that review-only custom terms matched (logged, never a strike).
    */
-  private checkNameSafe(name: string): { ok: true } | { ok: false; reason: string; severe: boolean } {
+  private checkNameSafe(name: string): { ok: true; flagged?: string[] } | { ok: false; labels: string[]; severe: boolean } {
     try {
       const r = checkName(name, this.filterOpts);
-      if (r && r.ok) return { ok: true };
+      if (r && r.ok) {
+        const flags: unknown[] = r.action === 'flag' && Array.isArray(r.hits) ? r.hits : [];
+        return flags.length ? { ok: true, flagged: flags.slice(0, 5).map(hitLabel) } : { ok: true };
+      }
       const list: unknown[] = Array.isArray(r?.hits) ? r.hits : [];
-      const hits = list.slice(0, 5).map(hitLabel).join(', ');
+      const labels = list.slice(0, 5).map(hitLabel);
       const severe = list.some((h) => !!h && typeof h === 'object' && (h as { tier?: unknown }).tier === 'block');
-      return { ok: false, reason: hits || (r && typeof r.reason === 'string' && r.reason ? r.reason : 'name'), severe };
+      return { ok: false, labels: labels.length ? labels : [r && typeof r.reason === 'string' && r.reason ? r.reason : 'name'], severe };
     } catch (e) {
       this.log(`moderation checkName failed: ${(e as Error)?.message ?? e}`);
-      return { ok: false, reason: 'filter-error', severe: false };
+      return { ok: false, labels: [FILTER_ERROR], severe: false };
     }
   }
 
@@ -1070,21 +1086,36 @@ export class Zone {
    * sexual term or threat): profanity inside a name is refused but not punished, because real names collide with
    * the list and a student retrying their own name must not end up auto-muted.
    */
-  private nameRefused(user: ZoneUser, attempted: string, reason: string, severe: boolean,
+  private nameRefused(user: ZoneUser, attempted: string, labels: string[], severe: boolean,
     channel: Extract<LogChannel, 'name' | 'room'>, room: Room | null): void {
     this.logChat({
       time: Date.now(), roomId: room?.id ?? null, roomName: room ? room.settings.name : ZONE_LOG_ROOM_NAME, channel,
       team: NO_TEAM, playerId: user.playerId, name: user.name, accountId: user.account?.accountId ?? null,
-      address: user.address, original: attempted, shown: '', action: 'block', hits: [reason],
+      address: user.address, original: attempted, shown: '', action: 'block', hits: labels,
     });
     if (severe) this.strike(user, 'name');
   }
 
-  /** Is a human-chosen name (callsign or room name) allowed? A refusal is logged (and a strike when severe). */
+  /** An allowed name that review-only custom terms flagged: logged as 'flag' for a moderator (never a strike). */
+  private nameFlagged(user: ZoneUser, name: string, hits: string[], channel: Extract<LogChannel, 'name' | 'room'>, room: Room | null): void {
+    this.logChat({
+      time: Date.now(), roomId: room?.id ?? null, roomName: room ? room.settings.name : ZONE_LOG_ROOM_NAME, channel,
+      team: NO_TEAM, playerId: user.playerId, name: user.name, accountId: user.account?.accountId ?? null,
+      address: user.address, original: name, shown: name, action: 'flag', hits,
+    });
+  }
+
+  /**
+   * Is a human-chosen name (callsign or room name) allowed? A refusal is logged (and a strike when severe); an
+   * allowed name that review-only custom terms flagged is logged as 'flag'.
+   */
   private nameAllowed(user: ZoneUser | null, name: string, channel: 'name' | 'room', room: Room | null): boolean {
     const chk = this.checkNameSafe(name);
-    if (chk.ok) return true;
-    if (user) this.nameRefused(user, name, chk.reason, chk.severe, channel, room);
+    if (chk.ok) {
+      if (chk.flagged && user) this.nameFlagged(user, name, chk.flagged, channel, room);
+      return true;
+    }
+    if (user) this.nameRefused(user, name, chk.labels, chk.severe, channel, room);
     return false;
   }
 

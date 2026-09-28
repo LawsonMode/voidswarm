@@ -1,0 +1,32 @@
+== P1. Pocket healer: target Juggernaut (fighting back) rayed by an Artificer; attackers at their band, bot discipline, realistic acc
+   Ray: 120 hull/s x healMult below full hull; at full hull +220 shield/s and a jump-start every 6-tick payout (J = jump-start honoured, i.e. own regen may run under fire).
+attackers vs rayed Jugg         no healer  Ray base, no jump  Ray base + jump-start  Medic Ray + jump  Medic+Medkit5 Ray + jump  2 Medic Rays + jump
+-------------------------  --------------  -----------------  ---------------------  ----------------  ------------------------  -------------------
+1x Jugg MD                 dies 3.1s (-1)     Jugg WINS 3.1s         Jugg WINS 3.1s    Jugg WINS 3.1s            Jugg WINS 3.1s       Jugg WINS 3.1s
+1x Arc Laser               Jugg WINS 8.1s     Jugg WINS 8.1s         Jugg WINS 8.1s    Jugg WINS 8.1s            Jugg WINS 8.1s       Jugg WINS 8.1s
+2x (Jugg MD + Art Phaser)       dies 2.5s     dies 3.1s (-1)         dies 3.2s (-1)    Jugg WINS 7.8s            Jugg WINS 7.8s       Jugg WINS 7.8s
+3x (MD + Laser + Phaser)        dies 1.7s          dies 1.9s              dies 1.9s         dies 2.2s                 dies 2.9s            dies 3.1s
+
+== P2. Dreadnought fortress under focus fire (tick sim). Host = Bulwark+Titan Jugg with Shield Booster 5 / Reinforced Hull 5 / Plating 5; attackers at band, bot discipline, realistic acc
+host                                                     vs 1 Jugg MD  vs 3 (MD+Laser+Phaser)                 vs 6
+------------------------------------------------  -------------------  ----------------------  -------------------
+plain Jugg (base stats)                                         3.1 s                   1.7 s                0.9 s
+max-card Jugg, no turrets                                      11.6 s                   7.4 s                3.1 s
+ + Polarize                                                    14.4 s                   8.8 s                4.3 s
+Dreadnought n=2: 2 Art welders                    >120 s (unkillable)     >120 s (unkillable)                6.6 s
+Dreadnought n=3: 2 welders + 1 Jugg brace         >120 s (unkillable)     >120 s (unkillable)  >120 s (unkillable)
+Dreadnought n=5: 3 welders + 2 braces + Polarize  >120 s (unkillable)     >120 s (unkillable)  >120 s (unkillable)
+   (the host does not shoot back; welders heal 140 hull/s each, then 200 shield/s + jump-start; Brace x0.5; turret power: weld 180/s vs 450/s docked reactor = indefinite)
+
+== P3. Spire (Arcanist host) laser resonance under the host-power rule (offense stops below 20% host power)
+  1 lasers: 260 DPS, host draw 90/s -> sustainable; Overcharge (free +1 counted) 390 DPS; Jugg EHP 2326 deleted in 8.95 s (5.96 s overcharged)
+  2 lasers: 780 DPS, host draw 270/s -> burst 26.00 s = 20280 dmg, then ~664 DPS at the reactor rate; Overcharge (free +1 counted) 1170 DPS; Jugg EHP 2326 deleted in 2.98 s (1.99 s overcharged)
+  3 lasers: 1755 DPS, host draw 608/s -> burst 2.75 s = 4835 dmg, then ~664 DPS at the reactor rate; Overcharge (free +1 counted) 2633 DPS; Jugg EHP 2326 deleted in 1.33 s (0.88 s overcharged)
+  5 lasers: 6581 DPS, host draw 2278/s -> burst 0.51 s = 3342 dmg, then ~664 DPS at the reactor rate; Overcharge (free +1 counted) 9872 DPS; Jugg EHP 2326 deleted in 0.35 s (0.24 s overcharged)
+
+== P4. v0.x TTK baseline (energy = health = ammo, recharge on while hit) vs v1.0, same accuracy model
+v0.x attacker       vs Jugg acc1 / acc.6       vs Arc       vs Art
+------------------  --------------------  -----------  -----------
+Autocannon (brute)           3.67 / 9.72  2.20 / 6.42  2.38 / 6.42
+Plasma (tech)                3.75 / 9.75  2.10 / 6.15  2.40 / 6.15
+Rivet (engineer)            4.40 / 12.10  2.60 / 8.10  2.80 / 8.00

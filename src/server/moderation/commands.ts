@@ -24,6 +24,7 @@ function logLine(r: ChatLogRow): string {
   const where = r.channel === 'name' ? 'callsign' : r.channel === 'room' ? 'room name' : r.roomName || 'Zone';
   let tag = '';
   if (r.action === 'mask') tag = ` [masked: "${r.shown}"]`;
+  else if (r.action === 'flag') tag = ' [for review]';
   else if (r.action !== 'pass') tag = ` [${r.action}]`;
   return `${hhmm(r.ts)} (${where}${r.channel === 'team' ? ', team' : ''}) ${r.name}: ${r.original}${tag}`;
 }
