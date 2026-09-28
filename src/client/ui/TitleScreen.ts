@@ -502,11 +502,14 @@ export class TitleScreen {
       h('p', { class: 'warn-line' }, `Connect to ${host}? Your login will be sent there.`),
       h('div', { class: 'muted small' }, 'Only continue if you trust whoever gave you this link.'),
       h('button', {
-        class: 'btn btn-primary btn-big', type: 'button', 'data-nav': 'server-stay', 'data-autofocus': true,
+        class: 'btn btn-primary btn-big btn-fit', type: 'button', 'data-nav': 'server-stay', 'data-autofocus': true,
+        title: `Stay on ${stay}`, 'aria-label': `Stay on ${stay}`,
         onclick: () => { this.pendingServer = null; this.setView('login'); },
-      }, `Stay on ${stay}`),
+      }, h('span', { class: 'btn-fit-label' }, 'Stay on'), h('span', { class: 'btn-fit-host' }, stay)),
       h('button', {
-        class: 'btn btn-danger', type: 'button', 'data-nav': 'server-accept',
+        class: 'btn btn-danger btn-fit', type: 'button', 'data-nav': 'server-accept',
+        // Long hosts (e.g. *.trycloudflare.com) shrink + ellipsize inside the button; full name on hover.
+        title: `Connect to ${host}`, 'aria-label': `Connect to ${host}`,
         onclick: () => {
           this.pendingServer = null;
           this.sessionOnlyUrl = url;
@@ -514,7 +517,7 @@ export class TitleScreen {
           this.setView('login');
           void this.checkSession();
         },
-      }, `Connect to ${host}`),
+      }, h('span', { class: 'btn-fit-label' }, 'Connect to'), h('span', { class: 'btn-fit-host' }, host)),
       h('div', { class: 'title-links' }, this.offlineLink()));
   }
 

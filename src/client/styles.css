@@ -76,6 +76,10 @@ body.in-game #bg { display: none; }
 .btn { appearance: none; border: 1px solid rgba(59, 242, 255, 0.45); background: rgba(59, 242, 255, 0.07); color: var(--text);
   padding: 0.45rem 1rem; border-radius: 0.35rem; cursor: pointer; font-family: var(--font-display); font-size: 0.78rem; letter-spacing: 0.1em;
   text-transform: uppercase; font-weight: 700; transition: background 0.12s, box-shadow 0.12s, transform 0.08s, border-color 0.12s; white-space: nowrap; }
+/* A button whose label ends in a long value (server host): the fixed label stays, the value shrinks and ellipsizes. */
+.btn-fit { display: flex; align-items: baseline; justify-content: center; gap: 0.45em; width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
+.btn-fit-label { flex: none; }
+.btn-fit-host { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: 0.02em; font-size: 0.9em; }
 .btn:hover:not(:disabled), .btn:focus-visible { background: rgba(59, 242, 255, 0.18); box-shadow: var(--glow-c); outline: none; }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: 0.4; cursor: default; }
