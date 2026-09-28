@@ -25,8 +25,12 @@ function medianUs(iters: number, run: (i: number) => void): number {
   return times.sort((a, b) => a - b)[runs >> 1];
 }
 
-/** CI machines are slower than a dev box; the budget is generous so the test only catches real blow-ups. */
-const BUDGET_US = 50;
+/**
+ * The budget only catches real blow-ups (catastrophic backtracking costs milliseconds, not microseconds).
+ * Shared CI runners are 1.5–2× slower than a dev box and noisy (a 79 us 'wildcard words' median failed Pages
+ * CI on 2026-09-28 against the old flat 50 us), so CI (GitHub Actions sets CI=true) gets 4× headroom.
+ */
+const BUDGET_US = process.env.CI ? 200 : 50;
 
 describe('performance', () => {
   it('filters a 200-character chat line in well under 50 us', () => {
