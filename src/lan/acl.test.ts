@@ -186,7 +186,10 @@ function daclOf(p: string, tmp: string): ReturnType<typeof parseDacl> {
 
 const explicitFor = (d: ReturnType<typeof parseDacl>, sid: string) => d.aces.filter((a) => a.sid === sid && !a.inherited);
 
-describe.skipIf(!WIN)('T-LAN-11: real icacls on a scratch install', () => {
+// GitHub's Windows runners run as an administrator on a D:\ with broad inherited grants, so a 'safe folder' is
+// impossible to set up there; these real-icacls checks are for a normal user profile and run locally.
+const CI_RUNNER = process.env.GITHUB_ACTIONS === 'true';
+describe.skipIf(!WIN || CI_RUNNER)('T-LAN-11: real icacls on a scratch install', () => {
   let base = '';
   let me = '';
   beforeAll(async () => {

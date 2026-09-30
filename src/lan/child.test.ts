@@ -177,7 +177,8 @@ describe('exit codes and flags', () => {
     expect(dataDirConflict(root, path.join(link, 'data'))).toBeNull();
   });
 
-  it.runIf(process.platform === 'win32')('a root reached through a junction is granted by its real path too, and the child starts', async () => {
+  // Skipped on GitHub runners (admin account, runner drive layout); runs on a normal Windows profile.
+  it.runIf(process.platform === 'win32' && process.env.GITHUB_ACTIONS !== 'true')('a root reached through a junction is granted by its real path too, and the child starts', async () => {
     const { root, data: realData } = makeRoot();
     const link = path.join(tmpRoot, `junction-${seq++}`);
     fs.symlinkSync(root, link, 'junction');

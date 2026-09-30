@@ -261,8 +261,11 @@ function systemExe(name) {
 export function authenticode(file) {
   const script = '$s = Get-AuthenticodeSignature -LiteralPath $env:VS_FILE; '
     + '[pscustomobject]@{ status = [string]$s.Status; subject = [string]$s.SignerCertificate.Subject } | ConvertTo-Json -Compress';
+  // Drop an inherited PowerShell 7 PSModulePath: Windows PowerShell 5.1 would load PS7's modules and the cmdlet fails silently.
+  const env = { ...process.env, VS_FILE: file };
+  for (const k of Object.keys(env)) if (k.toLowerCase() === 'psmodulepath') delete env[k];
   const r = spawnSync(systemExe('powershell'), ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script], {
-    env: { ...process.env, VS_FILE: file }, encoding: 'utf8', windowsHide: true, timeout: 60_000,
+    env, encoding: 'utf8', windowsHide: true, timeout: 60_000,
   });
   if (r.status !== 0) return { status: 'Unknown', subject: null, error: (r.stderr || r.error?.message || '').trim().slice(0, 300) };
   try {

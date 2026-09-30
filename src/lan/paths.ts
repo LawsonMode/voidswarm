@@ -170,7 +170,10 @@ export async function runPowerShell(
 ): Promise<ExecResult> {
   if (script.includes('"')) throw new Error('runPowerShell: scripts must not contain double quotes');
   for (const k of Object.keys(vars)) if (!/^VS_[A-Z0-9_]+$/.test(k)) throw new Error(`runPowerShell: bad variable name ${k}`);
-  const env = { ...(opts.env ?? process.env), ...vars };
+  // Windows PowerShell 5.1 must not inherit PowerShell 7's PSModulePath (a launch from a pwsh 7 window or a CI step):
+  // it would load PS7's incompatible modules and Get-AuthenticodeSignature and friends fail silently.
+  const env: Record<string, string | undefined> = { ...(opts.env ?? process.env), ...vars };
+  for (const k of Object.keys(env)) if (k.toLowerCase() === 'psmodulepath') delete env[k];
   return (opts.exec ?? execTool)(
     systemTool('powershell', env),
     ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script],
