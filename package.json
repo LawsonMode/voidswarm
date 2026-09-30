@@ -1,6 +1,6 @@
 {
   "name": "voidswarm",
-  "version": "0.5.0",
+  "version": "0.6.0-m1",
   "private": true,
   "description": "Voidswarm — SubSpace-inspired 32-player neon PvPvE arena shooter (browser client + Node server).",
   "type": "module",

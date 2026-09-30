@@ -35,7 +35,7 @@ The stack is TypeScript + Vite + PixiJS v8 on the client and an authoritative No
 - **Gotchas:** under `--permission`, `fs.fsyncSync` throws ERR_ACCESS_DENIED (use `src/server/durable.ts fsyncBestEffort`); a worker thread would escape the sandbox, so never pass `--allow-worker`. `--this-pc-only` keeps the game on loopback (a try-out, or a gate run with no firewall prompt). Test the LAN package on ports other than 7777/7778 (`PORT=27777` seeds a first run).
 
 ## Version location
-The root `package.json` `version` (currently 0.5.0; `package-lock.json` carries the same, keep them in step). `src/shared/version.ts` reads it, and it also holds `PROTOCOL_VERSION` (currently 5, bumped in v0.5 because the capital skill knobs changed the codec's knob table; bump it on wire changes). Don't hardcode versions anywhere else.
+The root `package.json` `version` (currently 0.6.0-m1, the LAN Edition M1 release; `package-lock.json` carries the same, keep them in step). `src/shared/version.ts` reads it, and it also holds `PROTOCOL_VERSION` (currently 5, bumped in v0.5 because the capital skill knobs changed the codec's knob table; bump it on wire changes). Don't hardcode versions anywhere else.
 
 ## How to run
 ```
