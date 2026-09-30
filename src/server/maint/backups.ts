@@ -23,6 +23,9 @@ import { BACKUP_EXT, BACKUPS_DIR, backupFileName, compareNewestFirst, isBackupRe
 import { readPendingRestore } from './restoreStage';
 import { planRetention, retentionPolicy, DAY_MS } from './retention';
 
+/** node:sqlite backup rate meaning "every page in one step" (a positive int32; -1 is refused on Node 24.21+). */
+const ALL_PAGES_AT_ONCE = 0x7fffffff;
+
 export const DB_FILE = 'voidswarm.db';
 export const CONFIG_FILE = 'voidswarm.config.json';
 /** A start backup runs when the last one is older than this (§6.1). */
@@ -294,7 +297,8 @@ export async function createBackup(opts: CreateBackupOptions): Promise<CreateBac
       schemaVersion = Number((src.prepare('PRAGMA user_version').get() as { user_version: number }).user_version);
       if (opened && opts.stampLineage !== false) stampLineage(src, dbPath, opts.key, schemaVersion);
       await sqliteBackup(src, snapshot, {
-        rate: opts.pagesPerStep && opts.pagesPerStep > 0 ? Math.floor(opts.pagesPerStep) : -1,
+        // Node 24.21+ rejects rate -1 ("all at once"); a huge positive step copies everything in one step on every 24.x.
+        rate: opts.pagesPerStep && opts.pagesPerStep > 0 ? Math.floor(opts.pagesPerStep) : ALL_PAGES_AT_ONCE,
         progress: ({ totalPages, remainingPages }) => opts.onProgress?.({ stage: 'snapshot', done: totalPages - remainingPages, total: totalPages }),
       });
     } finally {

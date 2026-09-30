@@ -572,7 +572,8 @@ describe('launch (§2.2): first run, banner, browser, secrets over IPC, the pipe
     }
   }, 30_000);
 
-  it('a setup code the child minted is printed in the console only; bad codes and unknown folders are ignored; open-folder is rate-limited', async () => {
+  // The LAN host is Windows-only (spec section 10): console layout and path wording are checked on Windows.
+  it.runIf(process.platform === 'win32')('a setup code the child minted is printed in the console only; bad codes and unknown folders are ignored; open-folder is rate-limited', async () => {
     const { root, app, data } = makeRoot();
     fakeServer(app, {
       sendAfterReady: [
@@ -721,7 +722,7 @@ describe('launch refusals (exit codes)', () => {
     }
   }, 30_000);
 
-  it('--data that is, holds, or sits in the program folders → 4 before anything runs (the child could replace app\\launch.mjs)', async () => {
+  it.runIf(process.platform === 'win32')('--data that is, holds, or sits in the program folders → 4 before anything runs (the child could replace app\\launch.mjs)', async () => {
     const { root, app } = makeRoot();
     fakeServer(app);
     const port = await freeBase();

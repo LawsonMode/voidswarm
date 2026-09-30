@@ -82,7 +82,8 @@ describe('the package build guards (every platform)', () => {
     expect(NON_FETCH_URLS.every((u) => u.startsWith('http://www.w3.org/') || u === 'http://www.pixijs.com/')).toBe(true);
   });
 
-  it('--out: dist/ reached another way (a junction; the A:\\ mapping of C:\\AI Bins when this PC has it) is refused before anything is written', async () => {
+  // Junctions and the A:\ mapping are Windows-only.
+  it.runIf(process.platform === 'win32')('--out: dist/ reached another way (a junction; the A:\\ mapping of C:\\AI Bins when this PC has it) is refused before anything is written', async () => {
     const project = path.resolve(__dirname, '..', '..');
     const dist = path.join(project, 'dist');
     // By identity: a junction to a folder is the folder.
