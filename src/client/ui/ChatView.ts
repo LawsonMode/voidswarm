@@ -1,6 +1,7 @@
 // Reusable chat log + input (zone lobby, room lobby, in-match overlay).
 import { CHAT_MAX_LEN } from '../../shared/constants';
 import type { ChatLine } from '../../shared/protocol';
+import { chatNoticeText } from '../net/serverInfo';
 import { fmtTime, h, teamCss } from './dom';
 
 export interface ChatViewOpts {
@@ -22,11 +23,17 @@ export class ChatView {
   readonly root: HTMLElement;
   readonly log: HTMLElement;
   readonly input: HTMLInputElement;
+  /**
+   * LAN edition §4.15 / §8.2: who can read this chat and for how long (GET /api/info → notice), pinned above the log.
+   * Hidden while there is none (offline play, an older server).
+   */
+  readonly notice: HTMLElement;
   private channelBtn: HTMLButtonElement | null = null;
   channel: 'all' | 'team' = 'all';
 
   constructor(private opts: ChatViewOpts) {
     this.log = h('div', { class: 'chat-log', role: 'log', 'aria-live': 'polite' });
+    this.notice = h('div', { class: 'chat-notice hidden', role: 'note' });
     this.input = h('input', {
       class: 'chat-input', type: 'text', maxlength: CHAT_MAX_LEN, placeholder: opts.placeholder,
       autocomplete: 'off', spellcheck: 'false', 'data-nav': 'chat-input',
@@ -65,7 +72,15 @@ export class ChatView {
       row.push(this.channelBtn);
     }
     row.push(this.input);
-    this.root = h('div', { class: `chat${opts.fading ? ' chat-fading' : ''}` }, this.log, h('div', { class: 'chat-row' }, row));
+    this.root = h('div', { class: `chat${opts.fading ? ' chat-fading' : ''}` }, this.notice, this.log, h('div', { class: 'chat-row' }, row));
+  }
+
+  /** The server's chat notice ('' hides the line). Plain text only: the server's words are never parsed as HTML. */
+  setNotice(notice: string): void {
+    const t = chatNoticeText(notice);
+    this.notice.textContent = t;
+    this.notice.title = t;
+    this.notice.classList.toggle('hidden', !t);
   }
 
   setChannel(c: 'all' | 'team'): void {

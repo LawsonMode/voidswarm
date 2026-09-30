@@ -72,6 +72,12 @@ This runs everything from one computer: online play, accounts, loot and moderati
 
 Details and troubleshooting are in **[docs/LOCAL-HOSTING.md](docs/LOCAL-HOSTING.md)**. To host over the internet, use [docs/HOSTING.md](docs/HOSTING.md) (a free tunnel from your PC) or [docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md) (an always-on server).
 
+**LAN Edition (0.6, in development).** A portable Windows folder for a class or a household: no Node.js to install,
+no internet, and a **Host Control Panel** on `http://localhost:7778` with a live chat feed, the full chat log (the
+original text only on an audited Reveal), custom filter words and announcements. Milestone 1 (host basics and the
+chat log) has landed; HTTPS, school accounts and the school tabs follow. Build it with `npm run package:lan -- --out
+<folder>`; the host guide is **[docs/LAN-EDITION.md](docs/LAN-EDITION.md)**.
+
 <p align="center"><img src="docs/assets/divider.svg" width="100%" alt=""></p>
 
 ## What is Voidswarm?
@@ -494,7 +500,7 @@ npm run mod -- promote <your-username>   # the account must exist; a running ser
 # then open http://localhost:7777/admin (or your tunnel URL + /admin)
 ```
 
-Setup, what gets logged, retention, ban scopes and the NAT caveat are covered in **[docs/MODERATION.md](docs/MODERATION.md)**.
+Setup, what gets logged, retention, ban scopes and the NAT caveat are covered in **[docs/MODERATION.md](docs/MODERATION.md)**. The LAN Edition's Host Control Panel (Live, the full Chat log with audited Reveal, friendly stand-in lines instead of starred text, custom terms) is in **[docs/LAN-EDITION.md](docs/LAN-EDITION.md)**.
 
 <p align="center"><img src="docs/assets/divider.svg" width="100%" alt=""></p>
 

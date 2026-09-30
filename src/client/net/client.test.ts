@@ -6,6 +6,8 @@ import { WS_CLOSE_KICKED } from '../../shared/net/closeCodes';
 import type { GameEvent, ShipView, Snapshot, UpgradeChoice, YouState } from '../../shared/types';
 import { EventQueue, MAX_BATCHES, RELEASE_MS, STALE_MS } from './eventQueue';
 import { ConnectSuperseded, GameClient } from './GameClient';
+import { classifyClose } from './reconnect';
+import { SILENT_CLOSE_REASON } from './silence';
 import type { Transport } from './transport';
 import { NEXT_OFFER_ARM_MS, PICK_RETRY_MS, UpgradePickGuard } from './upgradePick';
 
@@ -16,6 +18,8 @@ class FakeTransport implements Transport {
   onClose: ((reason: string, code?: number) => void) | null = null;
   sent: ClientMsg[] = [];
   closed = false;
+  /** Answer each ping with a pong, like a live server (false: a silent host, net/silence.ts). */
+  answerPings = true;
   private resolveOpen: (() => void) | null = null;
   private rejectOpen: ((e: Error) => void) | null = null;
   connect(): Promise<void> {
@@ -25,7 +29,10 @@ class FakeTransport implements Transport {
   welcome(playerId: number): void {
     this.onMessage?.({ type: 'welcome', playerId, name: 'p', serverVersion: 'x', motd: '', account: null });
   }
-  send(msg: ClientMsg): void { this.sent.push(msg); }
+  send(msg: ClientMsg): void {
+    this.sent.push(msg);
+    if (msg.type === 'ping' && this.answerPings) this.onMessage?.({ type: 'pong', t: msg.t });
+  }
   close(): void {
     this.closed = true;
     // like a browser WebSocket closed while CONNECTING: the pending connect() fails
@@ -232,6 +239,101 @@ describe('NET-1: GameClient mirrors its spectate target to the server', () => {
     c.matchActive = false;
     c.cycleSpectate();
     expect(targets()).toEqual([]);
+  });
+});
+
+describe('T-CL-6: a silent online host is dropped as lost (LAN §3.7: SilenceWatch on the ping timer)', () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  class OfflineFake extends FakeTransport {
+    override readonly kind = 'offline' as unknown as 'online';
+  }
+
+  async function connected(t: FakeTransport = new FakeTransport()) {
+    vi.useFakeTimers();
+    const c = new GameClient(null);
+    const p = c.connectTransport(t, 'a');
+    t.open();
+    await vi.advanceTimersByTimeAsync(0);
+    t.welcome(5);
+    await p;
+    const closes: { reason: string; code: number | undefined; kicked: boolean }[] = [];
+    c.on('close', (r) => closes.push({ reason: r, code: c.closeCode, kicked: c.closeKicked }));
+    const pings = () => t.sent.filter((m) => m.type === 'ping').length;
+    return { c, t, closes, pings };
+  }
+
+  it('no answer for 8 s after a ping: closed as a lost connection with no code, and the ping timer stops', async () => {
+    const t = new FakeTransport();
+    t.answerPings = false; // the host PC went to sleep: nothing comes back, and no close either
+    const { c, closes, pings } = await connected(t);
+    await vi.advanceTimersByTimeAsync(7900);
+    expect(closes).toEqual([]);
+    expect(c.connected).toBe(true);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(closes).toEqual([{ reason: SILENT_CLOSE_REASON, code: undefined, kicked: false }]);
+    // main.ts: 'lost' = the host-lost text and the 60 s retry (never the kicked path)
+    expect(classifyClose(closes[0]!.reason, closes[0]!.code)).toBe('lost');
+    expect(c.connected).toBe(false);
+    expect(c.welcomed).toBe(false);
+    expect(c.transport).toBeNull();
+    expect(t.closed).toBe(true);
+    expect(t.onClose).toBeNull(); // the dead socket's own close, whenever it comes, is not reported again
+    const sent = pings();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(pings()).toBe(sent);
+    expect(closes).toHaveLength(1);
+  });
+
+  it('a host that answers its pings is never dropped', async () => {
+    const { c, closes, pings } = await connected();
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(closes).toEqual([]);
+    expect(c.connected).toBe(true);
+    expect(pings()).toBeGreaterThan(290);
+    c.disconnect(true);
+  });
+
+  it('anything the host sends counts (messages, snapshots), not only pongs', async () => {
+    const t = new FakeTransport();
+    t.answerPings = false;
+    const { c, closes } = await connected(t);
+    const feed = setInterval(() => t.onMessage?.({ type: 'scores', scores: [] }), 1500);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(closes).toEqual([]);
+    expect(c.connected).toBe(true);
+    clearInterval(feed);
+    await vi.advanceTimersByTimeAsync(12_000); // and once it stops, it is noticed
+    expect(closes.map((x) => x.reason)).toEqual([SILENT_CLOSE_REASON]);
+  });
+
+  it('offline (the in-page zone) is never dropped this way', async () => {
+    const t = new OfflineFake();
+    t.answerPings = false;
+    const { c, closes } = await connected(t);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(closes).toEqual([]);
+    expect(c.connected).toBe(true);
+    c.disconnect(true);
+  });
+
+  it('a disconnect or a newer connection ends the old watch', async () => {
+    const t = new FakeTransport();
+    t.answerPings = false;
+    const { c, closes } = await connected(t);
+    await vi.advanceTimersByTimeAsync(5000);
+    const t2 = new FakeTransport(); // answers its pings
+    const p2 = c.connectTransport(t2, 'a');
+    t2.open();
+    await vi.advanceTimersByTimeAsync(0);
+    t2.welcome(6);
+    await p2;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(closes).toEqual([]);
+    expect(c.connected).toBe(true);
+    c.disconnect(true);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(closes).toEqual([]);
   });
 });
 

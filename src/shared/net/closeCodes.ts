@@ -7,3 +7,11 @@
  * it as a lost connection.
  */
 export const WS_CLOSE_KICKED = 4001;
+
+/**
+ * A planned restart (the LAN launcher replacing its server child: setup done, a restore, a port change). The client
+ * shows the reason and reconnects on its own (src/client/net/reconnect.ts; RFC 6455 1012 "Service Restart").
+ */
+export const WS_CLOSE_SERVICE_RESTART = 1012;
+/** The close reason of a planned restart (the client shows it; must fit 123 bytes). */
+export const RESTART_CLOSE_REASON = 'Server restarting — back in about 20 s';

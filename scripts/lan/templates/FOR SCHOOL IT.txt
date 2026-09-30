@@ -1,0 +1,73 @@
+VOIDSWARM LAN {{VERSION}}: NOTES FOR SCHOOL IT (one page)
+=========================================================
+
+WHAT IT IS
+- A portable folder: the official node.exe {{NODE_VERSION}} (signed by the OpenJS Foundation) plus plain-text
+  JavaScript. It installs nothing, changes no registry settings and runs no service.
+- It listens on TCP 7777 (the game: http and https) and TCP 7778 (the control panel: this PC only, plus
+  https if the teacher turns on remote access). The ports can be changed in Settings; the console banner
+  and the control panel show the ones in use.
+- Its only outbound traffic is SMTP, and only when mail is set up (school-email verification).
+
+PROCESS TREE AND WRITES
+- cmd.exe -> node.exe (launcher) -> node.exe (server, sandboxed with Node's --permission model).
+- The launcher also runs read-only system tools: powershell.exe (Get-NetConnectionProfile, Get-Volume),
+  netsh, powercfg, icacls, whoami, tasklist and netstat, and explorer.exe when the teacher asks for a folder.
+- It writes only inside ...\Voidswarm LAN\data\, plus an off-PC backup folder if one is configured.
+
+THE HOST PC
+- Install location: %USERPROFILE%\Voidswarm LAN for the teacher's account. The launcher refuses OneDrive,
+  Temp, Downloads, network (UNC) and FAT locations, and in School mode refuses folders other users can write.
+- AppLocker or WDAC: allow runtime\node.exe (publisher: OpenJS Foundation) AND a script rule for
+  ...\Voidswarm LAN\*.cmd. Scope both to the teacher's user or group plus this path: a global OpenJS allow
+  would give every student a script runtime. The default script rules (%WINDIR% and %PROGRAMFILES% only)
+  otherwise block the .cmd files.
+- Antivirus and EDR: Defender attack-surface-reduction prevalence rules and Bitdefender may need an exclusion
+  for ...\runtime\node.exe; a common Sigma rule flags "node.exe running a .js file". Voidswarm never runs as
+  administrator (School mode refuses to).
+- SmartScreen and Smart App Control: unblock the zip before extracting it (Properties -> Unblock), or
+  deliver the folder from a network share or USB stick.
+- Firewall: by GPO, an inbound PROGRAM rule for ...\runtime\node.exe (no port) on the Domain and Private
+  profiles. Never run the .cmd files elevated from a user folder.
+- Addresses: a DHCP reservation for the host PC (with a USB-C dock, reserve the DOCK's MAC address).
+  Wired Ethernet is best.
+- BitLocker and a Windows password: the chat log and account records are on this PC.
+
+THE NETWORK
+- Student Wi-Fi client isolation: allow the student VLAN -> host IP on TCP 7777 (and 7778 only if remote
+  admin is used).
+- Proxy or PAC: DIRECT for the host IP. A cloud proxy (Securly, Lightspeed, iboss, Zscaler) cannot reach a
+  private IP address.
+- Web filter and URLAllowlist (allowlist-only OUs): http://<host-ip>:7777 (the start page) AND
+  https://<host-ip>:7777.
+- Teacher tools (GoGuardian Teacher scenes, Hapara, Securly Classroom): add both addresses too, or they close
+  the tab. A teacher can do this without IT.
+
+CHROMEBOOKS
+- Best: push the host's certificate, voidswarm-lan-ca.crt (PEM), under Devices -> Networks -> Certificates
+  for the classroom OU. Optionally use CACertificatesWithConstraints with permitted_cidrs=<host-ip>/32.
+- Or: give the host its own certificate (Settings -> Network) for an internal DNS name, for example
+  voidswarm.yourdistrict.example. Then there is nothing to push and no warnings.
+- Otherwise: SSLErrorOverrideAllowedForOrigins = https://<host-ip>:7777. Prefer pushing the certificate:
+  weekly click-throughs teach students to ignore certificate warnings.
+- CACertificateManagementAllowed = 2 (students can't import certificates) is fine.
+
+IPADS
+- Deliver the certificate payload through MDM.
+
+EVERY IP-BASED RULE BREAKS WHEN THE ADDRESS CHANGES. Reserve the address, or use the DNS name.
+
+MAIL (only for school-email verification)
+- Outbound 587 or 465 from the host PC to the mail relay, or the Workspace SMTP relay for the school's
+  public IP. Use a dedicated no-reply mailbox, and a student test mailbox for the Test button.
+
+INCIDENT
+- Host PC lost or compromised: remove the Voidswarm certificate from the OU now; the teacher then makes a
+  New certificate in the control panel.
+
+DATA
+- Accounts, the full chat log and conduct records stay in data\ on the host PC. Backups in data\backups
+  are encrypted (AES-256-GCM).
+
+BEFORE ROLLOUT
+- Open http://<host-ip>:7777/check on a student-profile Chromebook.

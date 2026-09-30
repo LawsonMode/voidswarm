@@ -14,7 +14,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "tsx src/shared/smoke.ts",
-    "mod": "tsx src/server/moderation/cli.ts"
+    "mod": "tsx src/server/moderation/cli.ts",
+    "package:lan": "node scripts/build-lan.mjs",
+    "lan": "node scripts/build-lan.mjs --run --"
   },
   "dependencies": {
     "nodemailer": "^10.0.11",
@@ -26,6 +28,7 @@
     "@types/node": "^22.0.0",
     "@types/nodemailer": "^8.0.2",
     "@types/ws": "^8.5.0",
+    "esbuild": "0.28.2",
     "tsx": "^4.20.0",
     "typescript": "~5.9.0",
     "vite": "^8.0.0",

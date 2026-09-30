@@ -68,3 +68,51 @@ describe('static hosting: server URL defaults (GitHub Pages)', () => {
     expect(isTrustedServerUrl('wss://voidswarm.example.com:9443', selfHosted())).toBe(true);
   });
 });
+
+// LAN edition §3.7 / T-CL-1: a page served by the game server dials its own origin (any port, http or https); only the
+// Vite dev / preview pages keep ws://<hostname>:7777, and a static host (Pages) has no default at all.
+describe('T-CL-1: the same-origin default server URL', () => {
+  const at = (href: string) => {
+    const u = new URL(href);
+    return { protocol: u.protocol, hostname: u.hostname, host: u.host, port: u.port, search: u.search };
+  };
+
+  it('the spec examples', () => {
+    expect(defaultServerUrl(at('https://10.0.0.5:7779/'))).toBe('wss://10.0.0.5:7779');
+    expect(defaultServerUrl(at('http://localhost:5173/'))).toBe('ws://localhost:7777');
+    expect(defaultServerUrl(at('https://lawsonmode.github.io/voidswarm/'))).toBe('');
+  });
+
+  it('the LAN edition on any port, http or https, and IPv6: the page\'s own origin', () => {
+    expect(defaultServerUrl(at('http://10.0.0.5:7779/play'))).toBe('ws://10.0.0.5:7779');
+    expect(defaultServerUrl(at('http://192.168.1.50:7781/'))).toBe('ws://192.168.1.50:7781');
+    expect(defaultServerUrl(at('https://192.168.1.50:7781/'))).toBe('wss://192.168.1.50:7781');
+    expect(defaultServerUrl(at('http://localhost:7779/'))).toBe('ws://localhost:7779');
+    expect(defaultServerUrl(at('http://[::1]:7779/'))).toBe('ws://[::1]:7779');
+    expect(defaultServerUrl(at('https://voidswarm.caldwellschools.org/'))).toBe('wss://voidswarm.caldwellschools.org');
+    // npm start and a TLS reverse proxy / tunnel are unchanged
+    expect(defaultServerUrl(at('http://192.168.1.20:7777/'))).toBe('ws://192.168.1.20:7777');
+    expect(defaultServerUrl(at('https://play.example.com/'))).toBe('wss://play.example.com');
+    // a plain http page on port 80 (no port in location.host) stays on it too
+    expect(defaultServerUrl(at('http://bat-computer/'))).toBe('ws://bat-computer');
+  });
+
+  it('Vite dev (5173, or any port when the dev server says so) and preview (4173) dial port 7777', () => {
+    expect(defaultServerUrl(at('http://192.168.1.50:5173/'))).toBe('ws://192.168.1.50:7777');
+    expect(defaultServerUrl(at('http://localhost:4173/'))).toBe('ws://localhost:7777');
+    expect(defaultServerUrl(at('http://localhost:5174/'), false, true)).toBe('ws://localhost:7777');
+    expect(defaultServerUrl(at('http://localhost:5174/'), false, false)).toBe('ws://localhost:5174');
+    // a page with no host (file://) falls back to this machine's game server
+    expect(defaultServerUrl({ protocol: 'file:', hostname: '', host: '', port: '', search: '' })).toBe('ws://localhost:7777');
+  });
+
+  it('resolveServer and the reset link (main.ts resetServerUrl) use the same default', () => {
+    expect(resolveServer(at('https://10.0.0.5:7779/'), null)).toEqual({ url: 'wss://10.0.0.5:7779', source: 'default', pending: null });
+    expect(resolveServer(at('http://10.0.0.5:7779/?reset=abc'), 'ws://'))
+      .toEqual({ url: 'ws://10.0.0.5:7779', source: 'default', pending: null });
+    // a saved server still wins over the default, and the page's own host (any port) is trusted in ?server=
+    expect(resolveServer(at('https://10.0.0.5:7779/'), 'ws://192.168.1.9:7777').url).toBe('ws://192.168.1.9:7777');
+    expect(isTrustedServerUrl('wss://10.0.0.5:7779', at('https://10.0.0.5:7779/'))).toBe(true);
+    expect(resolveServer(at('http://localhost:5173/'), null, false, true).url).toBe('ws://localhost:7777');
+  });
+});

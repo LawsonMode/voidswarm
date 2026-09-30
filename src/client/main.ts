@@ -1,4 +1,5 @@
 // Voidswarm client entry: boot, screens state machine, fixed-rate input loop, per-frame render.
+import './fonts.css';
 import './styles.css';
 import type { IAudioFx, IGameRenderer, RenderFrame } from './contracts';
 import { GameRenderer } from './render/GameRenderer';
@@ -11,7 +12,9 @@ import type { GameEvent, GameMap, GameType } from '../shared/types';
 import { InputManager, type UiAction } from './input/InputManager';
 import { pickAttachCandidate } from './net/attach';
 import { ConnectSuperseded, GameClient } from './net/GameClient';
-import { isSessionExpiredMessage } from './net/accounts';
+import { apiBaseFromServerUrl, isSessionExpiredMessage, SESSION_EXPIRED_MSG } from './net/accounts';
+import { classifyClose, closeNoticeText, retryStatusParts, SessionRetry, type RedialSession } from './net/reconnect';
+import { fetchChatNotice } from './net/serverInfo';
 import { defaultServerUrl, normalizeServerUrl, resolveServer } from './net/serverUrl';
 import { loadSettings, saveSettings, type ClientSettings } from './settings';
 import { loadStr, saveStr } from './storage';
@@ -31,6 +34,9 @@ type ScreenId = 'title' | 'command' | 'room' | 'game';
 
 const KEY_NAME = 'voidswarm.name';
 const KEY_SERVER = 'voidswarm.server';
+
+/** An online session that reached the zone: what an auto-reconnect dials again (net/reconnect.ts). */
+type LiveSession = RedialSession;
 
 /** Used only if the real renderer fails to initialize — keeps the UI usable. */
 class FallbackRenderer implements IGameRenderer {
@@ -121,18 +127,81 @@ async function boot(): Promise<void> {
   let bigMap = false;
   let chatFocused = false;
 
+  // --- LAN edition §3.7: an unexpected close retries for 60 s (net/reconnect.ts SessionRetry: the same server,
+  // callsign and token), with the host-lost / restart text on its own Title line.
+  /** The online session in play (null offline, on the title, and while reconnecting). */
+  let live: LiveSession | null = null;
+  let connecting = false;
+  const retry = new SessionRetry({
+    client,
+    // an account session is only redialled while the Title still holds its token (never after Log out)
+    currentToken: () => title.sessionToken,
+    canAttempt: () => !connecting,
+    onStatus: (s) => {
+      if (s.state === 'waiting' || s.state === 'trying') {
+        const p = retryStatusParts(s.notice, s.secondsLeft);
+        title.setRetryStatus(p.text, p.countdown);
+      } else if (s.state === 'gaveUp') {
+        title.setRetryStatus(s.notice, '', true);
+        ui('error');
+      } else {
+        title.setRetryStatus(''); // connected / stopped
+      }
+    },
+    onRefused: (msg) => {
+      // A refusal on purpose (ws close 4001: banned, session revoked, guests off...; a protocol mismatch after an
+      // update): the retry ends with the server's message.
+      showTitle(msg, true);
+      if (isSessionExpiredMessage(msg)) title.expireSession(msg);
+      ui('error');
+    },
+    onReconnected: (s, accepted) => {
+      live = { url: s.url, name: s.name, token: accepted ? s.token : undefined };
+      if (!accepted) {
+        title.expireSession(SESSION_EXPIRED_MSG);
+        toasts.show('Your session expired — playing as a guest. Log in again to use your account.', 'error', 6000);
+      }
+      title.setStatus('', false);
+      title.noteAccount(client.account);
+      toasts.show('Reconnected.', 'info', 3000);
+      ui('start');
+      loadChatNotice(s.url);
+      refresh();
+    },
+  });
+  /** Stop any auto-reconnect (and an attempt in flight): the player chose what happens next (Play, Log in, Quit...). */
+  const stopReconnect = () => { retry.stop(); title.setRetryStatus(''); };
+
+  // --- LAN edition §4.15: the server's chat notice (GET /api/info → notice) at the top of the lobby chat panels.
+  let noticeSeq = 0;
+  const setChatNotice = (text: string) => { command.chat.setNotice(text); room.chat.setNotice(text); };
+  const loadChatNotice = (serverUrl: string) => {
+    const seq = ++noticeSeq;
+    setChatNotice('');
+    const base = apiBaseFromServerUrl(serverUrl);
+    if (!base) return;
+    void fetchChatNotice(base).then((text) => { if (seq === noticeSeq && live) setChatNotice(text); });
+  };
+  const clearChatNotice = () => { noticeSeq++; setChatNotice(''); };
+
   const leave = () => { client.send({ type: 'leaveRoom' }); ui('click'); menu.close(); };
   /** Log out (account) / Disconnect (guest) / Quit to Title (offline). */
   const exitLabel = () => (client.offline ? 'Quit to Title' : client.account ? 'Log out' : 'Disconnect');
   const exit = () => {
     menu.close();
     const logOut = !client.offline && !!client.account;
+    live = null;
+    stopReconnect();
+    clearChatNotice();
     client.disconnect(true);
     showTitle('');
     if (logOut) void title.logout();
   };
   /** Command's guest banner: leave the zone and open the Create account form. */
   const createAccount = () => {
+    live = null;
+    stopReconnect();
+    clearChatNotice();
     client.disconnect(true);
     showTitle('');
     title.showView('register');
@@ -176,6 +245,11 @@ async function boot(): Promise<void> {
     onOffline: (name) => void connect('offline', name, ''),
     onSettings: () => openModal(settingsModal),
     onControls: () => openModal(controlsModal),
+    onLogout: () => {
+      // Nothing under way may bring the account back: no auto-reconnect, and no connect in flight with its token.
+      stopReconnect();
+      if (connecting) client.disconnect(true);
+    },
   }, {
     name: savedName, server, resetToken,
     resetServerUrl: defaultServerUrl(window.location), pageHost: window.location.hostname,
@@ -262,8 +336,8 @@ async function boot(): Promise<void> {
     if (msg) title.setStatus(msg, error);
   }
 
-  let connecting = false;
   async function connect(kind: 'online' | 'offline', name: string, url: string, token?: string): Promise<void> {
+    stopReconnect(); // the player's own choice replaces an auto-reconnect (its attempt is superseded)
     if (connecting) return; // one attempt at a time (Play buttons are disabled meanwhile)
     connecting = true;
     try { await connectNow(kind, name, url, token); } finally { connecting = false; }
@@ -280,20 +354,27 @@ async function boot(): Promise<void> {
       if (title.isPersistable(url)) saveStr(KEY_SERVER, url);
     }
     title.setBusy(true, kind === 'online' ? `Connecting to ${url}…` : 'Starting offline zone…');
+    live = null;
+    clearChatNotice();
     try {
       if (kind === 'online') await client.connectOnline(url, name, token);
       else await client.connectOffline(name);
       title.setBusy(false);
       if (kind === 'online' && token && !client.account) {
         // Token not accepted: we're a guest on this server now.
-        title.expireSession('Session expired — please log in again');
+        title.expireSession(SESSION_EXPIRED_MSG);
         toasts.show('Your session expired — playing as a guest. Log in again to use your account.', 'error', 6000);
+      }
+      if (kind === 'online') {
+        live = { url, name, token: token && client.account ? token : undefined };
+        loadChatNotice(url);
       }
       title.noteAccount(client.account);
       ui('start');
       refresh();
     } catch (e) {
-      if (e instanceof ConnectSuperseded) { title.setBusy(false); return; } // replaced by a newer attempt / disconnect
+      // superseded by a disconnect (Quit, Log out...): whoever did that owns the status line ("Logged out.")
+      if (e instanceof ConnectSuperseded) { title.setBusy(false, null); return; }
       console.error('[voidswarm] connect failed', e);
       client.disconnect(true);
       title.setBusy(false);
@@ -306,6 +387,10 @@ async function boot(): Promise<void> {
 
   client.on('change', refresh);
   client.on('close', (reason) => {
+    if (retry.active) return; // a reconnect attempt failing: the retry carries on (or reports why not)
+    const session = live;
+    live = null;
+    clearChatNotice();
     if (client.closeKicked) {
       // The server ended this session on purpose (ws close 4001; its 'error' message was already toasted):
       // back to the login screen with that message. A revoked session's stored token is forgotten.
@@ -313,8 +398,18 @@ async function boot(): Promise<void> {
       if (isSessionExpiredMessage(reason)) title.expireSession(reason);
       return;
     }
-    toasts.show(`Disconnected: ${reason}`, 'error', 6000);
-    showTitle(`Disconnected: ${reason}`, true);
+    if (!session) {
+      toasts.show(`Disconnected: ${reason}`, 'error', 6000);
+      showTitle(`Disconnected: ${reason}`, true);
+      return;
+    }
+    // Lost an online session (the host slept / stopped / moved, or a planned restart): retry it for 60 s.
+    const kind = classifyClose(reason, client.closeCode);
+    const notice = closeNoticeText(kind, reason, session.url);
+    toasts.show(notice, kind === 'restart' ? 'info' : 'error', 6000);
+    showTitle('');
+    ui('error');
+    retry.start(session, notice);
   });
   client.on('error', (msg) => {
     if (isSessionExpiredMessage(msg)) title.expireSession(msg);

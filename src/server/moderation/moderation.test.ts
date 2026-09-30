@@ -105,10 +105,10 @@ async function drain(svc: ModerationService): Promise<void> {
 describe('schema (MIGRATIONS[2])', () => {
   it('bumps user_version once and creates the moderation tables + indexes', () => {
     const dbPath = setupDb([]);
-    expect(SCHEMA_VERSION).toBe(3);
+    expect(SCHEMA_VERSION).toBe(4); // v4 (§6.6) is additive: the v3 moderation tables are unchanged
     const db = new DatabaseSync(dbPath);
     try {
-      expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(3);
+      expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(4);
       const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((r) => r.name);
       for (const t of ['chat_log', 'mod_actions', 'bans', 'reports', 'admins', 'mod_meta']) expect(tables).toContain(t);
       const idx = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as { name: string }[]).map((r) => r.name);
@@ -188,8 +188,11 @@ describe('strikes → automatic mute', () => {
     const { svc, zone, student, clock, teach } = rig();
     const hook = svc.hook();
     expect(hook.onStrike(student, 'language')).toBeNull();
+    expect(hook.strikeStatus!(student)).toEqual({ count: 1, limit: 3 });
     clock.t += MIN;
-    expect(hook.onStrike(student, 'language')).toMatch(/one more and you'll be muted for 10 minutes/);
+    // v0.6 (§5.8, A2): the escalating "one more …" warning is the Zone's (from strikeStatus); onStrike only says "muted".
+    expect(hook.onStrike(student, 'language')).toBeNull();
+    expect(hook.strikeStatus!(student)).toEqual({ count: 2, limit: 3 });
     clock.t += MIN;
     expect(hook.onStrike(student, 'language')).toBe('You are muted for 10 minutes (repeated blocked language).');
     const mute = hook.isMuted(student);
@@ -263,17 +266,21 @@ describe('strikes → automatic mute', () => {
     expect(hook.isMuted(student)).toBeNull();
   });
 
-  it('alerts about withheld self-harm / threat lines reach online moderators, at most once a minute per pilot, with no strike', () => {
+  it('self-harm alerts are for the host alone and nameless (T-WB-1); threats raise a host alert; neither is a strike', () => {
     const { svc, zone, student, teach, clock } = rig();
     const hook = svc.hook();
     hook.alert!(student, 'selfharm');
     hook.alert!(student, 'selfharm');
-    expect(zone.toldTo(teach.playerId).filter((t) => t.includes('self-harm'))).toHaveLength(1);
+    // v0.6: nothing reaches a moderator in game, and the host's alert carries no name.
+    expect(zone.toldTo(teach.playerId).filter((t) => t.includes('self-harm') || t.includes('Student'))).toHaveLength(0);
+    const wellbeing = svc.alertsList().filter((a) => a.kind === 'wellbeing');
+    expect(wellbeing.length).toBeGreaterThan(0);
+    for (const a of wellbeing) expect(a).not.toHaveProperty('name');
     hook.alert!(student, 'threat');
-    expect(zone.toldTo(teach.playerId).filter((t) => t.includes('threatening'))).toHaveLength(1);
+    expect(svc.alertsList().some((a) => a.kind === 'threat')).toBe(true);
     clock.t += MIN + 1;
     hook.alert!(student, 'selfharm');
-    expect(zone.toldTo(teach.playerId).filter((t) => t.includes('self-harm'))).toHaveLength(2);
+    expect(zone.toldTo(teach.playerId).filter((t) => t.includes('self-harm'))).toHaveLength(0);
     expect(svc.strikeCount(student)).toBe(0);
   });
 
@@ -374,8 +381,10 @@ describe('reports', () => {
     expect(r.reporter).toMatchObject({ name: 'Other', accountId: 'id-other' });
     expect(r.target).toMatchObject({ name: 'Student', accountId: 'id-student', playerId: 2 });
     expect(r.recentChat).toHaveLength(20);
-    expect(r.recentChat.at(-1)!.original).toBe('msg 24');
-    expect(r.recentChat[0]!.original).toBe('msg 5');
+    // §6.4: a report stores only what others saw (no original text, address or hit labels).
+    expect(r.recentChat.at(-1)!.shown).toBe('msg 24');
+    expect(r.recentChat[0]!.shown).toBe('msg 5');
+    for (const line of r.recentChat) expect(line.original ?? '').toBe('');
     expect(zone.toldTo(teach.playerId).some((t) => t.startsWith(`[mod] New report #${r.id}: Other reported Student`))).toBe(true);
     // self / unknown
     expect(await hook.report(reporter, 'Other', 'x', { roomId: null, roomName: 'Zone' })).toEqual(["You can't report yourself."]);
@@ -522,7 +531,7 @@ describe('CLI', () => {
     const text = readFileSync(file, 'utf8');
     expect(text.startsWith('﻿id,time')).toBe(true);
     expect(text.trim().split('\r\n')).toHaveLength(2);
-    expect(csvCell('-1+1')).toBe("'-1+1");
+    expect(csvCell('-1+1')).toBe(`"'-1+1"`);
     expect(csvCell('fine')).toBe('fine');
   });
 });
@@ -633,8 +642,8 @@ describe('network targets, purge-log, CSV numbers', () => {
   it('CSV: numbers are written as numbers (team -1), only text cells get the formula guard', () => {
     expect(csvCell(-1)).toBe('-1');
     expect(csvCell(42)).toBe('42');
-    expect(csvCell('-1')).toBe("'-1");
-    expect(csvCell('@home')).toBe("'@home");
+    expect(csvCell('-1')).toBe(`"'-1"`);
+    expect(csvCell('@home')).toBe(`"'@home"`);
   });
 });
 

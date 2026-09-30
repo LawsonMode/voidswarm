@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voidswarm LAN: start here</title>
+<style>
+  :root {
+    --bg: #f6f7fb; --card: #ffffff; --ink: #1c2233; --muted: #5a6275; --line: #d9dde8;
+    --accent: #0b7a8a; --accent-ink: #ffffff; --warn-bg: #fff4d6; --warn-line: #e3b341; --win: #f3f3f3; --win-bar: #ffffff;
+    --blue: #0067c0; --shield: #0067c0; --red: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11141c; --card: #1a1f2b; --ink: #e8ebf3; --muted: #a3abbe; --line: #2e3547;
+      --accent: #3cc6d6; --accent-ink: #0b1016; --warn-bg: #2f2812; --warn-line: #a88420; --win: #262b36; --win-bar: #2f3542;
+      --blue: #5aa9ff; --shield: #5aa9ff; --red: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.9rem; margin: 0 0 4px; letter-spacing: 0.01em; }
+  h2 { font-size: 1.25rem; margin: 0 0 8px; display: flex; gap: 10px; align-items: baseline; }
+  h2 .n { display: inline-grid; place-items: center; min-width: 1.8em; height: 1.8em; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 0.85em; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin: 16px 0; }
+  code, kbd { font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.92em; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+  figure { margin: 14px 0 4px; }
+  figure svg { width: 100%; max-width: 520px; height: auto; display: block; }
+  figcaption { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+  th, td { text-align: left; vertical-align: top; padding: 7px 8px; border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  ul, ol { padding-left: 1.3em; margin: 6px 0; }
+  li { margin: 3px 0; }
+  footer { color: var(--muted); font-size: 0.85rem; text-align: center; margin-top: 28px; }
+  .svg-win { fill: var(--win); stroke: var(--line); }
+  .svg-bar { fill: var(--win-bar); stroke: var(--line); }
+  .svg-ink { fill: var(--ink); }
+  .svg-muted { fill: var(--muted); }
+  .svg-btn { fill: var(--card); stroke: var(--line); }
+  .svg-primary { fill: var(--blue); }
+  .svg-primary-ink { fill: #ffffff; }
+  .svg-hl { fill: none; stroke: var(--red); stroke-width: 3; }
+  .svg-line { stroke: var(--line); }
+  svg text { font-family: "Segoe UI", system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Voidswarm LAN {{VERSION}}</h1>
+  <p class="sub">Host a Voidswarm game for your class or your home on this PC. Players join from their browsers on the same network. Nothing is installed, and the game needs no internet.</p>
+
+  <section>
+    <h2><span class="n">1</span> Unblock the zip (once, before extracting)</h2>
+    <p>Right-click the downloaded <code>voidswarm-lan-{{VERSION}}-win-x64.zip</code> → <b>Properties</b> → tick <b>Unblock</b> → <b>OK</b>. This stops Windows from asking about every file.</p>
+    <figure>
+      <svg viewBox="0 0 520 250" role="img" aria-label="The zip's Properties window with the Unblock box ticked at the bottom">
+        <rect class="svg-win" x="1" y="1" width="518" height="248" rx="8"/>
+        <rect class="svg-bar" x="1" y="1" width="518" height="34" rx="8"/>
+        <text class="svg-ink" x="16" y="23" font-size="13">voidswarm-lan-{{VERSION}}-win-x64.zip Properties</text>
+        <text class="svg-muted" x="20" y="64" font-size="12">General</text>
+        <line class="svg-line" x1="20" y1="74" x2="500" y2="74"/>
+        <text class="svg-muted" x="20" y="98" font-size="12">Type of file:</text><text class="svg-ink" x="130" y="98" font-size="12">Compressed (zipped) Folder</text>
+        <text class="svg-muted" x="20" y="120" font-size="12">Size:</text><text class="svg-ink" x="130" y="120" font-size="12">about 36 MB</text>
+        <line class="svg-line" x1="20" y1="136" x2="500" y2="136"/>
+        <text class="svg-muted" x="20" y="160" font-size="12">Security:</text>
+        <text class="svg-ink" x="130" y="160" font-size="12">This file came from another computer and</text>
+        <text class="svg-ink" x="130" y="176" font-size="12">might be blocked to help protect this computer.</text>
+        <rect class="svg-btn" x="410" y="162" width="14" height="14" rx="2"/>
+        <path d="M412 169 l4 4 l7 -9" fill="none" stroke="var(--blue)" stroke-width="2.4"/>
+        <text class="svg-ink" x="430" y="174" font-size="12">Unblock</text>
+        <rect class="svg-hl" x="402" y="154" width="96" height="30" rx="6"/>
+        <rect class="svg-primary" x="330" y="210" width="80" height="26" rx="4"/><text class="svg-primary-ink" x="360" y="227" font-size="12">OK</text>
+        <rect class="svg-btn" x="418" y="210" width="80" height="26" rx="4"/><text class="svg-ink" x="436" y="227" font-size="12">Cancel</text>
+      </svg>
+      <figcaption>Properties of the zip: tick Unblock, then OK.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span> Extract it into your user folder</h2>
+    <p>Right-click the zip → <b>Extract All…</b>, type <code>%USERPROFILE%</code> in the box, and extract. You get <code>C:\Users\&lt;you&gt;\Voidswarm LAN</code>.</p>
+    <table>
+      <tr><th>Don't extract to</th><th>Why</th></tr>
+      <tr><td>the Desktop or Documents</td><td>they often sync to OneDrive, which would copy the chat log and passwords to the cloud</td></tr>
+      <tr><td>Downloads, Temp, a USB stick</td><td>antivirus suspicion, automatic clean-up, or no file permissions</td></tr>
+      <tr><td>directly under <code>C:\</code></td><td>every user of the PC could change the files</td></tr>
+    </table>
+    <p>Voidswarm refuses to start from those places and tells you where to move it.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span> Double-click <code>Start Voidswarm Host.cmd</code></h2>
+    <p>A small black window opens. <b>Keep it running</b>: closing it stops the game. After the first run it opens minimised. Don't click inside it (a selection pauses its text; the game keeps running).</p>
+    <p>If Windows shows <b>"Windows protected your PC"</b>, the zip wasn't unblocked. Click <b>More info</b> → <b>Run anyway</b>, or go back to step 1.</p>
+    <figure>
+      <svg viewBox="0 0 520 210" role="img" aria-label="The blue SmartScreen window: click More info, then Run anyway">
+        <rect x="1" y="1" width="518" height="208" rx="8" fill="#0067c0"/>
+        <text x="24" y="48" font-size="20" fill="#ffffff">Windows protected your PC</text>
+        <text x="24" y="80" font-size="12" fill="#ffffff">Microsoft Defender SmartScreen prevented an unrecognised app from starting.</text>
+        <text x="24" y="104" font-size="12" fill="#ffffff" text-decoration="underline">More info</text>
+        <rect x="16" y="88" width="76" height="24" rx="5" fill="none" stroke="#ffd54f" stroke-width="3"/>
+        <text x="24" y="136" font-size="12" fill="#ffffff">App: Start Voidswarm Host.cmd</text>
+        <rect x="300" y="160" width="100" height="30" rx="3" fill="none" stroke="#ffffff"/><text x="318" y="180" font-size="12" fill="#ffffff">Run anyway</text>
+        <rect x="292" y="152" width="116" height="46" rx="6" fill="none" stroke="#ffd54f" stroke-width="3"/>
+        <rect x="408" y="160" width="100" height="30" rx="3" fill="#ffffff"/><text x="428" y="180" font-size="12" fill="#0067c0">Don't run</text>
+      </svg>
+      <figcaption>SmartScreen: More info first, then Run anyway appears.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span> The first run: create the host admin login</h2>
+    <p>Your browser opens the <b>Host Control Panel</b> at <code>http://localhost:7778</code> (the black window shows the address if it doesn't). The setup code is already filled in; it is also in the black window.</p>
+    <ol>
+      <li>Choose a username and a password (10 characters or more) for the host admin. Write the password down somewhere safe.</li>
+      <li>Choose <b>Home</b> or <b>School</b>, and name the server.</li>
+      <li>In School mode, choose how students get accounts: <b>school email</b> (a 6-digit code is emailed) or a <b>class roster</b> (printed login slips, no email needed).</li>
+      <li>Make the <b>recovery file</b> when the panel offers it, and keep it and its passphrase apart, away from this PC.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span> Let other devices in: the firewall</h2>
+    <p>The first time, Windows may ask about <b>"Node.js JavaScript Runtime"</b>. That is Voidswarm's engine (<code>runtime\node.exe</code>). Tick <b>Private networks</b> and click <b>Allow</b>.</p>
+    <figure>
+      <svg viewBox="0 0 520 230" role="img" aria-label="The Windows Security Alert about Node.js JavaScript Runtime: tick Private networks and click Allow">
+        <rect class="svg-win" x="1" y="1" width="518" height="228" rx="8"/>
+        <rect class="svg-bar" x="1" y="1" width="518" height="34" rx="8"/>
+        <text class="svg-ink" x="16" y="23" font-size="13">Windows Security Alert</text>
+        <path d="M30 52 l16 -6 l16 6 v14 c0 10 -8 16 -16 19 c-8 -3 -16 -9 -16 -19 z" fill="var(--shield)"/>
+        <text class="svg-ink" x="76" y="66" font-size="14">Windows Defender Firewall has blocked some features of this app</text>
+        <text class="svg-muted" x="76" y="92" font-size="12">Name:</text><text class="svg-ink" x="140" y="92" font-size="12">Node.js JavaScript Runtime</text>
+        <text class="svg-muted" x="76" y="110" font-size="12">Publisher:</text><text class="svg-ink" x="140" y="110" font-size="12">Node.js</text>
+        <rect class="svg-btn" x="76" y="130" width="14" height="14" rx="2"/>
+        <path d="M78 137 l4 4 l7 -9" fill="none" stroke="var(--blue)" stroke-width="2.4"/>
+        <text class="svg-ink" x="98" y="142" font-size="12">Private networks, such as my home or work network</text>
+        <rect class="svg-hl" x="68" y="122" width="360" height="30" rx="6"/>
+        <rect class="svg-btn" x="76" y="160" width="14" height="14" rx="2"/>
+        <text class="svg-ink" x="98" y="172" font-size="12">Public networks (not recommended)</text>
+        <rect class="svg-primary" x="300" y="190" width="100" height="28" rx="4"/><text class="svg-primary-ink" x="330" y="209" font-size="12">Allow</text>
+        <rect class="svg-btn" x="408" y="190" width="100" height="28" rx="4"/><text class="svg-ink" x="436" y="209" font-size="12">Cancel</text>
+      </svg>
+      <figcaption>Allow on Private networks only. If you clicked Cancel by mistake, the control panel's Network check says what to do.</figcaption>
+    </figure>
+    <ul>
+      <li>Your network must be set to <b>Private</b> in Windows (Settings → Network &amp; internet → your connection → Network profile type). On a Public network only this PC can play.</li>
+      <li><b>Bitdefender:</b> allow <code>runtime\node.exe</code> under <b>Protection → Firewall → Rules</b> (Home/Office networks). If Bitdefender ever flags it, add an exception under <b>Protection → Advanced Threat Defense</b>.</li>
+      <li><b>If <code>runtime\node.exe</code> disappeared</b> (the black window says your antivirus may have removed it): open <b>Bitdefender → Protection → Quarantine</b>, restore the file, and add an exception for it.</li>
+      <li>Router guest networks and "AP isolation" stop players from reaching this PC. Use the main Wi-Fi, and plug this PC in with a cable if you can.</li>
+    </ul>
+    <figure>
+      <svg viewBox="0 0 520 170" role="img" aria-label="Bitdefender: Protection, then Quarantine, then Restore the file and add an exception">
+        <rect class="svg-win" x="1" y="1" width="518" height="168" rx="8"/>
+        <rect x="1" y="1" width="120" height="168" rx="8" fill="var(--win-bar)" stroke="var(--line)"/>
+        <text class="svg-muted" x="16" y="34" font-size="12">Dashboard</text>
+        <text class="svg-ink" x="16" y="58" font-size="12" font-weight="600">Protection</text>
+        <rect class="svg-hl" x="8" y="42" width="104" height="24" rx="5"/>
+        <text class="svg-muted" x="16" y="82" font-size="12">Privacy</text>
+        <text class="svg-ink" x="140" y="34" font-size="14">Protection → Antivirus → Quarantine</text>
+        <line class="svg-line" x1="140" y1="48" x2="504" y2="48"/>
+        <text class="svg-ink" x="140" y="76" font-size="12">...\Voidswarm LAN\runtime\node.exe</text>
+        <rect class="svg-btn" x="140" y="96" width="90" height="26" rx="4"/><text class="svg-ink" x="164" y="113" font-size="12">Restore</text>
+        <rect class="svg-hl" x="134" y="90" width="102" height="38" rx="6"/>
+        <rect class="svg-btn" x="244" y="96" width="140" height="26" rx="4"/><text class="svg-ink" x="258" y="113" font-size="12">Add exception</text>
+        <text class="svg-muted" x="140" y="150" font-size="11">(the menus differ a little between Bitdefender versions)</text>
+      </svg>
+      <figcaption>Bitdefender quarantine: restore node.exe and add an exception for it.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span> Players join</h2>
+    <p>The control panel's <b>Home</b> tab shows the join address, for example <code>http://192.168.1.50:7777</code>. Players type it into their browser on the same Wi-Fi. <b>Show on projector</b> opens a page with only the join address and the rooms, safe to show the class.</p>
+    <p>Before class, open the address followed by <code>/check</code> on one student device to test it.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">7</span> Everyday use</h2>
+    <table>
+      <tr><th>To…</th><th>Do this</th></tr>
+      <tr><td>stop the game</td><td>press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the black window, or <b>Stop</b> in the control panel. The chat log is saved first.</td></tr>
+      <tr><td>open the control panel again</td><td>double-click <code>Start Voidswarm Host.cmd</code> while it runs: it opens the panel.</td></tr>
+      <tr><td>update Voidswarm</td><td>stop the host, put the new <code>voidswarm-lan-…-win-x64.zip</code> in this folder (or in an <code>updates</code> folder inside it), and double-click <code>Update Voidswarm.cmd</code>. Your data, the firewall permission and your shortcuts stay as they are. A backup is made first, and the old version is kept.</td></tr>
+      <tr><td>go back to the old version</td><td>run <code>Update Voidswarm.cmd --rollback</code> from a Command Prompt in this folder (host stopped).</td></tr>
+      <tr><td>reset a forgotten admin password</td><td>double-click <code>Reset admin password.cmd</code> on this PC. It prints a new setup code; then open the control panel and set a new password.</td></tr>
+      <tr><td>restore a backup</td><td>stop the host and double-click <code>Restore a backup.cmd</code>, or use <b>Server → Backups</b> in the control panel.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="n">8</span> If something goes wrong</h2>
+    <table>
+      <tr><th>The black window says</th><th>What to do</th></tr>
+      <tr><td>Unzip the WHOLE folder first</td><td>You started a file from inside the zip, or copied one file out. Extract the whole zip (step 2) and start it from the extracted folder.</td></tr>
+      <tr><td>Your antivirus may have removed runtime\node.exe</td><td>Restore it from your antivirus quarantine and add an exception (step 5), or extract the zip again.</td></tr>
+      <tr><td>Windows blocked the Voidswarm engine (school policy)</td><td>Give <code>FOR SCHOOL IT.txt</code> to your IT team: it says exactly what to allow.</td></tr>
+      <tr><td>a message about the folder (OneDrive, Downloads, …)</td><td>Move the whole <code>Voidswarm LAN</code> folder to <code>%USERPROFILE%</code> and start it there.</td></tr>
+      <tr><td>Voidswarm is already running</td><td>It opened the control panel of the running host: nothing else to do.</td></tr>
+    </table>
+    <div class="warn">Keep this PC's Windows password and BitLocker on: the chat log and the student accounts live in the <code>data</code> folder. Backups in <code>data\backups</code> are encrypted; copies you keep elsewhere belong on storage your school approves, not a personal cloud drive.</div>
+  </section>
+
+  <footer>Voidswarm LAN {{VERSION}} · Node.js {{NODE_VERSION}} · built {{BUILD_DAY}} · third-party licences in THIRD-PARTY-NOTICES.txt</footer>
+</main>
+</body>
+</html>

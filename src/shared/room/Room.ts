@@ -35,12 +35,12 @@ import {
   extractLine, floorLine, riftAwards, riftBotClass, riftOutcomeOf, riftResultLine, riftWinner, type RiftLeaver,
 } from './rift';
 import { SnapshotBuilder } from './snapshot';
-import { allowChat, type LootGrantEntry, type LootGrantOutcome, type RoomHost, type ZoneUser } from './user';
+import { allowChat, type ChatWhere, type LootGrantEntry, type LootGrantOutcome, type RoomHost, type ZoneUser } from './user';
 import {
   BOT_CALLSIGNS, ROOM_NAME_MAX_LEN, clampSettings, dedupeName, isShipClass, leastUsedClass, nameKey, parseGameType,
   parseSubMode, sanitizeInput, sanitizeName, sanitizeText,
 } from './util';
-import { MSG_ROOM_NAME_REFUSED } from './moderation';
+import { MSG_ROOM_NAME_REFUSED, chatSenderKey } from './moderation';
 
 /** Server-only: a room with >=1 ready human auto-starts after this long in the lobby. */
 export const AUTO_START_SEC = 20;
@@ -159,6 +159,53 @@ export interface RoomPlayer {
 
 interface PendingBotChat { at: number; pid: PlayerId; text: string; channel: 'all' | 'team' }
 
+/**
+ * v0.6 (LAN edition, docs/LAN-EDITION-proposal.md §5.8): what the Zone's chat gate decided for one human line — the
+ * richer form of RoomHost.chatGate's text.
+ */
+export interface ChatVerdict {
+  /** What to broadcast, or null = nothing (the sender was told privately). */
+  text: string | null;
+  /** 'sender' = a line from the sender (as typed, or a positive substitute under their name); 'system' = a system line. */
+  as: 'sender' | 'system';
+  /** A substitute: everyone EXCEPT the sender gets it (the sender got a private warning instead). */
+  skipSender: boolean;
+}
+
+/**
+ * v0.6: what a Room needs from its Zone beyond room/user.ts RoomHost (to be folded into RoomHost by its owner).
+ *  - chatVerdict: the moderation gate with substitution (RoomHost.chatGate stays for the shape; Rooms use this);
+ *  - roomNameRefusal: RoomHost.roomNameAllowed with the note to tell the host when the name is refused (null =
+ *    allowed): the ordinary refusal, or the kind note (988) for a name read as a self-harm statement (never a strike);
+ *  - roomNameAccepted: a room host's rename went through — the Zone logs the accepted name (§5.7).
+ */
+export interface ZoneRoomHost extends RoomHost {
+  chatVerdict(user: ZoneUser, text: string, where: ChatWhere): ChatVerdict;
+  roomNameRefusal(user: ZoneUser | null, name: string): string | null;
+  roomNameAccepted(user: ZoneUser | null, name: string): void;
+}
+
+/** A chat line kept for the room's history, with its audience (a team-only system line, or all but one pilot). */
+interface HistoryEntry {
+  line: ChatLine;
+  /** a pilot who must not see it (the sender of a substitute); 0 = none */
+  skip: PlayerId;
+  /** that sender's chatSenderKey (a reconnect gets a new playerId but must not see its substitute either); null = none */
+  skipWho: string | null;
+  /** only this team sees it (a team line substituted as a system line); null = everyone the channel allows */
+  team: TeamId | null;
+}
+
+/** Room.pushChat audience options. */
+export interface ChatAudience {
+  /** everyone except this pilot (a substitute's sender) */
+  skip?: PlayerId;
+  /** ...and except anyone with this chatSenderKey (the same sender after a reconnect) */
+  skipWho?: string;
+  /** only this team (a system line standing in for a team line) */
+  team?: TeamId;
+}
+
 const CLASS_LIST = SHIP_CLASS_IDS.map((id) => `${id} (${SHIP_CLASSES[id].name})`).join(', ');
 const HELP_LINES = [
   'Commands: /help  /name <callsign>  /team <1-8|auto|spec>  /class <class>  /ready  /leave  /report <name> <reason>',
@@ -192,10 +239,10 @@ export class Room {
   private readonly baseSettings: RoomSettings;
   private customized = false;
 
-  private host: RoomHost;
+  private host: ZoneRoomHost;
   private players: RoomPlayer[] = [];
   private hostPid: PlayerId = 0;
-  private history: ChatLine[] = [];
+  private history: HistoryEntry[] = [];
   private dirty = true;
   private joinCounter = 0;
   private tickCount = 0;
@@ -267,7 +314,7 @@ export class Room {
   /** A floor started this tick: the next snapshot goes out now, right after the floorStart message. */
   private forceSnapshot = false;
 
-  constructor(id: string, settings: RoomSettings, host: RoomHost, userCreated: boolean) {
+  constructor(id: string, settings: RoomSettings, host: ZoneRoomHost, userCreated: boolean) {
     this.id = id;
     this.settings = settings;
     this.baseSettings = { ...settings };
@@ -786,10 +833,14 @@ export class Room {
         p.ready = msg.ready === true;
         this.dirty = true;
         break;
-      case 'updateSettings':
+      case 'updateSettings': {
         if (p.playerId !== this.hostPid) { this.tell(p, 'Only the host can change settings.'); break; }
+        const before = this.settings.name;
         this.applySettings(this.screenRoomName(p, msg.settings), p);
+        // §5.7: an accepted rename is logged by the Zone (only once it actually applied: a house room keeps its name)
+        if (this.settings.name !== before && p.user) this.host.roomNameAccepted(p.user, this.settings.name);
         break;
+      }
       case 'startMatch': this.requestStart(p); break;
       case 'joinMatch': this.joinMatch(p); break;
       case 'spectate': {
@@ -832,21 +883,32 @@ export class Room {
     let ch: 'all' | 'team' = channel === 'team' ? 'team' : 'all';
     if (text.startsWith('//')) { ch = 'team'; text = text.slice(2).trim(); if (!text) return; }
     else if (text.startsWith('/')) { this.command(p, text); return; }
-    // Moderation: mute / repeat flood / word filter / chat log (null = not shown; the sender was told why).
-    const shown = this.host.chatGate(p.user, text, { roomId: this.id, roomName: this.settings.name, channel: ch, team: p.team });
-    if (shown === null) return;
-    this.pushChat({ fromPlayerId: p.playerId, fromName: p.name, channel: ch, team: p.team, text: shown, time: Date.now() });
+    // Moderation: mute / repeat flood / word filter / chat log (text null = not shown; the sender was told why). A
+    // substitute (v0.6, A2) goes to everyone but the sender — a team line only to the team, in either form.
+    const v = this.host.chatVerdict(p.user, text, { roomId: this.id, roomName: this.settings.name, channel: ch, team: p.team });
+    if (v.text === null) return;
+    const time = Date.now();
+    const audience: ChatAudience = v.skipSender ? { skip: p.playerId, skipWho: chatSenderKey(p.user) } : {};
+    if (v.as === 'system') {
+      if (ch === 'team') audience.team = p.team;
+      this.pushChat({ fromPlayerId: 0, fromName: '', channel: 'system', team: ch === 'team' ? p.team : NO_TEAM, text: v.text, time }, audience);
+      return;
+    }
+    this.pushChat({ fromPlayerId: p.playerId, fromName: p.name, channel: ch, team: p.team, text: v.text, time }, audience);
   }
 
   /**
    * Moderation: a settings patch that renames the room is checked with the name filter first. A refused name is
-   * dropped from the patch (the host is told; the rest of the patch still applies).
+   * dropped from the patch (the host is told, with the Zone's note: the ordinary refusal, or the kind note for a
+   * name read as a self-harm statement; the rest of the patch still applies).
    */
   private screenRoomName(p: RoomPlayer, patch: unknown): unknown {
     if (!patch || typeof patch !== 'object' || (patch as Record<string, unknown>).name === undefined) return patch;
     const name = sanitizeName((patch as Record<string, unknown>).name, this.settings.name, ROOM_NAME_MAX_LEN);
-    if (name === this.settings.name || this.host.roomNameAllowed(p.user, name)) return patch;
-    this.tell(p, MSG_ROOM_NAME_REFUSED);
+    if (name === this.settings.name) return patch;
+    const refusal = this.host.roomNameRefusal(p.user, name);
+    if (refusal === null) return patch;
+    this.tell(p, refusal || MSG_ROOM_NAME_REFUSED);
     const { name: _refused, ...rest } = patch as Record<string, unknown>;
     return rest;
   }
@@ -1484,17 +1546,32 @@ export class Room {
   // Chat plumbing
   // ------------------------------------------------------------------------------------------
 
-  private historyFor(p: RoomPlayer): ChatLine[] {
-    return this.history.filter((l) => l.channel !== 'team' || l.team === p.team);
+  /** Does `p` belong to this history entry's audience? */
+  private static inAudience(e: HistoryEntry, p: RoomPlayer): boolean {
+    if (e.skip && e.skip === p.playerId) return false;
+    if (e.skipWho && p.user && chatSenderKey(p.user) === e.skipWho) return false;
+    if (e.line.channel === 'team' && p.team !== e.line.team) return false;
+    return e.team === null || p.team === e.team;
   }
 
-  pushChat(line: ChatLine): void {
-    this.history.push(line);
+  private historyFor(p: RoomPlayer): ChatLine[] {
+    const out: ChatLine[] = [];
+    for (const e of this.history) if (Room.inAudience(e, p)) out.push(e.line);
+    return out;
+  }
+
+  /**
+   * Broadcast a chat line (and keep it for history). Team lines reach their team only. `audience` (v0.6): `skip` =
+   * everyone except that pilot (a substitute's sender never sees it), `skipWho` = nor anyone with that chatSenderKey
+   * (the sender reconnected), `team` = only that team (a system line standing in for a team line).
+   */
+  pushChat(line: ChatLine, audience: ChatAudience = {}): void {
+    const e: HistoryEntry = { line, skip: audience.skip ?? 0, skipWho: audience.skipWho ?? null, team: audience.team ?? null };
+    this.history.push(e);
     if (this.history.length > CHAT_HISTORY) this.history.splice(0, this.history.length - CHAT_HISTORY);
     const msg: ServerMsg = { type: 'chat', line };
     for (const p of this.players) {
-      if (!p.user) continue;
-      if (line.channel === 'team' && p.team !== line.team) continue;
+      if (!p.user || !Room.inAudience(e, p)) continue;
       p.user.sink.sendMsg(msg);
     }
   }

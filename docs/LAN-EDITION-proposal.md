@@ -2472,3 +2472,29 @@ Gate: the owner can unzip at home, run it, and use Live and the full Chat log ov
 5. **Not asked, so the design defaults stand:**
    - imported custom lists are "confirm before strikes" (flag-only until the host confirms);
    - the IT-help question stays open, and the design works with or without IT.
+6. **The domain lock is a generic field for ANY school or network** (owner, 2026-09-29): "I want it to be for any domain lock... not just caldwellschools.org. I would like this to work for any school or network, so having a domain lock field would be better."
+   - **Field:** Settings → Accounts has an editable **Allowed email domains** field. It is a list of `{ domain, subdomains }`, any number of domains, and empty means any domain.
+     - It is also offered, optionally, in first-run setup when School mode is chosen.
+     - It is seeded from `ACCOUNT_EMAIL_DOMAINS` on the VPS / env path.
+   - **No hard-coded domain anywhere in production code or presets.** The School preset leaves the list empty until the host fills it in. `caldwellschools.org` appears only in tests and docs as an example.
+   - **Every user-facing string derives from the configured list:** the signup label, the placeholder, errors, the mail-sender hint, and masked addresses.
+     - One domain: "Use your @<domain> email". Placeholder `yourname@<domain>`.
+     - Several domains: "Use your school email (@a.org or @b.org)".
+     - None configured: a generic "you@example.org" placeholder.
+   - **Validation:** normalized to lowercase, IDN to punycode, no scheme/path/@/wildcards typed by hand (the subdomain toggle covers them), public-suffix-only entries refused (e.g. `org`, `co.uk`), duplicates merged.
+   - **Guard test (M3):** fails if a non-test file under `src/` or `scripts/` contains a literal school domain.
+7. **No QR code** (owner, 2026-09-29): "no reason to have a QR code for the join." The join card, the Home tab, `/display` and the Server panel show the join address as text only. Don't vendor qrcode-generator, or remove it if M1 already did. T-UI tests that expect a QR are dropped.
+
+## M1 gate rulings (integrator, 2026-09-30)
+
+These amend the body of this spec where it says otherwise; the code follows them.
+
+1. **HA: the maintenance worker is a process, not a thread.** On Node 24.16 a worker thread's permissions are not pinned to its process's (a `Worker` with `execArgv: []`, or an `env` holding `NODE_OPTIONS`, runs unsandboxed), so the server child gets **no `--allow-worker`** (§0 fact 12 and T-LAN-13 gain "no worker threads"). §5.16's `app\maint.mjs` runs as a second sandboxed child (`app\maint.mjs --maint`, the same flags as the server) that the launcher starts on the server's request and relays over IPC (`src/lan/maintRelay.ts`, `src/server/maint/ipcTransport.ts`; streams use `{t:'sp', id, m}` envelopes instead of a MessagePort). The npm / VPS path keeps a worker thread.
+2. **fsync in the sandbox.** Under `--permission`, Node 24.16 refuses `fs.fsyncSync` / `fdatasyncSync` (`FileHandle.sync()` works). The synchronous atomic writers keep temp + rename and skip the flush inside the sandbox (`src/server/durable.ts`). Durability of `data\` writes against a power cut inside the child is therefore the file system's (NTFS journals metadata); the settings file keeps its `.bak`.
+3. **Custom terms in M1:** `customTerms/list`, `add`, `remove` and `test` are built (a typed term is confirmed by the host who typed it); `update`, `import`, `export` and `confirm` stay with B21 (M4).
+4. **`--this-pc-only`** (launcher flag): the game listener stays on loopback whatever the network (notServing reason `this-pc-only`). For a solo try-out and for gate runs, so no firewall prompt appears.
+5. **Planned restarts** (the launcher's respawn after setup, and later restores and port changes) send `stop { restart: true }`; the child closes players' sockets with 1012 and `RESTART_CLOSE_REASON` (`shared/net/closeCodes.ts`), so clients reconnect on their own.
+6. **Zone.setLimits** (planned for B15) landed at the gate, so Settings → Rooms applies live (T-SET-5 runs on the real Zone).
+7. **The game port in LAN mode** serves no admin API: `/admin` is the "The control panel is on the host PC" page and `/api/admin/*` is 404 (§3.2), until B13's front door replaces it.
+8. **Decision 7 (no QR)** supersedes the QR in §1, §3.1, §3.4, §5.3, §5.9, §9.2, §11.7 (the `qr.js` line and T-UI-5) and B15; those passages are left as written for the record.
+9. **B11's packaging departures are accepted:** the §2.1 stub table gains the "An update is running or was interrupted…" row (exit 1; the Start stub refuses while `update.journal.json` exists, and Update runs `update.recover.mjs`); `update.recover.mjs` and `update.journal.json` sit at the root while a swap runs, and `previous\` also holds `root\` and `update.json`; the updater extracts and verifies before the pre-update backup (§2.5 steps 4 and 5 swap); T-PKG-4 allows exact XML-namespace strings and PixiJS's banner URL in the built JS / SVG (they are text, not requests).

@@ -1,0 +1,15 @@
+Voidswarm LAN {{VERSION}}: third-party notices
+==============================================
+
+This folder contains software written by others, used under their licences.
+
+- Node.js {{NODE_VERSION}} (runtime\node.exe): the official, unmodified Windows build, signed by the
+  OpenJS Foundation. Its licence, including the licences of the libraries Node.js itself bundles, is in
+  runtime\LICENSE.
+- The game fonts Orbitron and Rajdhani (web\fonts\): SIL Open Font License, Version 1.1. The licence text
+  and the copyright notices are in web\fonts\OFL.txt.
+- The JavaScript packages below. They are bundled into app\server.mjs, app\launch.mjs, app\tool.mjs,
+  app\maint.mjs and the game client in web\assets\. The list holds every production dependency of
+  Voidswarm; some are used only by the game client and some only by the server.
+
+{{NOTICES}}

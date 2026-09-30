@@ -20,7 +20,7 @@ import { isPrivateHost, isStaticHost, normalizeServerUrl, serverHost, type Resol
 import { featureLines } from '../title/features';
 import { LogoFx } from '../title/logoFx';
 import { TitleScene } from '../title/TitleScene';
-import { h } from './dom';
+import { h, setText } from './dom';
 import { FIT_CLASS, fitTextIn } from './fitText';
 
 export interface TitleCallbacks {
@@ -29,6 +29,11 @@ export interface TitleCallbacks {
   onOffline(name: string): void;
   onSettings(): void;
   onControls(): void;
+  /**
+   * The stored session was just forgotten by Log out (the token is already cleared): main.ts stops an
+   * auto-reconnect or a connect still in flight with that token, so neither brings the account back.
+   */
+  onLogout?(): void;
 }
 
 export type TitleView = 'login' | 'register' | 'guest' | 'forgot' | 'reset';
@@ -64,6 +69,10 @@ export class TitleScreen {
   private serverLink: HTMLButtonElement;
   private insecure: HTMLElement;
   private status: HTMLElement;
+  /** The auto-reconnect line (main.ts): its own line, so the countdown never overwrites a login error or "Logged out.". */
+  private retryLine: HTMLElement;
+  private retryText: HTMLElement;
+  private retryCount: HTMLElement;
   private accountBox: HTMLElement;
   private callsign: HTMLInputElement;
   private view: View;
@@ -125,7 +134,7 @@ export class TitleScreen {
       h('div', { class: 'muted small' }, isStatic
         // a static host (GitHub Pages) runs no game server, so there is no "this page's host" default
         ? 'The address of a Voidswarm game server, e.g. wss://play.example.com. Use wss:// for servers on the internet.'
-        : 'Default: this page\'s host on port 7777. Use wss:// for servers on the internet.'));
+        : 'Default: the game server that sent this page (same address). Use wss:// for servers on the internet.'));
     this.serverLink = h('button', {
       class: 'link subtle link-fit', type: 'button', 'data-nav': 'server-link', 'aria-expanded': 'false',
       onclick: () => this.toggleServer(),
@@ -136,6 +145,11 @@ export class TitleScreen {
       spellcheck: 'false', 'data-nav': 'name', 'aria-label': 'Callsign',
     });
     this.status = h('div', { class: 'title-status', role: 'status', 'aria-live': 'polite' });
+    // The seconds left change every second: outside the live region, so a screen reader hears the notice once.
+    this.retryText = h('span', { class: 'retry-text' });
+    this.retryCount = h('span', { class: 'retry-count', 'aria-hidden': 'true' });
+    this.retryLine = h('div', { class: 'title-status title-retry hidden', role: 'status', 'aria-live': 'polite' },
+      this.retryText, this.retryCount);
     this.accountBox = h('div', { class: 'account-box' });
     // Only while the page's own server is in use: a saved / linked server means online play is set up.
     this.offlineFirst = isStatic && !resetToken && !server.pending
@@ -167,6 +181,7 @@ export class TitleScreen {
     this.panel = h('div', { class: 'panel title-panel' + (this.offlineFirst ? ' offline-first' : '') },
       this.accountBox,
       this.insecure,
+      this.retryLine,
       this.status,
       this.serverBox,
       h('div', { class: 'title-foot' },
@@ -303,10 +318,11 @@ export class TitleScreen {
     return !this.sessionOnlyUrl || normalizeServerUrl(url) !== normalizeServerUrl(this.sessionOnlyUrl);
   }
 
-  setBusy(busy: boolean, msg = ''): void {
+  /** `msg` replaces the status line; null leaves it as it is (a connect superseded by Log out keeps "Logged out."). */
+  setBusy(busy: boolean, msg: string | null = ''): void {
     this.busy = busy;
     this.applyBusy();
-    this.setStatus(msg, false);
+    if (msg !== null) this.setStatus(msg, false);
   }
 
   /** Play / submit buttons follow `busy`, including ones created by a later render(). */
@@ -317,6 +333,23 @@ export class TitleScreen {
   setStatus(msg: string, error: boolean): void {
     this.status.textContent = msg;
     this.status.classList.toggle('error', error);
+  }
+
+  /**
+   * The auto-reconnect line (net/reconnect.ts retryStatusParts): `text` is announced, `countdown` is only shown.
+   * '' hides the line. Called every second: each part is written only when it changes, because replacing the live
+   * region's text node, even with the same words, can make a screen reader read the notice again.
+   */
+  setRetryStatus(text: string, countdown = '', error = false): void {
+    setText(this.retryText, text);
+    setText(this.retryCount, text && countdown ? ` ${countdown}` : '');
+    this.retryLine.classList.toggle('error', error);
+    this.retryLine.classList.toggle('hidden', !text);
+  }
+
+  /** The session token held now (null when logged out): an auto-reconnect of an account session needs it to match. */
+  get sessionToken(): string | null {
+    return this.session?.token ?? null;
   }
 
   focusDefault(): void {
@@ -577,6 +610,9 @@ export class TitleScreen {
     const s = this.session;
     clearSession();
     this.session = null;
+    // Before anything else: nothing already under way may bring this account back (an auto-reconnect after a lost
+    // host, a connect in flight). On a shared PC the next person must not land on Command as this one.
+    try { this.cb.onLogout?.(); } catch (e) { console.error('[voidswarm] logout hook failed', e); }
     this.view = 'login';
     this.render();
     this.setStatus('Logged out.', false);

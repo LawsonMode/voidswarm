@@ -1,0 +1,54 @@
+/* Voidswarm projector page (/display): the join details and the rooms, large and high-contrast. No chat, no names. */
+:root {
+  --bg: #07040f;
+  --panel: rgba(16, 10, 34, 0.9);
+  --line: rgba(120, 220, 255, 0.28);
+  --cyan: #3bf2ff;
+  --magenta: #ff3bd4;
+  --yellow: #ffd43b;
+  --green: #3bff9a;
+  --text: #f2f4ff;
+  --muted: #b7bddf;
+  --font-display: 'Orbitron', 'Eurostile', 'Bank Gothic', 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Rajdhani', 'Bahnschrift', 'Segoe UI', 'Roboto Condensed', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0; min-height: 100vh; color: var(--text); font-family: var(--font-ui); font-size: clamp(16px, 1.6vw, 28px); line-height: 1.3;
+  background: radial-gradient(ellipse at 50% -10%, #2a0f4a 0%, #12072a 45%, var(--bg) 85%) fixed, var(--bg);
+}
+[hidden] { display: none !important; }
+.display { max-width: 1800px; margin: 0 auto; padding: 2.5vh 3vw; display: flex; flex-direction: column; gap: 2.5vh; min-height: 100vh; }
+.d-head { display: flex; align-items: baseline; gap: 1.2em; flex-wrap: wrap; }
+.d-logo { font-family: var(--font-display); font-weight: 900; letter-spacing: 0.16em; color: var(--cyan); font-size: 1.1em; }
+.d-name { margin: 0; font-family: var(--font-display); font-weight: 800; letter-spacing: 0.08em; font-size: 2em; color: #fff; }
+h2 { font-family: var(--font-display); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.9em; margin: 0 0 0.6em; color: var(--muted); }
+
+.d-join { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 3vh 3vw; text-align: center; }
+.d-kicker { color: var(--magenta); }
+.d-url { font-family: var(--font-mono); font-weight: 700; font-size: 3em; margin: 0; word-break: break-all; color: #fff; }
+.d-secure { font-family: var(--font-mono); font-size: 1.1em; color: var(--cyan); margin: 0.5em 0 0; word-break: break-all; }
+.d-wait { color: var(--yellow); font-size: 1.2em; margin: 0.6em 0 0; }
+.d-fp { color: var(--muted); font-family: var(--font-mono); font-size: 0.8em; margin: 0.8em 0 0; word-break: break-all; }
+
+.d-announce { background: rgba(255, 59, 212, 0.14); border: 2px solid var(--magenta); border-radius: 14px; padding: 1.6vh 2vw; }
+.d-announce-label { margin: 0; color: var(--muted); font-size: 0.9em; }
+.d-host { color: var(--magenta); font-weight: 800; font-family: var(--font-display); letter-spacing: 0.08em; }
+.d-time { font-family: var(--font-mono); }
+.d-announce-text { margin: 0.2em 0 0; font-size: 1.8em; font-weight: 700; color: #fff; word-break: break-word; }
+
+.d-rooms { flex: 1; }
+.d-room-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(18em, 1fr)); gap: 0.8em; }
+.d-room { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.7em 0.9em; }
+.d-room-name { font-weight: 800; color: #fff; font-size: 1.15em; word-break: break-word; }
+.d-room-mode { color: var(--muted); }
+.d-room-meta { display: flex; justify-content: space-between; gap: 0.6em; margin-top: 0.25em; font-family: var(--font-mono); }
+.d-phase { font-weight: 700; }
+.d-phase-playing { color: var(--green); }
+.d-phase-lobby, .d-phase-countdown { color: var(--yellow); }
+.d-empty { color: var(--muted); }
+.d-notice { color: var(--muted); font-size: 0.85em; border-top: 1px solid var(--line); padding-top: 1vh; }
+.d-status { color: var(--yellow); min-height: 1.2em; margin: 0; }

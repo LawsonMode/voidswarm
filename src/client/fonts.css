@@ -1,0 +1,39 @@
+/* The game fonts, self-hosted (LAN edition §7: the client makes no request to any other host, so it works offline).
+   Files in public/fonts/ (served at <base>fonts/; Vite rewrites these root-absolute URLs under the build's base), from
+   @fontsource-variable/orbitron 5.3.0 and @fontsource/rajdhani 5.3.0, latin subset, woff2 only; licence: fonts/OFL.txt.
+   The fallbacks are in styles.css (--font-display, --font-ui). */
+
+/* Orbitron: one variable file covers every weight the UI uses (500 to 900). */
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('/fonts/orbitron-latin-wght-normal.woff2') format('woff2-variations'),
+       url('/fonts/orbitron-latin-wght-normal.woff2') format('woff2');
+}
+
+/* Rajdhani: static 500 / 600 / 700 (the weights the Google Fonts link used to load). */
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/rajdhani-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/rajdhani-latin-600-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/rajdhani-latin-700-normal.woff2') format('woff2');
+}

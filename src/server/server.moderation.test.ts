@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import { clearCustomTerms, setCustomTerms } from '../shared/moderation/filter';
 import { TERM_GROUPS, rot13 } from '../shared/moderation/lists';
-import { MSG_BLOCKED } from '../shared/room/moderation';
+import { DEFAULT_POSITIVE_LINES, MSG_WARN_FIRST } from '../shared/room/moderation';
 import type { ClientMsg, ServerMsg } from '../shared/protocol';
 import { PROTOCOL_VERSION } from '../shared/version';
 import { runCli } from './moderation/cliCore';
@@ -133,17 +133,22 @@ async function waitModerator(c: Client): Promise<void> {
 }
 
 describe('moderation on the real server', () => {
-  it('the filter runs online: blocked lines reach nobody, masked lines are starred, everything is logged', async () => {
+  it('the filter runs online: blocked and masked lines become a friendly stand-in, the sender is warned, everything is logged', async () => {
     teach = await connect('', tokens.Teach);
     kiddo = await connect('', tokens.Kiddo);
     pal = await connect('', tokens.Pal);
+    // v0.6 (§5.8, A2): the others see a positive line under the sender's name; the sender gets a private warning
+    // that never names the words.
     say(kiddo, `you ${BLOCK}`);
-    await kiddo.waitSystem(new RegExp(MSG_BLOCKED.replace(/[.()]/g, '\\$&')));
+    expect(await kiddo.waitSystem(/^That message used inappropriate language/)).toBe(MSG_WARN_FIRST);
     say(kiddo, `oh ${MASK} it`);
-    const masked = await teach.wait((m) => m.type === 'chat' && m.line.fromName === 'Kiddo') as Extract<ServerMsg, { type: 'chat' }>;
-    expect(masked.line.text).toContain('*');
-    expect(masked.line.text.toLowerCase()).not.toContain(MASK);
-    expect(teach.msgs.some((m) => m.type === 'chat' && m.line.text.toLowerCase().includes(BLOCK))).toBe(false);
+    const fromKiddo = (): Extract<ServerMsg, { type: 'chat' }>[] => teach.msgs.filter((m): m is Extract<ServerMsg, { type: 'chat' }> => m.type === 'chat' && m.line.fromName === 'Kiddo');
+    for (let i = 0; i < 80 && fromKiddo().length < 2; i++) await sleep(50);
+    expect(fromKiddo()).toHaveLength(2);
+    for (const m of fromKiddo()) expect(DEFAULT_POSITIVE_LINES).toContain(m.line.text);
+    const leaks = (t: string): boolean => t.toLowerCase().includes(BLOCK) || t.toLowerCase().includes(MASK);
+    expect(teach.msgs.some((m) => m.type === 'chat' && leaks(m.line.text))).toBe(false);
+    expect(kiddo.system().some(leaks)).toBe(false);
     say(kiddo, 'good game everyone');
     await teach.wait((m) => m.type === 'chat' && m.line.text === 'good game everyone');
     await sleep(1300); // the chat log is flushed every second
@@ -330,24 +335,25 @@ describe('moderation on the real server', () => {
       await sleep(1100);
       say(scout, 'meet at zorblax');
       await teach.wait((m) => m.type === 'chat' && m.line.text === 'meet at zorblax');
-      say(scout, 'quenth and zorblax'); // masked 'q*****', then display taming cuts the star run to 3
-      await teach.wait((m) => m.type === 'chat' && m.line.text === 'q*** and zorblax');
+      say(scout, 'quenth and zorblax'); // a custom 'mask' term: the others see a friendly stand-in (§5.8, A2)
+      const stand = await teach.wait((m) => m.type === 'chat' && m.line.fromName === 'Zorblax_Scout' && m.line.text !== 'meet at zorblax') as Extract<ServerMsg, { type: 'chat' }>;
+      expect(DEFAULT_POSITIVE_LINES).toContain(stand.line.text);
       expect(scout.system().some((t) => /blocked|muted/i.test(t))).toBe(false);
       await sleep(1300); // the chat log is flushed every second
       const log = await admin('log', tokens.Teach!, { player: 'Zorblax_Scout', action: 'flag' });
       expect(log.status).toBe(200);
       const lines = log.json.lines as { action: string; channel: string; hits: string[]; shown: string }[];
       expect(lines.map((l) => [l.channel, l.action, l.shown])).toEqual([
-        ['all', 'mask', 'q*** and zorblax'], ['all', 'flag', 'meet at zorblax'], ['name', 'flag', 'Zorblax_Scout'],
+        ['all', 'mask', stand.line.text], ['all', 'flag', 'meet at zorblax'], ['name', 'flag', 'Zorblax_Scout'],
       ]);
       expect(lines[0]!.hits).toEqual(['custom:crew:quenth', 'flag:crew:zorblax']);
-      // no strike for review-only hits: no automatic warning / mute
-      expect(scout.system().some((t) => /Warning|muted/.test(t))).toBe(false);
+      // no mute (review-only hits are no strike; the masked line's private warning is the generic one)
+      expect(scout.system().some((t) => /muted/.test(t))).toBe(false);
       const out: string[] = [];
       expect(await runCli(['log', '--review', '--player', 'Zorblax_Scout'], { out: (x) => out.push(x), err: () => {}, env: { DB_PATH: dbPath } })).toBe(0);
       const text = out.join('');
       expect(text).toContain('meet at zorblax  [for review: flag:crew:zorblax]');
-      expect(text).toContain('[masked → "q*** and zorblax"]  [for review: flag:crew:zorblax]');
+      expect(text).toContain(`[masked → "${stand.line.text}"]  [for review: flag:crew:zorblax]`);
       expect(text).toContain('callsign attempt  Zorblax_Scout (guest) @127.0.0.1: Zorblax_Scout  [for review: flag:crew:zorblax]');
       expect((await admin('log', tokens.Teach!, { action: 'nope' })).json.error).toMatch(/pass, flag, mask/);
     } finally {

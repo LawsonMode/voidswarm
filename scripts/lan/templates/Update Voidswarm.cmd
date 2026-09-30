@@ -1,0 +1,8 @@
+@echo off & setlocal & set "VS_TOOL=%~dp0app\tool.mjs" & (if not exist "%~dp0update.journal.json" if exist "%~dp0runtime.next\node.exe" if not exist "%~dp0runtime\" move "%~dp0runtime.next" "%~dp0runtime" >nul 2>nul)
+if not exist "%~dp0app\tool.mjs" if exist "%~dp0update.journal.json" if exist "%~dp0update.recover.mjs" set "VS_TOOL=%~dp0update.recover.mjs"
+if not exist "%VS_TOOL%" (echo(& echo  Unzip the WHOLE folder first: this file must stay in the "Voidswarm LAN" folder, next to app\ and runtime\.& echo(& pause & exit /b 1)
+if not exist "%~dp0runtime\node.exe" (echo(& echo  Your antivirus may have removed runtime\node.exe. Check Bitdefender ^> Protection ^> Quarantine, then add an exception ^(START HERE.html^). Or unzip the folder again.& echo(& pause & exit /b 1)
+"%~dp0runtime\node.exe" "%VS_TOOL%" update %*
+set VS_RC=%errorlevel%
+if not exist "%~dp0update.journal.json" ((for /l %%i in (1,1,20) do if exist "%~dp0runtime.next\node.exe" if exist "%~dp0runtime\node.exe" if not exist "%~dp0previous\runtime\" move "%~dp0runtime" "%~dp0previous\runtime" >nul 2>nul || "%SystemRoot%\System32\ping.exe" -n 2 127.0.0.1 >nul) & if exist "%~dp0runtime.next\node.exe" (if not exist "%~dp0runtime\" (move "%~dp0runtime.next" "%~dp0runtime" >nul 2>nul&& (echo  The Node.js runtime was switched too.) || (move "%~dp0previous\runtime" "%~dp0runtime" >nul 2>nul& echo  The Node.js runtime could not be switched yet: run Update Voidswarm.cmd again.& set VS_RC=1)) else (echo  The Node.js runtime could not be switched yet: close every Voidswarm window, then run Update Voidswarm.cmd again.& set VS_RC=1)))
+(if %VS_RC% GEQ 1260 (echo(& echo  Windows blocked the Voidswarm engine ^(school policy^). Give FOR SCHOOL IT.txt to IT.))& echo(& pause & exit /b %VS_RC%

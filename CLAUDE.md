@@ -29,6 +29,11 @@ The stack is TypeScript + Vite + PixiJS v8 on the client and an authoritative No
 - **Hosting:** `scripts/host-local.bat` (Windows double-click LAN host) + `docs/LOCAL-HOSTING.md`.
 - The no-turret Deathmatch golden digests are the v0.4.0 values; the with-turret golden was re-pinned (reasons in `sim.v03.test.ts`).
 
+**v0.6 (0.6.0, in development) is the LAN Edition** (spec, canon for detail: `docs/LAN-EDITION-proposal.md`; host guide: `docs/LAN-EDITION.md`; seams: ARCHITECTURE.md §4c). **M1 landed** (host basics and the full chat log); M2 networking + HTTPS, M3 accounts and M4 school features follow (the build plan is spec §14).
+- **Package:** `npm run package:lan -- --out <folder>` builds `voidswarm-lan-<v>-win-x64.zip` (`scripts/build-lan.mjs`; never into `dist/`, never a network drive, `release/` is gitignored). It holds the signed `node.exe`, `app\{launch,server,maint,tool}.mjs`, `app\admin`, `app\display`, `web\` and the `.cmd` stubs. `npm run lan` runs the launcher from source.
+- **Processes:** the launcher (`src/lan/launch.ts`) starts the server child (`src/server/index.ts --lan` → `app.ts startServer`) under `node --permission` (no workers, no child processes, writes only `data\`), and relays a sandboxed maintenance PROCESS for panel reads, exports, purges and backups (`src/lan/maintRelay.ts`, `src/server/maint/ipcTransport.ts`). The Host Control Panel listens on the admin port (default 7778, loopback): first-run setup with the console's setup code, the host admin login, Home, `/display`, Live, the Chat log, custom terms, Audit.
+- **Gotchas:** under `--permission`, `fs.fsyncSync` throws ERR_ACCESS_DENIED (use `src/server/durable.ts fsyncBestEffort`); a worker thread would escape the sandbox, so never pass `--allow-worker`. `--this-pc-only` keeps the game on loopback (a try-out, or a gate run with no firewall prompt). Test the LAN package on ports other than 7777/7778 (`PORT=27777` seeds a first run).
+
 ## Version location
 The root `package.json` `version` (currently 0.5.0; `package-lock.json` carries the same, keep them in step). `src/shared/version.ts` reads it, and it also holds `PROTOCOL_VERSION` (currently 5, bumped in v0.5 because the capital skill knobs changed the codec's knob table; bump it on wire changes). Don't hardcode versions anywhere else.
 

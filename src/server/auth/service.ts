@@ -8,7 +8,7 @@ import { clientIp, corsHeaders, HttpError, originAllowed, readJsonBody, sendJson
 import type { AuthOptions, AuthService } from './index';
 import { createMailer, type Env, type Mailer } from './mailer';
 import { SlidingWindowLimiter } from './ratelimit';
-import { AuthStore, type AccountRow } from './store';
+import { AuthStore, type AccountRow, type AuthStoreOptions } from './store';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -87,6 +87,8 @@ export interface AuthDeps {
   limits?: Partial<AuthLimits>;
   /** Moderation guard for login / register (see SignInGuard). Default: none. */
   guard?: SignInGuard;
+  /** AuthStore options: the pepper (email_hash backfill) and the §6.5 schema check (LAN: 'refuse'). `log` defaults to opts.log. */
+  store?: AuthStoreOptions;
 }
 
 type Handler = (body: Record<string, unknown>, ip: string) => Promise<[status: number, body: unknown]>;
@@ -136,7 +138,7 @@ export function createAuthServiceWith(opts: AuthOptions, deps: AuthDeps = {}): A
   const resetIp = lim('resetPerIp');
   const limiters = [loginIp, loginFail, loginFailAccount, registerIp, forgotIp, forgotEmail, resetIp];
 
-  const store = new AuthStore(opts.dbPath);
+  const store = new AuthStore(opts.dbPath, { log, ...deps.store });
   store.prune(now());
   const usernames = new Set(store.allUsernamesLower());
   // Login against unknown users still pays for one scrypt verify (no user-enumeration timing).

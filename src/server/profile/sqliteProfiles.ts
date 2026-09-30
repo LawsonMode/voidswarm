@@ -18,6 +18,7 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { ProfileConflict, type GrantCommit, type ProfileStore } from '../../shared/profile/store';
 import type { Profile } from '../../shared/protocol';
 import { SCHEMA_VERSION } from '../auth/store';
+import { protectConnection } from '../db/guard';
 
 /** First auth schema version with the loot tables (MIGRATIONS[1]). */
 export const PROFILE_SCHEMA_MIN = 2;
@@ -87,6 +88,8 @@ export function createSqliteProfileStore(dbPath: string, opts: SqliteProfileOpti
   const db = new DatabaseSync(dbPath);
   let st: Record<'load' | 'rev' | 'update' | 'ledger' | 'prune', StatementSync>;
   try {
+    // The §6.5 protections (authorizer, trusted_schema OFF) before any other statement (T-LAN-13).
+    protectConnection(db);
     db.exec('PRAGMA busy_timeout = 5000');
     db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA synchronous = NORMAL');

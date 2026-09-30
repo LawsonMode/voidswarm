@@ -4,3 +4,5 @@ node_modules/
 .DS_Store
 # root-only: account/profile/chat-log DBs + playtest credentials (never commit)
 /data/
+# the LAN package build output (npm run package:lan; never commit)
+/release/

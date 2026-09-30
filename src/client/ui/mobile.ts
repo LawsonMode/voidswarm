@@ -85,8 +85,19 @@ export function readMobileEnv(src: EnvSource): MobileEnv {
 export const PAD_PROMPT_TITLE = 'Voidswarm plays best with a controller.';
 export const PAD_PROMPT_BODY = 'Connect a Bluetooth controller (Xbox, PlayStation or MFi) and press any button.';
 export const PAD_PROMPT_TOUCH = 'Touch controls are not available yet.';
-/** Only when the page can't read gamepads at all (no navigator.getGamepads: some browsers hide it off https). */
-export const PAD_PROMPT_NO_API = 'This browser can’t read controllers on this page: open Voidswarm over https:// to use one.';
+/**
+ * Only when the page can't read gamepads at all (no navigator.getGamepads). LAN edition §3.6: current Chrome, Edge,
+ * Firefox 125+ and Safari read controllers over plain http too (only Firefox 81–124 hid them there), so the secure
+ * address is suggested only on a page that isn't a secure context (padNoApiText).
+ */
+export const PAD_PROMPT_NO_API = 'This browser can’t read controllers here. Try Chrome or Edge, or open the secure address.';
+/** The same on a secure page (https, localhost): the secure address wouldn't help there. */
+export const PAD_PROMPT_NO_API_SECURE = 'This browser can’t read controllers here. Try Chrome or Edge.';
+
+/** The no-gamepad-API line for this page: suggests the secure address only when `secureContext` is false. */
+export function padNoApiText(secureContext: boolean): string {
+  return secureContext ? PAD_PROMPT_NO_API_SECURE : PAD_PROMPT_NO_API;
+}
 export const ROTATE_TITLE = 'Rotate to landscape to play';
 export const ROTATE_MATCH_NOTE = 'The match keeps running while you turn your device.';
 export const ROTATE_LOCK_NOTE = 'Screen won’t turn? Switch off rotation lock.';
@@ -361,7 +372,7 @@ export class MobileSupport {
         h('div', { class: 'pad-prompt-title' }, PAD_PROMPT_TITLE),
         h('p', { class: 'pad-prompt-body' }, PAD_PROMPT_BODY),
         h('p', { class: 'pad-prompt-note' }, PAD_PROMPT_TOUCH),
-        noApi ? h('p', { class: 'pad-prompt-note' }, PAD_PROMPT_NO_API) : null,
+        noApi ? h('p', { class: 'pad-prompt-note' }, padNoApiText(globalThis.isSecureContext === true)) : null,
         actions),
       h('button', {
         class: 'pad-prompt-close', type: 'button', 'data-nav': compact ? 'cmd-pad-prompt-close' : 'pad-prompt-close',

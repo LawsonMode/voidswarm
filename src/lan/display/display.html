@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Voidswarm — join the game</title>
+  <link rel="stylesheet" href="/display/display.css">
+  <script type="module" src="/display/display.js"></script>
+</head>
+<body>
+  <noscript><p class="d-status">This page needs JavaScript.</p></noscript>
+  <main class="display" id="d-main">
+    <header class="d-head">
+      <div class="d-logo">VOIDSWARM</div>
+      <h1 class="d-name" id="d-name">Voidswarm</h1>
+    </header>
+
+    <section class="d-join" aria-labelledby="d-join-title">
+      <div class="d-join-text">
+        <h2 class="d-kicker" id="d-join-title">Join the game</h2>
+        <p class="d-url" id="d-url">Connecting…</p>
+        <p class="d-secure" id="d-secure" hidden></p>
+        <p class="d-wait" id="d-not-serving" hidden></p>
+        <p class="d-fp" id="d-fp" hidden></p>
+      </div>
+    </section>
+
+    <section class="d-announce" id="d-announce" hidden aria-live="polite">
+      <p class="d-announce-label"><span class="d-host">[Host]</span> <span id="d-announce-target"></span> <span class="d-time" id="d-announce-time"></span></p>
+      <p class="d-announce-text" id="d-announce-text"></p>
+    </section>
+
+    <section class="d-rooms" aria-labelledby="d-rooms-title">
+      <h2 id="d-rooms-title">Rooms</h2>
+      <ul class="d-room-list" id="d-rooms"></ul>
+    </section>
+
+    <footer class="d-notice" id="d-notice"></footer>
+    <p class="d-status" id="d-status" role="status"></p>
+  </main>
+</body>
+</html>

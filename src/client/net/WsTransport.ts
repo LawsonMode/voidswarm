@@ -20,6 +20,7 @@ export class WsTransport implements Transport {
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       let settled = false;
+      let opened = false;
       let ws: WebSocket;
       try {
         ws = new WebSocket(this.url);
@@ -39,6 +40,7 @@ export class WsTransport implements Transport {
       ws.onopen = () => {
         if (settled) return;
         settled = true;
+        opened = true;
         clearTimeout(timer);
         resolve();
       };
@@ -55,6 +57,9 @@ export class WsTransport implements Transport {
           reject(new Error(`Connection to ${this.url} closed (${ev.code})`));
           return;
         }
+        // A failed attempt fires 'error' then 'close' in one task: connect() already rejected, and that close is not a
+        // lost session (reporting it would supersede the attempt's own error; net/reconnect.ts retries on that error).
+        if (!opened) return;
         if (!this.closedByUs) this.onClose?.(ev.reason || `Connection lost (code ${ev.code})`, ev.code);
       };
       ws.onmessage = (ev) => this.receive(ev.data);

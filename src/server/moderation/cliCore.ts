@@ -1,9 +1,13 @@
 // OWNER: SERVER MODERATION. The moderation CLI (`npm run mod -- <command>`; entry point ./cli.ts). It opens the game
 // DB directly (WAL, so it works while the server runs); a running server notices ban / mute / moderator changes
 // within a few seconds (mod_meta.rev) and disconnects newly banned pilots itself.
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { AuthStore } from '../auth/store';
+import { csvRow } from './csv';
+import { openProtectedDb, protectConnection } from '../db/guard';
+import { appendLedgerFor, effectiveCut, ledgerPath, nativeLineage } from '../maint/ledger';
 import { describeDuration, parseDuration, parseSince, stamp } from './durations';
 import { CLI_ACTOR, ModerationService, isAddressTarget, looksLikeAddress, type BanSpec } from './service';
 import { MOD_SCHEMA_MIN, type BanRow, type ChatLogRow, type LogQuery, type ReportRow, type ReportStatus } from './store';
@@ -75,7 +79,7 @@ const flagStr = (f: Flags, k: string): string | undefined => {
 function openService(dbPath: string, now: () => number, err: (s: string) => void): ModerationService {
   let version = -1;
   if (existsSync(dbPath)) {
-    const db = new DatabaseSync(dbPath);
+    const db = protectConnection(new DatabaseSync(dbPath));
     try { version = Number((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version); } finally { db.close(); }
   }
   // A missing or older file is created / migrated by the AuthStore (the same migrations the server runs).
@@ -99,7 +103,8 @@ function logRow(r: ChatLogRow): string {
   if (r.action === 'mask') tag = `  [masked → "${r.shown}"]${reviewHits(r)}`;
   else if (r.action === 'flag') tag = `  [for review: ${r.hits.join(', ')}]`;
   else if (r.action !== 'pass') tag = `  [${r.action}${r.hits.length ? `: ${r.hits.join(', ')}` : ''}]`;
-  return `${stamp(r.ts)}  ${where}  ${who}${r.address ? ` @${r.address}` : ''}: ${r.original}${tag}`;
+  // A report's saved copy is shown-only since v4 (§6.4): no original text, no address.
+  return `${stamp(r.ts)}  ${where}  ${who}${r.address ? ` @${r.address}` : ''}: ${r.original || r.shown}${tag}`;
 }
 
 function banRow(b: BanRow, svc: ModerationService): string {
@@ -117,20 +122,40 @@ function reportRow(r: ReportRow): string[] {
 }
 
 /**
- * One CSV cell: quoted when needed; a TEXT cell starting with = + - @ (a spreadsheet formula) is neutralized with a
- * quote mark. Numbers (team -1, ids) are written as they are.
+ * One CSV cell: the shared writer's (csv.ts, T-CSV-1): quoted when needed; a TEXT cell starting with = + - @, a tab
+ * or a carriage return (a spreadsheet formula) is neutralized with a quote mark and quoted. Numbers are as they are.
  */
-export function csvCell(v: unknown): string {
-  let s = v === null || v === undefined ? '' : String(v);
-  if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
+export { csvCell } from './csv';
 
 export const CSV_HEADER = ['id', 'time', 'room', 'channel', 'team', 'player_id', 'name', 'account_id', 'address', 'action', 'original', 'shown', 'hits'];
 
 export function csvLine(r: ChatLogRow): string {
-  return [r.id, new Date(r.ts).toISOString(), r.roomName, r.channel, r.team, r.playerId, r.name, r.accountId, r.address, r.action,
-    r.original, r.shown, r.hits.join(' ')].map(csvCell).join(',');
+  return csvRow([r.id, new Date(r.ts).toISOString(), r.roomName, r.channel, r.team, r.playerId, r.name, r.accountId, r.address, r.action,
+    r.original, r.shown, r.hits.join(' ')]);
+}
+
+/**
+ * The ledger entry of a CLI purge (the whole log, or one account's lines), written before the lines go. With the
+ * data's lineage, stamped from this install's backup key when the database has none (ledger.ts appendLedgerFor).
+ * False for a guest's lines (a callsign is not something the ledger re-applies).
+ */
+function recordCliPurge(dbPath: string, accountId: string | null, player: string | undefined, before: number, ts: number): boolean {
+  if (player && !accountId) return false;
+  const dataDir = path.dirname(path.resolve(dbPath));
+  let fallback: string | null = null;
+  try {
+    const key = readFileSync(path.join(dataDir, 'secrets', 'backup.key'));
+    if (key.length === 32) fallback = nativeLineage(key);
+  } catch { /* no key: the database's own lineage, if any */ }
+  const db = openProtectedDb(dbPath, { busyTimeoutMs: 5000 });
+  try {
+    appendLedgerFor(db, ledgerPath(dataDir), {
+      ts, kind: 'purge', by: 'cli', before: effectiveCut({ ts, before }), ...(accountId ? { accountId } : {}),
+    }, { lineage: fallback });
+  } finally {
+    db.close();
+  }
+  return true;
 }
 
 /** Run one CLI command. Returns the process exit code. */
@@ -145,7 +170,7 @@ export async function runCli(argv: string[], io: CliIO): Promise<number> {
   let svc: ModerationService;
   try { svc = openService(dbPath, now, io.err); } catch (e) { io.err(`Can't open ${dbPath}: ${(e as Error)?.message ?? e}`); return 1; }
   try {
-    return await run(svc, cmd, parseFlags(rest), io, now);
+    return await run(svc, cmd, parseFlags(rest), io, now, dbPath);
   } catch (e) {
     io.err(`Failed: ${(e as Error)?.message ?? e}`);
     return 1;
@@ -154,7 +179,7 @@ export async function runCli(argv: string[], io: CliIO): Promise<number> {
   }
 }
 
-async function run(svc: ModerationService, cmd: string, f: Flags, io: CliIO, now: () => number): Promise<number> {
+async function run(svc: ModerationService, cmd: string, f: Flags, io: CliIO, now: () => number, dbPath: string): Promise<number> {
   const store = svc.store;
   const out = (s: string): void => io.out(`${s}\n`);
   const usage = (s: string): number => { io.err(`Usage: npm run mod -- ${s}\n`); return 1; };
@@ -290,6 +315,9 @@ async function run(svc: ModerationService, cmd: string, f: Flags, io: CliIO, now
         cutoff = since;
       }
       const player = flagStr(f, 'player');
+      // The deletion ledger first (§6.4, T-BAK-3): a restore of an older backup re-applies the purge.
+      const recorded = recordCliPurge(dbPath, store.accountByUsername(player ?? '')?.id ?? null, player, cutoff, now());
+      if (!recorded) out(`Note: ${player}'s lines are purged by callsign (a guest), which the deletion ledger can't record: a restore of an older backup brings them back.`);
       const n = store.purgeChat({ before: cutoff, player });
       svc.audit(CLI_ACTOR, 'note', player ? { name: player } : null,
         `purged ${n} chat-log line(s)${all ? ' (all)' : ` older than ${before}`}${player ? ` for ${player}` : ''}`);

@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
   canFullscreen, countPads, fullscreenButtonVisible, isFullscreen, isMobileLike, isStandalone, NARROW_SCREEN_PX,
-  padPromptReducer, padPromptVisible, playFullscreen, readMobileEnv, rotateOverlayVisible,
+  PAD_PROMPT_NO_API, PAD_PROMPT_NO_API_SECURE, padNoApiText, padPromptReducer, padPromptVisible, playFullscreen, readMobileEnv,
+  rotateOverlayVisible,
   type EnvSource, type MobileEnv, type MobileScreen, type PadPromptEvent, type PadPromptState,
 } from './mobile';
 
@@ -259,5 +260,18 @@ describe('web manifest', () => {
     for (const size of ['192x192', '512x512']) {
       for (const purpose of ['any', 'maskable']) expect(icons.some((i) => i.sizes === size && i.purpose === purpose)).toBe(true);
     }
+  });
+});
+
+// LAN edition §3.6: controllers work over plain http on current browsers, so the no-API line (shown only when
+// navigator.getGamepads is missing) suggests another browser, and the secure address only off a secure context.
+describe('pad prompt: the no-gamepad-API wording', () => {
+  it('suggests Chrome or Edge, and the secure address only when the page is not a secure context', () => {
+    expect(padNoApiText(false)).toBe(PAD_PROMPT_NO_API);
+    expect(padNoApiText(true)).toBe(PAD_PROMPT_NO_API_SECURE);
+    expect(PAD_PROMPT_NO_API).toBe('This browser can’t read controllers here. Try Chrome or Edge, or open the secure address.');
+    expect(PAD_PROMPT_NO_API_SECURE).toBe('This browser can’t read controllers here. Try Chrome or Edge.');
+    for (const t of [PAD_PROMPT_NO_API, PAD_PROMPT_NO_API_SECURE]) expect(t).not.toMatch(/https?:\/\//);
+    expect(padNoApiText(true)).not.toMatch(/secure address/);
   });
 });

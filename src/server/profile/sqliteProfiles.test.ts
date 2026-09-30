@@ -99,7 +99,7 @@ describe('createSqliteProfileStore: opening', () => {
   it('opens its own WAL connection with foreign_keys ON and busy_timeout 5000 once AuthStore has migrated', () => {
     const { dbPath } = setup();
     const store = open(dbPath);
-    expect(SCHEMA_VERSION).toBe(3); // v3 added the moderation tables (the profile store needs ≥ 2)
+    expect(SCHEMA_VERSION).toBe(4); // v3 added the moderation tables, v4 the LAN tables (the profile store needs ≥ 2)
     expect(store.diagnostics()).toEqual({ journalMode: 'wal', foreignKeys: 1, busyTimeout: 5000, userVersion: SCHEMA_VERSION });
   });
 

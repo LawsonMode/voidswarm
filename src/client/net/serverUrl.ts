@@ -24,19 +24,32 @@ export function isStaticHost(loc: LocationLike, flagged: boolean = staticHostFla
 }
 
 /**
- * Default ws URL for the server that served this page:
+ * Ports of the Vite dev server (`npm run dev`, 5173) and `vite preview` (4173). A page there is not served by the
+ * game server, so it dials the game server on DEFAULT_PORT of the same machine instead.
+ */
+export const VITE_PAGE_PORTS: readonly string[] = ['5173', '4173'];
+
+/**
+ * True for a page served by the Vite dev server itself (`import.meta.env.DEV`), whatever port it picked (5174 when
+ * 5173 is busy). False under vitest (mode 'test'), in every build, and when there is no import.meta.env.
+ */
+function viteDevFlag(): boolean {
+  try { return import.meta.env.DEV === true && import.meta.env.MODE !== 'test'; } catch { return false; }
+}
+
+/**
+ * Default ws URL for the server that served this page (LAN edition spec §3.7):
  * - a static host (GitHub Pages, see isStaticHost) → '' — there is no game server there, so the player
  *   must enter one under "Server…" (or play offline); never ws://<static host>:DEFAULT_PORT;
- * - `npm start` serves the page on DEFAULT_PORT → same host and port;
- * - an https page on the default port (reverse proxy / tunnel) → wss:// on the same origin;
- * - anything else (e.g. the Vite dev server) → ws://<hostname>:DEFAULT_PORT.
+ * - a Vite dev or preview page (ports 5173 / 4173, or the dev server on any port) → ws://<hostname>:DEFAULT_PORT;
+ * - everything else is served by the game server itself (`npm start`, the LAN edition on 7779 or any other port,
+ *   http or https, a reverse proxy / tunnel on 443) → the page's own origin: ws(s)://<location.host>.
  */
-export function defaultServerUrl(loc: LocationLike, staticHost: boolean = isStaticHost(loc)): string {
+export function defaultServerUrl(loc: LocationLike, staticHost: boolean = isStaticHost(loc), viteDev: boolean = viteDevFlag()): string {
   if (staticHost) return '';
-  const secure = loc.protocol === 'https:';
-  if (loc.port === String(DEFAULT_PORT)) return `${secure ? 'wss' : 'ws'}://${loc.host}`;
-  if (secure && (loc.port === '' || loc.port === '443')) return `wss://${loc.host}`;
-  return `ws://${loc.hostname || 'localhost'}:${DEFAULT_PORT}`;
+  const host = loc.host || loc.hostname;
+  if (viteDev || VITE_PAGE_PORTS.includes(loc.port) || !host) return `ws://${loc.hostname || 'localhost'}:${DEFAULT_PORT}`;
+  return `${loc.protocol === 'https:' ? 'wss' : 'ws'}://${host}`;
 }
 
 /**
@@ -112,14 +125,14 @@ export interface ResolvedServer {
  * value is never meant to be persisted (see TitleScreen.isPersistable). On a static host the default
  * is '' (no server), so a page with neither a saved nor a ?server= value starts with no server set.
  */
-export function resolveServer(loc: LocationLike, saved: string | null, staticHost: boolean = isStaticHost(loc)): ResolvedServer {
+export function resolveServer(loc: LocationLike, saved: string | null, staticHost: boolean = isStaticHost(loc), viteDev: boolean = viteDevFlag()): ResolvedServer {
   let q: string | null = null;
   try { q = new URLSearchParams(loc.search).get('server'); } catch { q = null; }
   // A saved value without a host (e.g. "ws://" saved by a guest attempt with no server set) is ignored.
   const savedUrl = saved && saved.trim() ? normalizeServerUrl(saved.trim()) : '';
   const fallback: ResolvedServer = savedUrl && hostnameOf(savedUrl)
     ? { url: savedUrl, source: 'saved', pending: null }
-    : { url: defaultServerUrl(loc, staticHost), source: 'default', pending: null };
+    : { url: defaultServerUrl(loc, staticHost, viteDev), source: 'default', pending: null };
   if (!q || !q.trim()) return fallback;
   const url = normalizeServerUrl(q.trim());
   if (!hostnameOf(url)) return fallback;

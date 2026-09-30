@@ -233,6 +233,116 @@ login and (for address bans) registration.
 ### `actions` — the moderation audit trail
 `{ limit?: 1..1000 (default 100), before?: number, target?: string }` → `{ ok, actions: ActionRow[], nextBefore: number | null }`
 
+## LAN edition (v0.6): the Host Control Panel's endpoints
+
+In the LAN edition the panel is served by the **admin listener** on port A (default 7778, loopback only unless the host
+turns on remote access; `src/server/listeners.ts`, `http.ts startAdminPanel`), not by the game port (its `/admin` only
+says "The control panel is on the host PC"). The request rules above hold, with these differences (spec §5.15):
+
+- `Authorization: Bearer <admin session>` (a `vsadm_…` token from `setup` or `login`). Player game tokens are refused.
+  Only `setup/status`, `setup`, `login` and `display/state` need no token.
+- No CORS: a POST must carry the listener's own `Origin` (`http://localhost:A` on the host PC), else `403`.
+- Each route has a capability (`capabilities.ts can()`); `401 { code: 'reauth' }` asks for `reauth` on a sensitive
+  (★) call with a stale session; `403 Host PC only` / `Not allowed for your role`.
+- Rows for moderators never carry `address` (an `addressTag` instead), `original`, email or SELF-HARM lines.
+- The Chat log reads (`log`, `log/context`, `log/reveal`, `log/rooms`, `log/stats`, `log/export`, `log/purge`) run in
+  the maintenance worker; while it is down they answer `503`.
+
+### `setup/status`
+Host PC only, no token. `{}` → `{ ok, needsSetup, setupKind: 'first' | 'reset' | null }`.
+
+### `setup`
+Host PC only, no token. `{ setupCode, username, password, preset: 'home' | 'school', serverName, accountsMode: 'email' |
+'roster', domains?: { domain, subdomains }[] }` → `{ ok, token, session }`. `400 { field, attemptsLeft }` on a wrong
+code or a weak password; `429 { retryAfter }` after too many wrong codes (the code is voided; the console shows a new
+one); `404` once set up. The code comes from the launcher's console (the browser it opens has it in the URL fragment).
+
+### `login`
+`{ role?: 'host' | 'moderator', username, password }` → `{ ok, token, session }`. `401` wrong password; `403` remote
+access off / the moderators' view off / needs https; `429 { retryAfter }` after repeated failures.
+
+### `reauth`
+`{ password }` → `{ ok, session }`: the step-up for ★ calls (valid `admin.stepUpMinutes`, default 10).
+
+### `logout`
+`{}` → `{ ok }` (this session only).
+
+### `home`
+`{}` → host: `{ ok, serverName, join: { url, notServing, others }, rooms, counts, online, alerts: { urgent, banner,
+wellbeing }, openReports, presentingAtLogin, … }`; a moderator gets the counts only (`{ ok, counts, openReports? }`).
+
+### `alerts/list`
+`{ includeAcked? }` → `{ ok, alerts: Alert[], counts }` (newest first; a wellbeing alert is nameless: no name,
+account or words, only `wellbeing: true` and its tags). Host principals only.
+
+### `alerts/ack`
+★ `{ id, note? }` → `{ ok, alert }`. A wellbeing alert also needs `wellbeing`, and is stored so it never comes back.
+
+### `wellbeing/open`
+★ `{ id }` → `{ ok, student, line, context }`: the one place a wellbeing line's name and words are shown (audited).
+
+### `wellbeing/ack`
+★ `{ id, note }` → `{ ok }`.
+
+### `chat/live`
+`{ after?: seq, wait?: 0..25 (seconds, long-poll), limit?: 1..500, roomUid?, tag?, flaggedOnly?, channel?, player? }` →
+`{ ok, lines: LiveLine[], next, gap }`. Lines are what the others saw (`shown`, with `display`: as-typed, substituted,
+system, hidden, withheld) with their `tags` and `ts`; never the original. `gap: true` when lines were missed (a ring of
+5,000, numbered from the start time, so a restart shows a gap). At most 4 waits per session (`429 liveBusy`).
+
+### `log/context`
+`{ id, before?: 0..50, after?: 0..50 }` → `{ ok, anchor, before, after, scope, moreBefore, moreAfter }` (the lines
+around one line in the same room; always audited).
+
+### `log/reveal`
+★ `{ ids: number[] }` (1..100) or `{ accountId, since?, until?, before? }` → `{ ok, originals: { id, original }[],
+nextBefore }`. The ONLY way to read what a student typed; every call is audited (never coalesced).
+
+### `log/rooms`
+`{ since?, until?, limit?: 1..1000 }` → `{ ok, rooms }` (the rooms that have lines in the range).
+
+### `log/stats`
+`{ days?, tzOffsetMin?, fresh? }` → `{ ok, rows, oldest, newest, dbBytes, walBytes, perDay, retention, nextPurgeAt,
+dropped, pending, indexTidyPending }`.
+
+### `log/export`
+★ A filter (as `log`) plus `{ format: 'csv' | 'json', all?, includeOriginal?, includeWellbeing?, saveOnHost? }` → a file
+(`Content-Disposition`, `X-Row-Count`; CSV is UTF-8 with a BOM, CRLF, formula cells neutralised), or with `saveOnHost`
+`{ ok, savedTo, fileName, rows }` (data\exports, deleted after 7 days). `includeOriginal` needs `reveal`. Audited.
+
+### `log/purge`
+★ `{ before, accountId?, confirmRows? }` → first `409 { needsConfirm, rows }`, then with `confirmRows` equal to that
+count `{ ok, deleted }`. Recorded in the deletion ledger (a restore re-applies it). Audited.
+
+### `announce`
+`{ text: 1..200, roomId? }` → `{ ok, delivered, roomId }`: a `[Host] <text>` line to every room (or one), logged on
+channel `announce`.
+
+### `settings/get`
+★ `{}` → `{ ok, settings, rev }` (no secrets: the SMTP password is only reported as set or not).
+
+### `settings/update`
+★ `{ rev, patch }` → `{ ok, settings, rev, changed, warnings, restartNeeded }`; `409 { error, rev }` when `rev` is
+stale; `400 { error, field }`. Applies live and writes one `settings` audit row per changed leaf.
+
+### `customTerms/list`
+★ Host admin only. `{}` → `{ ok, terms: CustomTerm[] }` (the host's own list; never shown to moderators).
+
+### `customTerms/add`
+★ `{ term: 2..64 characters, category?, action?: 'block' | 'mask' | 'flag' (default flag), scope?: 'chat' | 'names' |
+'both', match?: 'word' | 'phrase' | 'strong', context?: string[] (at most 8), note? }` → `{ ok, term }`. A typed term
+is confirmed by the host who typed it and applies at once; a term that doesn't compile is refused (`400`) and not
+saved. Audited by category (never the term itself).
+
+### `customTerms/remove`
+★ `{ id }` → `{ ok, removed }` (`404` for an unknown id).
+
+### `customTerms/test`
+★ `{ text }` → `{ ok, action, tags, customHits }` ("Try a line"; never names a built-in term).
+
+`customTerms/update`, `customTerms/import`, `customTerms/export` and `customTerms/confirm` arrive in M4 (they answer
+`501` until then), as do the Rooms, Accounts, Conduct, certificate and network endpoints listed in spec §5.15.
+
 ## Retention
 
 Chat log rows are kept `CHAT_LOG_RETENTION_DAYS` days (env, default 90); reports and moderation actions 365 days;

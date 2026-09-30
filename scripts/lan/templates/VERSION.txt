@@ -1,0 +1,3 @@
+Voidswarm LAN {{VERSION}}
+Node.js runtime {{NODE_VERSION}} (runtime\node.exe, the official build signed by the OpenJS Foundation)
+Built {{BUILD_DATE}}

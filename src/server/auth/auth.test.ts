@@ -561,7 +561,7 @@ describe('storage', () => {
   }
 
   it('migrates an existing v1 (v0.2) DB to the current schema: loot tables added, accounts + sessions intact, profile_json NULL', async () => {
-    expect(SCHEMA_VERSION).toBe(3); // v2 = loot tables (v0.3 M2), v3 = moderation tables
+    expect(SCHEMA_VERSION).toBe(4); // v2 = loot tables (v0.3 M2), v3 = moderation tables, v4 = LAN edition (§6.6)
     const dir = mkdtempSync(join(tmpdir(), 'voidswarm-auth-'));
     const { dbPath, token } = await v1Db(dir);
     const h = await start({ dir });

@@ -32,6 +32,7 @@ import {
 } from './interp';
 import { LocalTransport } from './LocalTransport';
 import { moveSkillsFor, predictRechargeMult, predictSpeedMult, predictStats, Predictor, type PredictCtx } from './prediction';
+import { PING_INTERVAL_MS, SILENCE_MS, SILENT_CLOSE_REASON, SilenceWatch } from './silence';
 import type { Transport } from './transport';
 import { UpgradePickGuard } from './upgradePick';
 import { WsTransport } from './WsTransport';
@@ -123,6 +124,14 @@ export class GameClient {
    * WS_CLOSE_KICKED: session revoked, logged in elsewhere...): the 'close' reason is its message.
    */
   closeKicked = false;
+  /** The WebSocket close code of the last unexpected close (undefined when unknown / in-page). See net/reconnect.ts. */
+  closeCode: number | undefined = undefined;
+  /**
+   * Ping cadence, and how long an online host may stay silent after a ping before the connection is dropped as lost
+   * (net/silence.ts; LAN edition §3.7). Read at connect time; tests shorten them.
+   */
+  pingIntervalMs = PING_INTERVAL_MS;
+  silenceMs = SILENCE_MS;
 
   roomId: string | null = null;
   phase: RoomPhase = 'lobby';
@@ -258,8 +267,11 @@ export class GameClient {
     this.resetSession();
     this.offline = t.kind === 'offline';
     this.closeKicked = false;
-    t.onMessage = (m) => this.handleMsg(m);
-    t.onSnapshot = (s) => this.handleSnapshot(s);
+    this.closeCode = undefined;
+    // A silent online host (asleep, unplugged) never sends a close: anything it sends proves it is still there.
+    const watch = t.kind === 'online' ? new SilenceWatch(this.silenceMs, this.pingIntervalMs) : null;
+    t.onMessage = (m) => { watch?.received(); this.handleMsg(m); };
+    t.onSnapshot = (s) => { watch?.received(); this.handleSnapshot(s); };
     t.onClose = (reason, code) => this.handleClose(reason, code);
     this.transport = t;
     try {
@@ -286,8 +298,12 @@ export class GameClient {
     });
     if (!current()) throw new ConnectSuperseded();
     if (this.pingTimer) clearInterval(this.pingTimer);
-    this.pingTimer = setInterval(() => this.send({ type: 'ping', t: performance.now() }), 2000);
-    this.send({ type: 'ping', t: performance.now() });
+    const ping = () => {
+      if (watch?.tick(performance.now())) { this.dropSilent(t); return; }
+      this.send({ type: 'ping', t: performance.now() });
+    };
+    this.pingTimer = setInterval(ping, this.pingIntervalMs);
+    ping();
   }
 
   /** Close the connection. `silent` = no 'close' event. Supersedes a connect still in flight. */
@@ -312,8 +328,21 @@ export class GameClient {
     this.emit('change', undefined);
   }
 
+  /**
+   * The online host stopped answering (SilenceWatch): drop the connection and report it like an unexpected close with
+   * no code (net/reconnect.ts classifies it 'lost', so main.ts shows the host-lost text and retries for 60 s).
+   */
+  private dropSilent(t: Transport): void {
+    if (this.transport !== t) return;
+    t.onMessage = t.onSnapshot = null;
+    t.onClose = null;
+    try { t.close(); } catch { /* ignore */ }
+    this.handleClose(SILENT_CLOSE_REASON);
+  }
+
   private handleClose(reason: string, code?: number): void {
     this.closeKicked = code === WS_CLOSE_KICKED;
+    this.closeCode = code;
     this.connectAttempt++;
     this.transport = null;
     if (this.pingTimer) { clearInterval(this.pingTimer); this.pingTimer = null; }
