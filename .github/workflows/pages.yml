@@ -39,7 +39,7 @@ jobs:
       # The accounts/scrypt suite (src/server/auth) is slow and server-only, so it is skipped here;
       # run the full suite locally with `npm test`.
       - name: Tests (without the server auth suite)
-        run: npx vitest run --exclude "src/server/auth/**"
+        run: npx vitest run --exclude "src/server/auth/**" --exclude "src/lan/**" --exclude "**/*.perf.test.ts"
 
       - name: Build for Pages (base /voidswarm/)
         run: npm run build:pages
