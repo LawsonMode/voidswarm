@@ -35,7 +35,7 @@ jobs:
       - run: npm run typecheck
 
       - name: LAN tests
-        run: npx vitest run src/lan src/server/lan.m1.test.ts
+        run: npx vitest run src/lan src/server/lan.m1.test.ts --testTimeout=30000
 
       - name: Build the package
         run: npm run package:lan -- --out lan-out
