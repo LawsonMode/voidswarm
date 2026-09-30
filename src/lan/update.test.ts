@@ -2,6 +2,7 @@
 // update zips are made in scratch folders: small stand-ins for the bundles and node.exe (the signature check is
 // injected, except where the real node.exe is checked), a real database and data\secrets, and real zips from Windows
 // tar (the same makeZip / writeSums the package build uses).
+// The updater is Windows-only (runtime\node.exe, the .cmd stubs): some flows are checked on win32 only.
 import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import os from 'node:os';
@@ -142,7 +143,7 @@ describe('versions, zips and checksum files', () => {
     expect(['0.6.1-rc.9', '0.6.1', '0.6.1-rc.10', '0.6.1-rc.1'].sort(compareVersions)).toEqual(['0.6.1-rc.1', '0.6.1-rc.9', '0.6.1-rc.10', '0.6.1']);
   });
 
-  it('finds update zips in the folder and in updates\\, newest version first; other files are ignored', () => {
+  it.runIf(process.platform === 'win32')('finds update zips in the folder and in updates\\, newest version first; other files are ignored', () => {
     const root = mkScratch('vs-zips-');
     fs.mkdirSync(path.join(root, 'updates'));
     for (const f of ['voidswarm-lan-0.6.1-win-x64.zip', 'updates/voidswarm-lan-0.6.10-win-x64.zip', 'voidswarm-lan-0.6.2-rc.1-win-x64.zip', 'voidswarm-lan-latest.zip', 'notes.zip']) {
@@ -417,7 +418,7 @@ describe('the update checks and refusals (injected extractor)', () => {
     expect(versionOf(i.paths.app)).toBe('0.6.0');
   });
 
-  it('--rollback with nothing to go back to, or when the backup it needs is gone, refuses', async () => {
+  it.runIf(process.platform === 'win32')('--rollback with nothing to go back to, or when the backup it needs is gone, refuses', async () => {
     const i = await install('0.6.0');
     expect(planRollback(i.paths).refusal).toMatch(/no previous version/);
     const r = await applyUpdate(i.paths, { file: path.join(i.root, zipName('0.6.1')), name: zipName('0.6.1'), version: '0.6.1' },
@@ -685,7 +686,7 @@ describe('T-LAN-17: the swap keeps app\\ out for one rename at a time, and the t
     for (const f of [UPDATE_JOURNAL, UPDATE_STAGING, RECOVER_TOOL]) expect(fs.existsSync(path.join(i.root, f)), f).toBe(false);
   }, 60_000);
 
-  it('a crash with a new runtime on the way (runtime.next\\): the next tool run undoes it first, so update and rollback still work', async () => {
+  it.runIf(process.platform === 'win32')('a crash with a new runtime on the way (runtime.next\\): the next tool run undoes it first, so update and rollback still work', async () => {
     const B: TreeOpts = { node: 'MZ stand-in node.exe B (a Node security release)' };
     let n = 0;
     await upd(await twoVersions(), '0.6.2', { swapProbe: (idx) => { n = Math.max(n, idx + 1); } }, B);
@@ -712,7 +713,7 @@ describe('T-LAN-17: the swap keeps app\\ out for one rename at a time, and the t
     expect(read(path.join(i.root, RUNTIME_NEXT, 'node.exe'))).toContain('node.exe B');
   }, 600_000);
 
-  it('a rollback taking a runtime back (previous\\runtime\\ → runtime.next\\), crashed at any op: the next run undoes it', async () => {
+  it.runIf(process.platform === 'win32')('a rollback taking a runtime back (previous\\runtime\\ → runtime.next\\), crashed at any op: the next run undoes it', async () => {
     const withOldRuntime = async (): Promise<Install> => {
       const i = await twoVersions();
       fs.mkdirSync(path.join(i.paths.previous, 'runtime'));
@@ -733,7 +734,7 @@ describe('T-LAN-17: the swap keeps app\\ out for one rename at a time, and the t
     }
   }, 600_000);
 
-  it('the recovery copy (update.recover.mjs at the root) finds its root, only undoes, and says to run the update again', async () => {
+  it.runIf(process.platform === 'win32')('the recovery copy (update.recover.mjs at the root) finds its root, only undoes, and says to run the update again', async () => {
     expect(toolRoot('C:\\Room 136 & Co\\Voidswarm LAN\\update.recover.mjs', 'win32')).toBe('C:\\Room 136 & Co\\Voidswarm LAN');
     expect(toolRoot('C:\\Room 136 & Co\\Voidswarm LAN\\UPDATE.RECOVER.MJS', 'win32')).toBe('C:\\Room 136 & Co\\Voidswarm LAN');
     expect(toolRoot('C:\\Room 136 & Co\\Voidswarm LAN\\app\\tool.mjs', 'win32')).toBe('C:\\Room 136 & Co\\Voidswarm LAN');
