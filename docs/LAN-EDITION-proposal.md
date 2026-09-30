@@ -2498,3 +2498,24 @@ These amend the body of this spec where it says otherwise; the code follows them
 7. **The game port in LAN mode** serves no admin API: `/admin` is the "The control panel is on the host PC" page and `/api/admin/*` is 404 (§3.2), until B13's front door replaces it.
 8. **Decision 7 (no QR)** supersedes the QR in §1, §3.1, §3.4, §5.3, §5.9, §9.2, §11.7 (the `qr.js` line and T-UI-5) and B15; those passages are left as written for the record.
 9. **B11's packaging departures are accepted:** the §2.1 stub table gains the "An update is running or was interrupted…" row (exit 1; the Start stub refuses while `update.journal.json` exists, and Update runs `update.recover.mjs`); `update.recover.mjs` and `update.journal.json` sit at the root while a swap runs, and `previous\` also holds `root\` and `update.json`; the updater extracts and verifies before the pre-update backup (§2.5 steps 4 and 5 swap); T-PKG-4 allows exact XML-namespace strings and PixiJS's banner URL in the built JS / SVG (they are text, not requests).
+
+
+## Carried into M2–M4 (from the M1 gate, 2026-09-30)
+
+Open items the M1 checkpoint handed forward. Each is picked up by the task named in it; the next milestone's builders must read this list.
+
+- **B8a minors:**
+  - `ts_disorder` only ever rises (SERVER MODERATION).
+  - The two retention paths treat report copies differently (needs a spec ruling).
+  - Conduct days are UTC, not local (your decision).
+- **M3 accounts (B16/B19):** `GET /api/info`, which the client also needs to choose its "host lost" text on IT hostnames. The `email_key`/`email_hash` fixes, and the alert email (`setUrgentAlertSink` needs mail).
+- **B22:** in-game address bans still need to spare the host PC and only exempt trusted moderators.
+- **B23:** account deletion must refuse ids that aren't accounts.
+- **Unassigned (T-LAN-15):** "bring in data from another copy". The launcher offers the other copies, but nothing imports them yet.
+- **M2 (B13/B14):** front door, landing page, `/check`, remote access over https, the iOS wss hint, the firewall stub, and the https parts of T-PKG-5.
+- **B24 docs:** FOR SCHOOL IT additions, MODERATION.md and README updates for v4, update-recovery docs, the make-icons comment.
+- **Smaller items:**
+  - Only a player's `/report` got `noWait`. Lifting a ban and reviewing a report can still wait up to 250 ms on the game thread, because the CLI shares the service.
+  - The npm/VPS path still uses the v0.5 admin, with no settings service and no maintenance worker.
+  - T-ROOM-5 still has `Math.random` in `Room.ts`/`util.ts`; fixing it needs a Zone seed in `smoke.ts`.
+  - B4a's fix-hint wording.
