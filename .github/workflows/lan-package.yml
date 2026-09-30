@@ -1,0 +1,61 @@
+# Builds the Windows LAN Edition zip (npm run package:lan) on a GitHub-hosted Windows runner and attests it.
+#
+# - The zip ships the official, OpenJS-signed node.exe from actions/setup-node (build-lan.mjs checks the
+#   Authenticode signature), plus the bundled game, admin panel and the double-click .cmd starters.
+# - actions/attest-build-provenance adds a signed SLSA provenance record: anyone can check that the zip was
+#   built by this workflow from this commit with
+#     gh attestation verify voidswarm-lan-<version>-win-x64.zip --repo LawsonMode/voidswarm
+# - Run it by hand (Actions → "Build LAN Edition package" → Run workflow): the zip is a downloadable artifact.
+#   Push a tag lan-v<version> (e.g. lan-v0.6.0) to also publish it as a GitHub Release.
+name: Build LAN Edition package
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['lan-v*']
+
+permissions:
+  contents: write      # release upload on tags
+  id-token: write      # attestation signing
+  attestations: write
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.16.0
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - name: LAN tests
+        run: npx vitest run src/lan src/server/lan.m1.test.ts
+
+      - name: Build the package
+        run: npm run package:lan -- --out lan-out
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'lan-out/*.zip'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voidswarm-lan-win-x64
+          path: |
+            lan-out/*.zip
+            lan-out/*.sha256
+          if-no-files-found: error
+
+      - name: Publish release (tags only)
+        if: startsWith(github.ref, 'refs/tags/lan-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release create "$GITHUB_REF_NAME" lan-out/*.zip lan-out/*.sha256 --title "Voidswarm LAN Edition ${GITHUB_REF_NAME#lan-v}" --notes "Portable Windows host. Unblock the zip, extract to your user folder, double-click Start Voidswarm Host.cmd. Verify with: gh attestation verify <zip> --repo LawsonMode/voidswarm"

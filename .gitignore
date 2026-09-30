@@ -6,3 +6,4 @@ node_modules/
 /data/
 # the LAN package build output (npm run package:lan; never commit)
 /release/
+/lan-out/
