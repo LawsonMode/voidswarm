@@ -231,7 +231,12 @@ export class TitleScreen {
   }
 
   // ------------------------------------------------------------------ attract scene lifecycle
-  private reducedMotion(): boolean { return !!this.reducedMq?.matches; }
+  /**
+   * Owner decision (2026-10-01): the title scene ALWAYS animates, even when the OS asks for reduced motion
+   * (school PCs often force it by policy). The animated title doubles as a check that the machine can run the game.
+   * `reducedMq` is kept so this is a one-line revert.
+   */
+  private reducedMotion(): boolean { return false; }
 
   private syncShown(): void {
     const active = this.root.classList.contains('active');

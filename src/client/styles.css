@@ -70,7 +70,7 @@ body.in-game #bg { display: none; }
   background-size: 6vmin 6vmin; transform: perspective(40vmin) rotateX(62deg); transform-origin: 50% 0;
   animation: grid-move 3s linear infinite; -webkit-mask: linear-gradient(transparent, #000 40%); mask: linear-gradient(transparent, #000 40%); opacity: 0.5; }
 @keyframes grid-move { from { background-position: 0 0; } to { background-position: 0 6vmin; } }
-@media (prefers-reduced-motion: reduce) { #bg .grid-floor { animation: none; } }
+/* The title backdrop always animates (owner decision 2026-10-01: a check that the machine can run the game). */
 
 /* ---------- screens ---------- */
 .screen { position: absolute; inset: 0; display: none; pointer-events: auto; }
@@ -285,11 +285,6 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
 .divider-btn { width: 100%; background: none; border: 0; padding: 0.45rem 0; cursor: pointer; color: #b8c2ea; }
 .divider-btn:hover, .divider-btn:focus-visible { color: var(--cyan); text-shadow: 0 0 0.4rem rgba(59, 242, 255, 0.45); }
 .divider-btn .divider-caret { margin-left: -0.3rem; letter-spacing: 0; font-size: 1.3em; line-height: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .logo::after { display: none; }
-  .title-panel::before, .ticker-track, .logo-wrap.intro > * { animation: none !important; }
-  .screen-title .btn-primary::after { display: none; }
-}
 @media (max-width: 480px) {
   .screen-title { padding: 0.8rem 16px; }
   .title-wrap { gap: 0.7rem; }
