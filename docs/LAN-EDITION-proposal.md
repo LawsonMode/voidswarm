@@ -2519,3 +2519,55 @@ Open items the M1 checkpoint handed forward. Each is picked up by the task named
   - The npm/VPS path still uses the v0.5 admin, with no settings service and no maintenance worker.
   - T-ROOM-5 still has `Math.random` in `Room.ts`/`util.ts`; fixing it needs a Zone seed in `smoke.ts`.
   - B4a's fix-hint wording.
+
+
+## M5: classroom learning features (planned 2026-10-01, NOT built yet)
+
+**Owner direction:** "Are there any of the Idaho standards for digital literacy and computer science standards that we could worm in here?", then "Don't build anything yet, but just set the builds up."
+
+**Source:** the owner's crosswalk `Digital Literacy Games\Proposals\Idaho Standards Crosswalk.md`. It was reviewed 2026-09-28 against Idaho's **Digital Literacy Course Guidance (Aug 21, 2025)**, and the identifiers below use its notation. Confirm the district's applicable version before formal course approval.
+
+**How Voidswarm fits:**
+- The crosswalk assigns privacy to Appagotchi, remixing and research to Arcade Repair Center, and programming, networking and cybersecurity perspectives to Programmon. Voidswarm doesn't duplicate those.
+- It adds what only a **real multiplayer game on a real network** can show:
+  - real latency;
+  - a real chat log kept about the students themselves;
+  - real data they generated.
+
+**The crosswalk's evidence rule applies to every task.** Playing is not evidence. Each feature ships with a short student task (compare / explain / create / evaluate) and a teacher guide in `docs/classroom/`. Game results (wins, takedowns, levels) are never used as mastery evidence.
+
+### Standards map
+
+| Identifier (crosswalk notation) | Voidswarm feature | Student evidence |
+|---|---|---|
+| 9-12.CS.2.6, cybersecurity viewpoints (essential) | **Chat-log policy council** (B30): the host's real chat-log settings are the case. Students argue as a security specialist, a privacy advocate and an administrator. | A written comparison of all three views and a defended retention/visibility policy. |
+| 9-12.ICT.2.1, identity/reputation (essential) | **"My record" self-view** (B29): a student sees their own callsign history, filtered-line count by tag (no other students) and how long it is kept. | Explain one lasting consequence of something typed in chat, and how it would differ with different content. |
+| 9-12.ICT.2.2, responsible behavior (supporting) | The existing stand-in lines and private warnings, plus a **"why was I warned?" explainer** (B29) that teaches without naming the matched words. | Respond to three fictional chat scenarios (impersonation, pile-on, a friend in distress). |
+| 9-12.ICT.2.4 security/tracking; ODC.9-10.5 privacy/tracking awareness (supporting) | **"What this server knows about you"** page on the join page (B29): what is stored, where, for how long, and who can see it. | Identify one item they would minimise, and how. |
+| 9-12.CS.3.3, personal-data tradeoffs (supporting) | B28 anonymisation choices plus B29. | Explain one convenience-vs-privacy tradeoff in the account settings (email optional vs required). |
+| 9-12.CS.3.7 define AI (supporting); 9-12.CS.3.8 AI impacts (essential, partial) | **Bot "why" viewer** (B31): spectating a bot shows the fixed rule it is following live ("hull < 30% → retreat to ally"). | Compare a fixed-rule bot with a learned model (pairs with the shared AI investigation). The crosswalk warns that scripted opponents alone don't teach AI literacy, so this is partial by design. |
+| 9-12.CS.5.1, execution diagrams (supporting) | B31's rule trace, exported as a step list. | Annotate a bot decision trace and predict its next action. |
+| Practical skill: export results to a spreadsheet and make an honest chart (crosswalk "real-tool transfer") | **Class data export** (B28): an anonymised match CSV (class picks, outcomes, per-minute stats; no names, no conduct data). | A spreadsheet summary plus one honest comparison chart (for example, "is one class overpowered?"). |
+| Networking practice (supports Programmon's IP/port/firewall work; not an essential identifier itself) | **Network stats overlay** (B26) and **Lag Lab** (B27). | Predict, then measure, the effect of added delay and loss. Explain what client prediction hides and what it can't. |
+| Algorithms: pseudo-randomness and determinism (CS practice) | **Seed Lab** (B32): enter a map/floor seed, and the same seed rebuilds the same map. | Predict and verify; explain why a game needs repeatable "randomness". |
+| ODC.9-12.8, media-supported explanations (supporting) | B28's per-match summary card (an image) for a short presentation. | A 1-minute narrated explanation of one match decision, made with real tools. |
+
+### Build plan (M5), sized like section 14
+
+| # | Task | Owner (files) | Depends | Acceptance tests | Size |
+|---|---|---|---|---|---|
+| B26 | **Network stats overlay**: a per-client toggle (F3 / Settings) showing ping, snapshot rate, bytes in/out per second, the prediction correction size, and packet age. The host can lock it on for a lesson. | CLIENT (`src/client/ui/netStats.ts`, HUD), ROOM (stats fields if needed) | M2 | Stats are pure functions of the transport counters (unit-tested); the overlay fits 812×375 phone landscape. No new wire fields unless the spec decides otherwise. | S |
+| B27 | **Lag Lab** (host control): the admin page sets added latency (0–400 ms), jitter and packet loss **per room**, labelled LAG LAB ACTIVE on every client in that room, with an auto-off timer (max 15 min). Never on house rooms unless chosen. | SERVER (send-queue shaping), ADMIN UI (Rooms tab), CLIENT (banner) | B15, B26 | The shaping is deterministic under a seeded test clock; it can't affect rooms not chosen; the auto-off fires; it is audited. | M |
+| B28 | **Class data export**: the admin page exports an anonymised per-match CSV + JSON (pseudonymous per-export player ids, class/path, team, outcome, duration, per-minute takedowns/assists/damage, wave/floor reached). No names, emails, chat or conduct. A summary-card PNG per match. | SERVER MODERATION (`maint/` export op), ADMIN UI | M4 | No column can identify a student (column allowlist test); ids are re-randomised per export; the CSV is RFC-4180 and opens in Excel and Sheets. | M |
+| B29 | **Transparency + "My record"**: a "What this server knows about you" page (public on the join page, generated from the live settings); a signed-in student's own record view (callsign history, tag counts, retention dates); and a "why was I warned?" explainer with no matched words. | SERVER (`/me/record`), CLIENT (Account screen), LAUNCHER (landing page) | M3, M4 (B20) | A student sees only their own data; no matched terms appear; the page text follows the settings (retention, email policy); a11y check. | M |
+| B30 | **Chat-log policy council kit**: teacher guide + 3 role cards + a policy worksheet in `docs/classroom/`, plus a read-only **policy simulator** in the admin page ("if retention were N days / emails hidden / guests on, here is what you could and couldn't see"). | DOCS, ADMIN UI | B29 | The simulator never changes settings; worksheet checklist. | S |
+| B31 | **Bot "why" viewer**: when spectating a bot, a panel shows the active rule and its inputs (the bots already pick goals in `src/shared/ai/bots.ts`); exportable as a step list. | AI (`bots.ts` debug reason, sim-neutral), CLIENT (spectate panel) | M2 | Exposing reasons doesn't change bot decisions (the determinism digest is unchanged); the reasons are PG and human-readable. | M |
+| B32 | **Seed Lab**: the room-create screen and the admin page accept a map/floor seed (lesson mode); a "seed" readout in the debrief. | ROOM (`RoomSettings.mapSeed` opt-in), CLIENT | – | Same seed ⇒ the same map digest (test); a lesson-mode-only control; the house rooms are unaffected. | S |
+| B33 | **Teacher guides**: `docs/classroom/README.md` with one 1-page lesson per feature (objective, identifiers, setup, the student task, a quick rubric, cautions), using the crosswalk's evidence plan (introduce → guided → independent → transfer). | DOCS | B26–B32 | Each lesson names its identifiers and the evidence artifact; no student data in examples. | M |
+
+**Order and risk:**
+- B26/B27 and B32 can move into M2 if wanted (networking).
+- B28–B30 need the M3/M4 accounts and conduct work.
+- B31 is independent of the LAN work.
+- Privacy guardrails: B28 and B29 get a dedicated privacy review (same critic as section 8) before release.
+- The title-animation toggle (Auto/On/Off) is still waiting on an owner answer and is not in M5.
