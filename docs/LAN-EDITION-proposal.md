@@ -2571,3 +2571,8 @@ Open items the M1 checkpoint handed forward. Each is picked up by the task named
 - B31 is independent of the LAN work.
 - Privacy guardrails: B28 and B29 get a dedicated privacy review (same critic as section 8) before release.
 - Title animation: decided (owner, 2026-10-01). It is always on, even with OS reduced motion, as a check that the machine can run the game. It shipped outside M5.
+
+
+## Moved to Quark (owner, 2026-10-01)
+
+The remaining LAN Edition milestones (**M2, M3, M4 and M5**) move into the planned **Quark** project (`A:\Code\Quark\docs\QUARK-PLAN.md`): a local hub for accounts/SSO, chat and standards progress shared by all of the owner's apps. Voidswarm becomes Quark's first client. The LAN release stays at **0.6.0-m1** until then. This spec stays the canon for those features' detail when they are rebuilt in Quark.
