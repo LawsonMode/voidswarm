@@ -195,7 +195,8 @@ Voidswarm LAN\
   Update Voidswarm.cmd                in-place update, or --rollback (host must be stopped)
   Reset admin password.cmd            host PC only; prints a new setup code
   Restore a backup.cmd                lists backups and restores one (host stopped)
-  Allow through firewall (admin).cmd  optional; Home = Private, School = Domain + Private
+  Allow through firewall (admin).cmd  optional; Home = Private, School = Domain + Private (planned)
+  Allow Voidswarm (for IT).cmd        0.6.0-m1.1: IT runs it once, elevated: inbound TCP program rule, Domain + Private
   START HERE.html                     host guide with pictures (unblock, SmartScreen, firewall, Bitdefender)
   FOR SCHOOL IT.txt                   §9.1
   VERSION.txt  SHA256SUMS.txt  THIRD-PARTY-NOTICES.txt
@@ -261,7 +262,7 @@ Voidswarm LAN\
 2. **Elevation.** A High-integrity token (`whoami /groups` shows `S-1-16-12288`) means it was started as administrator. School: **refuse**. Home: a warning banner (homes with UAC switched off run everything elevated).
 3. **Permissions** (`icacls`, read-only).
    - **The check:** any SID other than the user, SYSTEM and Administrators with write access to the root, `app\`, `runtime\` or the stubs, or with read access to `data\`.
-   - **Result:** School refuses to start; Home warns.
+   - **Result:** School refuses to start; Home warns. **0.6.0-m1.1:** both presets warn (`launcher.permissions` `warn`; `refuse` is still a setting, and `off`, the panel's "Don't warn me again", skips the check). Owner direction: a teacher without administrator rights must be able to host.
    - **One-click fix** (panel, or `--fix-permissions`): `icacls "<root>" /inheritance:r /grant:r "<user>":(OI)(CI)F *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F`.
    - `data\secrets\` always gets that ACL when it is created.
 4. **Mark-of-the-Web.** It lists files that still carry `:Zone.Identifier` and says "unblock these". It never strips them, because that is itself an antivirus signal.
@@ -1372,7 +1373,7 @@ Every tag has `dailySummary` on.
 | certificate scope / new root | this network (/24) / ask | **this PC (/32) / never automatic** |
 | port auto-pick | first run only | never |
 | started as administrator | warn | **refuse** |
-| permission problems | warn (with fix) | **refuse** (with fix) |
+| permission problems | warn (with fix) | warn (with fix); 0.6.0-m1.1, was **refuse**: a teacher without administrator rights must be able to host. `refuse` stays a setting; `off` (the panel's "Don't warn me again") skips the check |
 | moderator tier | limited | limited (fixed) |
 | rate limits | normal (scaled if shared) | **scaled** |
 | Presenting on at login | off | **on** |
@@ -1821,7 +1822,7 @@ Everything is stored on the host PC only.
 - It writes only inside `…\Voidswarm LAN\data\`, plus the off-PC backup folder if one is configured.
 
 **The host PC:**
-- **Install location:** `%USERPROFILE%\Voidswarm LAN` for the teacher's account. The launcher refuses OneDrive, Temp, Downloads, UNC and FAT paths, and in School mode refuses folders other users can write.
+- **Install location:** `%USERPROFILE%\Voidswarm LAN` for the teacher's account. The launcher refuses OneDrive, Temp, Downloads, UNC and FAT paths, and warns about folders other users can write (0.6.0-m1.1: it refused them in School mode).
 - **AppLocker or WDAC:** allow `runtime\node.exe` (publisher OpenJS Foundation) **and** the script rule for `…\Voidswarm LAN\*.cmd`. **Scope both to the teacher's user or group plus this path**: a global OpenJS allow would hand every student a script runtime. The default script rules (only `%WINDIR%` and `%PROGRAMFILES%`) otherwise block the `.cmd`.
 - **Antivirus and EDR:** Defender attack-surface-reduction prevalence rules and Bitdefender may need an exclusion for `…\runtime\node.exe`; a Sigma rule flags "node.exe running a .js file". It never runs as administrator (it refuses in School mode).
 - **SmartScreen and Smart App Control:** unblock the zip before extracting, or deliver the folder from a network share or USB.

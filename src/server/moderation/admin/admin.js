@@ -34,6 +34,8 @@ export const TOKEN_KEY = 'voidswarm.admin.token';
 export const MODE_KEY = 'voidswarm.admin.mode';
 /** localStorage: per-browser preferences (Presenting). Never a token. */
 export const PREFS_KEY = 'voidswarm.admin.prefs';
+/** sessionStorage: the banner codes dismissed in this tab (a JSON array; gone when the tab closes). */
+export const DISMISSED_KEY = 'voidswarm.admin.dismissed';
 export const ONLINE_REFRESH_MS = 5000;
 export const HOME_REFRESH_MS = 5000;
 export const ME_REFRESH_MS = 30000;
@@ -1348,6 +1350,38 @@ export function errorText(err) {
   return 'Something went wrong.';
 }
 
+/** The launcher's folder-permission warnings: one setting turns both off. */
+const STOP_PERMISSION_WARNINGS = Object.freeze({
+  kind: 'setting',
+  label: "Don't warn me again",
+  cap: 'settings',
+  patch: Object.freeze({ launcher: Object.freeze({ permissions: 'off' }) }),
+  hides: Object.freeze(['permissions', 'permissions-unchecked']),
+  done: "Voidswarm won't check who can reach its folder any more (from the next start on too).",
+});
+
+/**
+ * What the host can do about a banner, by its code (the launcher's banners keep their code through lan:start):
+ *  - the folder-permission warnings: "Don't warn me again" sets launcher.permissions = 'off' (settings/update, ★): the
+ *    banner goes now, the server stops sending it, and the launcher skips the check on later starts;
+ *  - the firewall warning: "Dismiss" hides it in this tab until the tab closes (sessionStorage); the next start or a
+ *    new tab shows it again while it is still true.
+ */
+export const BANNER_ACTIONS = Object.freeze({
+  permissions: STOP_PERMISSION_WARNINGS,
+  'permissions-unchecked': STOP_PERMISSION_WARNINGS,
+  'preflight-firewall-blocked': Object.freeze({ kind: 'session', label: 'Dismiss', cap: null, hides: Object.freeze(['preflight-firewall-blocked']) }),
+});
+
+/** The action for a banner, or null (none, or the caller's capabilities don't allow it). */
+export function bannerAction(banner, caps) {
+  const code = banner && typeof banner.code === 'string' ? banner.code : '';
+  if (!code || !Object.prototype.hasOwnProperty.call(BANNER_ACTIONS, code)) return null;
+  const a = BANNER_ACTIONS[code];
+  if (a.cap && !(Array.isArray(caps) && caps.includes(a.cap))) return null;
+  return a;
+}
+
 /** sessionStorage-backed value with an in-memory fallback (storage may be blocked / throw). */
 function createSessionValue(getStorage, key) {
   let memory = null;
@@ -1620,6 +1654,7 @@ export function boot(env) {
 
   const tokens = createTokenStore(() => win.sessionStorage);
   const modeStore = createSessionValue(() => win.sessionStorage, MODE_KEY);
+  const dismissedStore = createSessionValue(() => win.sessionStorage, DISMISSED_KEY);
   const prefs = createPrefs(() => win.localStorage);
 
   // The launcher's setup code (`#setup=K7QP-4MXD`): read once, into memory, and removed from the address bar and the
@@ -1952,14 +1987,65 @@ export function boot(env) {
     if (had) rerenderAll();
   }
 
+  /** The last banner list from the server (re-drawn after a banner's button). */
+  let lastBanners = [];
+  /** Codes hidden in this tab: "Don't warn me again" (until the server stops sending them) and "Dismiss". */
+  const hiddenBanners = new Set();
+  try {
+    const saved = JSON.parse(dismissedStore.get() ?? '[]');
+    if (Array.isArray(saved)) for (const c of saved) if (typeof c === 'string') hiddenBanners.add(c);
+  } catch { /* nothing dismissed */ }
+
   function renderBanners(list) {
-    const items = (Array.isArray(list) ? list : []).filter((b) => b && typeof b.text === 'string').slice(0, 12);
+    lastBanners = Array.isArray(list) ? list : [];
+    const items = lastBanners.filter((b) => b && typeof b.text === 'string' && !(typeof b.code === 'string' && hiddenBanners.has(b.code))).slice(0, 12);
     const order = { urgent: 0, warn: 1, info: 2 };
     items.sort((a, b) => (order[a.level] ?? 3) - (order[b.level] ?? 3));
-    $('banners').replaceChildren(...items.map((b) => h('div', {
-      class: `banner banner-${b.level === 'urgent' ? 'urgent' : b.level === 'warn' ? 'warn' : 'info'}`, role: b.level === 'urgent' ? 'alert' : 'status',
-      text: b.text,
-    })));
+    $('banners').replaceChildren(...items.map((b) => {
+      const cls = `banner banner-${b.level === 'urgent' ? 'urgent' : b.level === 'warn' ? 'warn' : 'info'}`;
+      const role = b.level === 'urgent' ? 'alert' : 'status';
+      const action = legacy ? null : bannerAction(b, caps);
+      if (!action) return h('div', { class: cls, role, text: b.text });
+      const btn = h('button', { type: 'button', class: 'small banner-action', data: { banner: b.code }, text: action.label });
+      btn.addEventListener('click', () => { void bannerClicked(action, btn); });
+      return h('div', { class: `${cls} has-action`, role }, h('span', { class: 'banner-text', text: b.text }), btn);
+    }));
+  }
+
+  function hideBanners(codes, remember) {
+    for (const c of codes) hiddenBanners.add(c);
+    if (remember) {
+      let saved = [];
+      try { const v = JSON.parse(dismissedStore.get() ?? '[]'); if (Array.isArray(v)) saved = v.filter((c) => typeof c === 'string'); } catch { /* none */ }
+      dismissedStore.set(JSON.stringify([...new Set([...saved, ...codes])]));
+    }
+    renderBanners(lastBanners);
+  }
+
+  /** A banner's button: "Dismiss" hides it for this tab; "Don't warn me again" saves the setting first. */
+  async function bannerClicked(action, btn) {
+    if (action.kind === 'session') { hideBanners(action.hides, true); return; }
+    btn.disabled = true;
+    const at = epoch;
+    try {
+      // settings/update needs the rev it read; one more try when it changed in between (409).
+      for (let attempt = 0; ; attempt++) {
+        const cur = await api.admin('settings/get', {});
+        try {
+          await api.admin('settings/update', { rev: cur.rev, patch: action.patch });
+          break;
+        } catch (err) {
+          if (attempt === 0 && err instanceof ApiError && err.status === 409) continue;
+          throw err;
+        }
+      }
+      if (at !== epoch) return;
+      hideBanners(action.hides, false);
+      toast(action.done, 'ok');
+    } catch (err) {
+      btn.disabled = false;
+      failToast(action.label, err);
+    }
   }
 
   function setCaps(list) {

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
-  accountName, aclDecision, checkPermissions, daclProblems, fixArgs, fixCommandLine, fixPermissions, OWNER_SCRIPT, parseDacl, parseIcaclsSave,
+  accountName, aclDecision, checkPermissions, DEFAULT_FIX_HINT, daclProblems, fixArgs, fixCommandLine, fixPermissions, OWNER_SCRIPT, parseDacl, parseIcaclsSave,
   parseOwnerOutput, protectDir, READ_MASK, rightsMask, SID_AUTHENTICATED_USERS, SID_USERS, WRITE_MASK, type AclTarget, type OwnerReader,
 } from './acl';
 import { readToken } from './elevation';
@@ -81,8 +81,19 @@ describe('T-LAN-11: the check (pure)', () => {
     expect(school.message).toMatch(/--fix-permissions/);
     const home = aclDecision(problems, [], 'home');
     expect(home.decision).toBe('warn');
-    expect(home.banner).toMatch(/Fix permissions/);
+    // The console line points at the panel; it no longer names a Fix permissions button that doesn't exist.
+    expect(home.banner).toMatch(/see the control panel/);
+    expect(home.banner).not.toMatch(/Fix permissions/);
     expect(aclDecision([], [], 'school').decision).toBe('ok');
+  });
+
+  it('the fix hint (0.6.0-m1.1) is for a host without administrator rights: the user folder, the command, "Don\'t warn me again"', () => {
+    expect(DEFAULT_FIX_HINT).toMatch(/None of this needs administrator rights/);
+    expect(DEFAULT_FIX_HINT).toContain('%USERPROFILE%\\Voidswarm LAN');
+    expect(DEFAULT_FIX_HINT).toContain('"Start Voidswarm Host.cmd" --fix-permissions');
+    expect(DEFAULT_FIX_HINT).toContain('"Don\'t warn me again"');
+    const home = aclDecision(daclProblems(parseDacl(ROOT_AU_M), ROOT_T, ME), [], 'home');
+    expect(home.message).toContain(DEFAULT_FIX_HINT);
   });
 
   it('fails closed: School refuses when the permissions couldn\'t be read; Home warns', () => {

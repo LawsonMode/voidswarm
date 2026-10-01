@@ -4,6 +4,7 @@
 export const TOKEN_KEY: string;
 export const MODE_KEY: string;
 export const PREFS_KEY: string;
+export const DISMISSED_KEY: string;
 export const ONLINE_REFRESH_MS: number;
 export const HOME_REFRESH_MS: number;
 export const ME_REFRESH_MS: number;
@@ -214,6 +215,18 @@ export function createTokenStore(getStorage: () => StorageLike | null | undefine
   get(): string | null; set(token: string): void; clear(): void;
 };
 export function createPrefs(getStorage: () => StorageLike | null | undefined): { presenting(): boolean | null; setPresenting(on: boolean): void };
+export interface BannerAction {
+  kind: 'setting' | 'session';
+  label: string;
+  cap: string | null;
+  /** kind 'setting': the settings/update patch. */
+  patch?: Record<string, unknown>;
+  /** The banner codes the action hides. */
+  hides: readonly string[];
+  done?: string;
+}
+export const BANNER_ACTIONS: Readonly<Record<string, BannerAction>>;
+export function bannerAction(banner: unknown, caps: readonly string[] | null | undefined): BannerAction | null;
 export function presentingAtStart(o: { remembered: boolean | null; atLogin: unknown; freshLogin: boolean }): boolean;
 
 // DOM (a real document in the page; a fake one in tests)

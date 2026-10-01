@@ -375,8 +375,9 @@ export function readStoredRev(file: string): number | null {
 
 /**
  * Upgrade an older config object to CONFIG_VERSION (field-level changes only; values are validated afterwards).
- * Version 1 is the first, so there is nothing to upgrade yet; a NEWER file (after a rollback) is read as far as
- * this version understands it, with a warning. Returns a new object.
+ * 1 → 2: `launcher.permissions: 'refuse'` becomes 'warn' (it was only ever the School preset's default, and the check
+ * no longer blocks a host by default). A NEWER file (after a rollback) is read as far as this version understands it,
+ * with a warning. Returns a new object.
  */
 export function migrateConfig(raw: Record<string, unknown>, warnings: string[] = []): Record<string, unknown> {
   const out = { ...raw };
@@ -384,7 +385,9 @@ export function migrateConfig(raw: Record<string, unknown>, warnings: string[] =
   if (v > CONFIG_VERSION) {
     warnings.push(`the settings file is from a newer Voidswarm (config version ${v}); settings this version doesn't know are ignored`);
   }
-  // (future) if (v < 2) { ...rename / reshape fields...; }
+  if (v < 2 && isPlainObject(out.launcher) && out.launcher.permissions === 'refuse') {
+    out.launcher = { ...out.launcher, permissions: 'warn' };
+  }
   out.configVersion = CONFIG_VERSION;
   return out;
 }

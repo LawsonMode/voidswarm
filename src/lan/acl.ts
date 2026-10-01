@@ -669,11 +669,14 @@ function checkPosix(opts: AclOptions, targets: AclTarget[], walk: TreeWalk): Fou
 }
 
 export const DEFAULT_FIX_HINT =
-  // The panel button needs the server -> launcher action path (planned with the M2 work, now in Quark); until then
-  // the hint names only what works today (owner report, 2026-10-01).
-  'To fix it, stop the host (close its black console window), open a Command Prompt in the Voidswarm LAN folder and run ' +
-  '"Start Voidswarm Host.cmd" --fix-permissions. ' +
-  'That gives only you, SYSTEM and Administrators access to this folder and everything in it, then starts the host.';
+  // A Fix permissions button needs the server -> launcher action path (planned with the M2 work, now in Quark); until
+  // then the hint names only what works today (owner report, 2026-10-01). 0.6.0-m1.1: for a host without
+  // administrator rights (none of these needs them).
+  'None of this needs administrator rights. The simplest fix is to extract Voidswarm into your own user folder ' +
+  '(%USERPROFILE%\\Voidswarm LAN). Or stop the host (close its black console window), open a Command Prompt in the ' +
+  'Voidswarm LAN folder and run "Start Voidswarm Host.cmd" --fix-permissions: it gives only you, SYSTEM and ' +
+  'Administrators access to this folder, then starts the host. Or, if you don\'t mind who can change these files, ' +
+  'choose "Don\'t warn me again" on this warning in the control panel.';
 
 const IT_HINT = "If that doesn't help, give FOR SCHOOL IT.txt to IT.";
 
@@ -736,7 +739,7 @@ export function aclDecision(
   return {
     decision: 'warn',
     message: ["Other accounts on this PC can change Voidswarm's files or read its data:", ...lines, fixHint].join('\n'),
-    banner: 'Permissions warning: other accounts on this PC can reach Voidswarm\'s folder. Fix permissions →',
+    banner: 'Permissions warning: other accounts on this PC can reach Voidswarm\'s folder (it still runs; see the control panel).',
   };
 }
 

@@ -13,6 +13,10 @@ const scratch: string[] = [];
 afterAll(() => { for (const d of scratch) { try { fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* held */ } } });
 
 const readTemplate = (name: string): string => fs.readFileSync(path.join(TEMPLATES_DIR, name), 'utf8');
+const IT_FILE = 'Allow Voidswarm (for IT).cmd';
+/** `net session` succeeds only elevated: the IT file's real run is tested only when it can't change the firewall. */
+const elevatedNow = (): boolean => process.platform === 'win32'
+  && spawnSync(path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'net.exe'), ['session'], { windowsHide: true, stdio: 'ignore', timeout: 15_000 }).status === 0;
 const VALUES = { VERSION: '9.9.9', NODE_VERSION: process.version, BUILD_DATE: '2026-09-29T00:00:00.000Z', BUILD_DAY: '2026-09-29', NOTICES: '' };
 
 describe('the stub templates (§2.1)', () => {
@@ -35,6 +39,39 @@ describe('the stub templates (§2.1)', () => {
       expect(text, s.name).toMatch(/"%~dp0(app|runtime)\\/);
       expect(text, s.name).not.toMatch(/"(app|runtime|data|previous)[.a-z]*\\/);
     }
+  });
+
+  it('"Allow Voidswarm (for IT).cmd" (0.6.0-m1.1): administrators only; System32 tools only; Domain + Private, never Public; a named rule a re-run replaces', () => {
+    const t = readTemplate(IT_FILE);
+    const lines = t.replace(/\r?\n$/, '').split(/\r?\n/);
+    // Elevation first-class: `net session` fails without it, and the file explains and exits before changing anything.
+    const elevated = lines.findIndex((l) => l.startsWith('"%SystemRoot%\\System32\\net.exe" session >nul 2>&1 || ('));
+    expect(elevated).toBeGreaterThan(0);
+    expect(lines[elevated]).toContain('Run as administrator');
+    expect(lines[elevated]).toMatch(/exit \/b 1\)$/);
+    const firstChange = lines.findIndex((l) => /advfirewall|Remove-NetFirewallRule|Set-NetFirewallRule/.test(l));
+    expect(firstChange).toBeGreaterThan(elevated);
+    // The rule: this copy's runtime\node.exe, inbound TCP on any local port (the ports can change in Settings), Domain
+    // and Private only, named after this folder; the same name is deleted first, so running it again replaces it.
+    expect(t).toContain('set "VS_EXE=%~dp0runtime\\node.exe"');
+    expect(t).toContain('for %%I in ("%~dp0.") do set "VS_NAME=Voidswarm LAN (%%~fI)"');
+    expect(t).toContain('"%SystemRoot%\\System32\\netsh.exe" advfirewall firewall delete rule name="%VS_NAME%" >nul 2>&1');
+    expect(t).toContain('"%SystemRoot%\\System32\\netsh.exe" advfirewall firewall add rule name="%VS_NAME%" dir=in action=allow program="%VS_EXE%" protocol=TCP localport=any profile=domain,private enable=yes');
+    expect(t.indexOf('delete rule name="%VS_NAME%"')).toBeLessThan(t.indexOf('add rule name="%VS_NAME%"'));
+    expect(t).not.toMatch(/profile=[a-z,]*public/i);
+    expect(t).not.toMatch(/-Profile (Any|Domain|Private)/);
+    // Block rules for this program (a Cancel on the Windows prompt) stop blocking Domain / Private; one that also covers
+    // Public keeps blocking Public (narrowed, never removed).
+    expect(t).toContain("$_.Action -eq 'Block'");
+    expect(t).toContain("if ([string]$r.Profile -match 'Any|Public') { $r | Set-NetFirewallRule -Profile Public;");
+    // It tells IT what it did and how to undo it.
+    expect(t).toContain('To remove it: netsh advfirewall firewall delete rule name="%VS_NAME%"');
+    expect(t).toContain('The Public profile was not changed.');
+    // Every program it runs is an absolute System32 path; it never runs node.exe or anything from its own folder.
+    const commands = [...t.matchAll(/(?:^|&\s+|\|\|\s+)"([^"]+)"/gm)].map((m) => m[1]!);
+    expect(commands).toHaveLength(4); // net session, netsh delete, PowerShell (the Block rules), netsh add
+    for (const c of commands) expect(c, c).toMatch(/^%SystemRoot%\\System32\\(net|netsh|WindowsPowerShell\\v1\.0\\powershell)\.exe$/);
+    expect(t).not.toMatch(/^\s*"%(~dp0|VS_EXE)/m);
   });
 
   it('only the Start stub re-calls itself with stdin from NUL; the tool stubs read the console (§2.5)', () => {
@@ -115,6 +152,15 @@ describe.runIf(process.platform === 'win32')('T-PKG-6: the stubs in a real cmd.e
       expect(r.out, s.name).toContain('Your antivirus may have removed runtime\\node.exe. Check Bitdefender > Protection > Quarantine, then add an exception (START HERE.html)');
       expect(r.out).not.toContain('Unzip the WHOLE');
     }
+  });
+
+  it.skipIf(elevatedNow())('the IT file run without administrator rights: explains, changes nothing, exit 1', () => {
+    const root = makeRoot('itfile');
+    const r = run(path.join(root, IT_FILE), '', {}, '');
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('This file is for IT.');
+    expect(r.out).toContain('right-click it and choose "Run as administrator" (an IT account). Nothing was changed.');
+    expect(r.out).not.toMatch(/Ok\.|Allowing|Done\./);
   });
 
   it('Start: runs app\\launch.mjs with --child and the flags, stdin at end-of-input, and passes the exit code through', () => {

@@ -9,7 +9,7 @@ import type { AclReport } from './acl';
 import { formatSetupCode } from './banner';
 import { LAUNCHER_ACTOR, SettingsService } from '../server/settings';
 import {
-  LAUNCH_EXIT, SETUP_CODE_ALPHABET, findImportCandidates, findPrimaryAddress, isEntry, isRfc1918, launch, movedRefusal, newSetupCode,
+  LAUNCH_EXIT, PERMISSIONS_OFF_LOG, SETUP_CODE_ALPHABET, findImportCandidates, findPrimaryAddress, isEntry, isRfc1918, launch, movedRefusal, newSetupCode,
   openInBrowser, parseLaunchArgs, readSetupState, vpsSettingsRefusal, type LaunchDeps,
 } from './launch';
 import { DatabaseSync } from 'node:sqlite';
@@ -849,6 +849,105 @@ describe('launch refusals (exit codes)', () => {
     expect(hf.text()).toContain('The folder permissions are fixed.');
     await r.host!.stop();
   }, 30_000);
+
+  const hostLogText = (data: string): string => {
+    const dir = path.join(data, 'logs');
+    return fs.readdirSync(dir).filter((f) => /^host-\d{4}-\d{2}-\d{2}\.log$/.test(f)).map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('');
+  };
+  const setLauncher = (data: string, launcher: Record<string, string>, extra: Record<string, unknown> = {}): void => {
+    const file = path.join(data, 'voidswarm.config.json');
+    const cfg = JSON.parse(fs.readFileSync(file, 'utf8'));
+    Object.assign(cfg, extra);
+    cfg.launcher = { ...cfg.launcher, ...launcher };
+    fs.writeFileSync(file, JSON.stringify(cfg));
+  };
+
+  it("launcher.permissions 'off' (Don't warn me again): the check is skipped, one host-log line, no banner, no console warning", async () => {
+    const { root, app, data } = makeRoot();
+    fakeServer(app);
+    const port = await freeBase();
+    const warnAcl: AclReport = { ...okAcl, ok: false, decision: 'warn', message: 'Other accounts on this PC can change Voidswarm\'s files.', banner: 'Permissions warning: other accounts on this PC can reach Voidswarm\'s folder (it still runs; see the control panel).' };
+    await (await launch(['--no-browser'], harness(root, port, { checkPermissions: async () => warnAcl }).deps)).host!.stop();
+    // Off, even in School (and a School config of this version that says so).
+    setLauncher(data, { permissions: 'off' }, { preset: 'school' });
+    let checked = 0;
+    const h = harness(root, port, { checkPermissions: async () => { checked++; return { ...warnAcl, decision: 'refuse' }; } });
+    const host = (await launch(['--no-browser'], h.deps)).host!;
+    await host.stop();
+    expect(checked).toBe(0);
+    expect(h.text()).not.toContain('Permissions warning');
+    expect(h.text()).not.toMatch(/folder permission/i);
+    const codes = starts(data).at(-1)!.start.banners.map((b: { code: string }) => b.code);
+    expect(codes).not.toContain('permissions');
+    expect(codes).not.toContain('permissions-unchecked');
+    expect(hostLogText(data).split('\n').filter((l) => l.includes(PERMISSIONS_OFF_LOG))).toHaveLength(1);
+    // whoami didn't answer: no "couldn't be checked" banner either (the check is off).
+    const hw = harness(root, port, { readToken: async () => ({ ...medium, userSid: '' }) });
+    const r0 = await launch(['--no-browser'], hw.deps);
+    await r0.host!.stop();
+    if (process.platform === 'win32') expect(starts(data).at(-1)!.start.banners.map((b: { code: string }) => b.code)).not.toContain('permissions-unchecked');
+    // --fix-permissions still runs the fix when given; what's left after it is not reported.
+    let fixed = false;
+    const hf = harness(root, port, { fixPermissions: async () => { fixed = true; return { report: warnAcl, ran: ['icacls …'], errors: [] }; } });
+    const r = await launch(['--fix-permissions', '--no-browser'], hf.deps);
+    await r.host!.stop();
+    expect(fixed).toBe(true);
+    expect(hf.text()).toContain('Some permissions could not be fixed');
+    expect(starts(data).at(-1)!.start.banners.map((b: { code: string }) => b.code)).not.toContain('permissions');
+  }, 30_000);
+
+  it("an old School config (version 1, permissions 'refuse') no longer refuses: it warns, and the host starts", async () => {
+    const { root, app, data } = makeRoot();
+    fakeServer(app);
+    const port = await freeBase();
+    await (await launch(['--no-browser'], harness(root, port).deps)).host!.stop();
+    setLauncher(data, { elevated: 'refuse', permissions: 'refuse' }, { preset: 'school', configVersion: 1 });
+    let asked: string | null = null;
+    const h = harness(root, port, { checkPermissions: async (o) => { asked = o.preset; return { ...okAcl, ok: false, decision: o.preset === 'school' ? 'refuse' : 'warn', message: 'Other accounts on this PC can change Voidswarm\'s files.' }; } });
+    const r = await launch(['--no-browser'], h.deps);
+    expect(r.host).not.toBeNull();
+    await r.host!.stop();
+    expect(asked).toBe('home');
+    expect(starts(data).at(-1)!.start.banners.map((b: { code: string }) => b.code)).toContain('permissions');
+  }, 30_000);
+
+  it('the firewall at startup: a cached preflight gets its firewall part re-read; likely blocked → one console line and a warn banner; --this-pc-only says nothing', async () => {
+    const { root, app, data } = makeRoot();
+    fakeServer(app);
+    const port = await freeBase();
+    const fwNone: PreflightReport['firewall'] = { source: 'powershell', rulesRead: true, rules: [], profiles: [{ name: 'Private', enabled: true, defaultInbound: 'Block', allowLocalRules: true }] };
+    const fwAllowed: PreflightReport['firewall'] = { ...fwNone!, rules: [{ program: process.execPath, name: 'Voidswarm LAN (x)', enabled: true, direction: 'Inbound', action: 'Allow', profiles: 'Domain, Private' }] };
+    const cached = async (o: { primary?: string | null }) => ({ report: { ...report(o.primary ?? null), firewall: fwNone }, ran: false });
+    // 1. The cache says no rule, the re-read finds the one IT just added: no warning.
+    let reads = 0;
+    const h1 = harness(root, port, { preflight: cached, readFirewall: async () => { reads++; return fwAllowed; } });
+    await (await launch(['--no-browser'], h1.deps)).host!.stop();
+    expect(reads).toBe(1);
+    expect(h1.text()).not.toContain('Firewall:');
+    expect(starts(data).at(-1)!.start.banners.map((b: { code: string }) => b.code)).not.toContain('preflight-firewall-blocked');
+    expect(starts(data).at(-1)!.start.preflight.firewall).toEqual(fwAllowed);
+    // 2. The re-read fails (null): the cached section stays, and it says likely blocked.
+    const h2 = harness(root, port, { preflight: cached, readFirewall: async () => null });
+    await (await launch(['--no-browser'], h2.deps)).host!.stop();
+    // One note under the console banner (wrapped there to the console width).
+    const lines = h2.text().split('\n').filter((l) => l.includes('Firewall:'));
+    expect(lines).toEqual([' ! Firewall: no rule lets other devices in. Ask IT to run "Allow Voidswarm (for IT).cmd", or play on this PC.']);
+    const banner = starts(data).at(-1)!.start.banners.find((b: { code: string }) => b.code === 'preflight-firewall-blocked');
+    expect(banner).toMatchObject({ level: 'warn' });
+    expect(banner.text).toMatch(/^Other devices probably can't connect: Windows Firewall has no rule allowing Voidswarm on this network \(the Private profile\)/);
+    // 3. A fresh preflight (ran: true) is not read twice.
+    let again = 0;
+    const h3 = harness(root, port, { preflight: async (o) => ({ report: { ...report(o.primary ?? null), firewall: fwNone }, ran: true }), readFirewall: async () => { again++; return fwAllowed; } });
+    await (await launch(['--no-browser'], h3.deps)).host!.stop();
+    expect(again).toBe(0);
+    // 4. --this-pc-only: no re-read, no firewall line, no banner.
+    let pcOnlyReads = 0;
+    const h4 = harness(root, port, { preflight: cached, readFirewall: async () => { pcOnlyReads++; return fwNone; } });
+    await (await launch(['--no-browser', '--this-pc-only'], h4.deps)).host!.stop();
+    expect(pcOnlyReads).toBe(0);
+    expect(h4.text()).not.toContain('Firewall:');
+    expect(starts(data).at(-1)!.start.banners.map((b: { code: string }) => b.code)).not.toContain('preflight-firewall-blocked');
+  }, 60_000);
 });
 
 describe('staged work (§2.2 step 8) and the first-run import offer (§2.5, T-LAN-16)', () => {

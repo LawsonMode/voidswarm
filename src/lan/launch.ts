@@ -59,7 +59,7 @@ import {
 } from './paths';
 import { acquireLock, secondLaunch, validatePanelUrl, type HostLock } from './pipe';
 import { choosePorts, type ChoosePortsOptions, type ChoosePortsResult, type PortPlan } from './ports';
-import { getPreflight, lanServingAllowed, preflightNotices, volumeLookup, type PreflightOptions, type PreflightReport } from './preflight';
+import { getPreflight, lanServingAllowed, preflightNotices, readFirewall, volumeLookup, type PreflightOptions, type PreflightReport } from './preflight';
 import { applyStagedRestore } from './restore';
 import { MaintRelay, maintEntryBeside } from './maintRelay';
 import { updateLeftoverNotes } from './update';
@@ -214,8 +214,19 @@ export async function openFolder(dir: string, opts: { exec?: ExecFn; platform?: 
   return r.code === 0;
 }
 
-/** The launcher policy decides like a preset: 'refuse' behaves as School, 'warn' as Home. */
-const policyPreset = (policy: 'warn' | 'refuse' | undefined, preset: Preset): Preset => (policy ? (policy === 'refuse' ? 'school' : 'home') : preset);
+/**
+ * The launcher policy decides like a preset: 'refuse' behaves as School, 'warn' as Home, none (no settings yet) as the
+ * preset. 'off' (the permission check only) is handled before this: it skips the check; should it get here (the fix
+ * with --fix-permissions), it is the gentlest one (Home: warn, never refuse).
+ */
+const policyPreset = (policy: 'warn' | 'refuse' | 'off' | undefined, preset: Preset): Preset => {
+  if (policy === 'refuse') return 'school';
+  if (policy === 'warn' || policy === 'off') return 'home';
+  return preset;
+};
+
+/** The host-log line for a start with the folder permission check off (launcher.permissions = 'off'). */
+export const PERMISSIONS_OFF_LOG = "folder permission check skipped (launcher.permissions = 'off': the host chose \"Don't warn me again\")";
 
 /** A VPS-only setting in the environment: the launcher refuses it (§3.2 "Refused combinations"). */
 export function vpsSettingsRefusal(env: Env): string | null {
@@ -440,7 +451,10 @@ export interface LaunchDeps {
   fixPermissions?: (opts: AclOptions) => Promise<{ report: AclReport; ran: string[]; errors: string[] }>;
   protectDir?: (dir: string, userSid: string) => Promise<string | null>;
   scanMotw?: (root: string) => MotwReport;
-  preflight?: (opts: PreflightOptions) => Promise<{ report: PreflightReport }>;
+  /** `ran: false` = the report came from the cache (then the firewall section is read again: `readFirewall`). */
+  preflight?: (opts: PreflightOptions) => Promise<{ report: PreflightReport; ran?: boolean }>;
+  /** The startup firewall re-read (default preflight.ts readFirewall; null = couldn't read, keep the cached one). */
+  readFirewall?: (opts: { nodeExe: string; platform: Platform; exec: ExecFn; env: Env }) => Promise<PreflightReport['firewall']>;
   /** The primary LAN address (B12's primary.ts plugs in here). */
   primary?: () => Promise<string | null> | string | null;
   choosePorts?: (opts: ChoosePortsOptions) => Promise<ChoosePortsResult>;
@@ -534,6 +548,8 @@ export async function launch(argv: readonly string[], deps: LaunchDeps = {}): Pr
 
   /** Short lines under the banner. */
   const notes: string[] = [];
+  /** Host-log lines from the checks that run before data\logs exists (written once the log is open). */
+  const earlyLog: string[] = [];
   const banners: LauncherBanner[] = [];
   const addBanner = (code: string, level: LauncherBanner['level'], text: string | null | undefined): void => {
     if (text) banners.push({ code, level, text });
@@ -595,11 +611,19 @@ export async function launch(argv: readonly string[], deps: LaunchDeps = {}): Pr
     if (elev.decision === 'warn') { notes.push(elev.banner ?? elev.message ?? 'Running as administrator.'); addBanner('elevated', 'warn', elev.message); }
     const userSid = token.userSid;
 
-    // 3. Permissions (read-only icacls; the fix only with --fix-permissions or from the panel).
-    const aclPreset = policyPreset(stored?.launcher.permissions, preset);
-    if (platform === 'win32' && !userSid) {
-      notes.push("Folder permissions couldn't be checked (whoami didn't answer).");
-      addBanner('permissions-unchecked', 'warn', "Voidswarm couldn't check who can reach its folder (whoami didn't answer).");
+    // 3. Permissions (read-only icacls; the fix only with --fix-permissions). 'off' (the panel's "Don't warn me again")
+    //    skips the check: one host-log line, no banner, no console warning; --fix-permissions still runs when given.
+    const permPolicy = stored?.launcher.permissions;
+    const permsOff = permPolicy === 'off';
+    const aclPreset = policyPreset(permPolicy, preset);
+    if (permsOff) earlyLog.push(flags.fixPermissions ? "launcher.permissions is 'off'; --fix-permissions runs the fix anyway" : PERMISSIONS_OFF_LOG);
+    if (permsOff && !flags.fixPermissions) {
+      // Nothing to check.
+    } else if (platform === 'win32' && !userSid) {
+      if (!permsOff) {
+        notes.push("Folder permissions couldn't be checked (whoami didn't answer).");
+        addBanner('permissions-unchecked', 'warn', "Voidswarm couldn't check who can reach its folder (whoami didn't answer).");
+      }
     } else if (userSid) {
       const aclOpts: AclOptions = { root, dataDir: paths.data, userSid, preset: aclPreset, platform, exec, checkOwners: !stored };
       let acl: AclReport;
@@ -612,8 +636,11 @@ export async function launch(argv: readonly string[], deps: LaunchDeps = {}): Pr
       } else {
         acl = await (deps.checkPermissions ?? checkPermissions)(aclOpts);
       }
-      if (acl.decision === 'refuse') throw new Refused(LAUNCH_EXIT.REFUSED, acl.message ?? 'Other accounts can reach Voidswarm\'s folder.');
-      if (acl.decision === 'warn') {
+      if (permsOff) {
+        // The fix ran (--fix-permissions); whatever is left is not reported (the host turned the warning off).
+      } else if (acl.decision === 'refuse') {
+        throw new Refused(LAUNCH_EXIT.REFUSED, acl.message ?? 'Other accounts can reach Voidswarm\'s folder.');
+      } else if (acl.decision === 'warn') {
         notes.push(acl.banner ?? 'Permissions warning: other accounts on this PC can reach Voidswarm\'s folder.');
         addBanner('permissions', 'warn', acl.message);
       }
@@ -661,6 +688,7 @@ export async function launch(argv: readonly string[], deps: LaunchDeps = {}): Pr
     const hostLog = log;
     if (deps.processHandlers !== false) process.on('exit', () => hostLog.flushSync());
     log.write(`Voidswarm LAN ${GAME_VERSION} starting (Node ${process.version}, pid ${process.pid}, ${platform})`);
+    for (const l of earlyLog.splice(0)) log.write(l);
 
     // 7. Config: created (code defaults → Home → the environment) on the first run.
     const openSettings = (): SettingsService => {
@@ -749,14 +777,25 @@ export async function launch(argv: readonly string[], deps: LaunchDeps = {}): Pr
     const primary = (await (deps.primary ? deps.primary() : findPrimaryAddress())) ?? null;
     let report: PreflightReport | null = null;
     try {
-      report = (await (deps.preflight ?? getPreflight)({ dataDir: paths.data, version: GAME_VERSION, nodeExe: execPath, primary, platform, exec, env, now })).report;
+      const pf = await (deps.preflight ?? getPreflight)({ dataDir: paths.data, version: GAME_VERSION, nodeExe: execPath, primary, platform, exec, env, now });
+      report = pf.report;
+      // A cached report (a day old at most): the firewall part is re-read now (read-only, about a second), so a rule
+      // IT just added, or a Block rule from a cancelled Windows prompt, shows at this start. Not needed on this PC only.
+      if (pf.ran === false && !flags.thisPcOnly) {
+        try {
+          const fw = await (deps.readFirewall ?? readFirewall)({ nodeExe: execPath, platform, exec, env });
+          if (fw) report = { ...report, firewall: fw };
+        } catch (e) {
+          log.write(`the firewall re-read failed: ${(e as Error)?.message ?? e}`);
+        }
+      }
     } catch (e) {
       log.write(`preflight failed: ${(e as Error)?.message ?? e}`);
     }
     if (report) {
-      for (const n of preflightNotices(report, { preset })) {
+      for (const n of preflightNotices(report, { preset, thisPcOnly: flags.thisPcOnly })) {
         addBanner(`preflight-${n.code}`, n.level, n.text);
-        if (n.level !== 'info') notes.push(n.text);
+        if (n.level !== 'info') notes.push(n.console ?? n.text);
       }
     }
     const allowed = lanServingAllowed(report, primary);

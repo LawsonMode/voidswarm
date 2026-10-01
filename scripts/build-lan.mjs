@@ -73,13 +73,16 @@ export function isPageFile(name) {
 
 /**
  * The .cmd stubs at the root (§2.1). Their contract (entry points) is frozen for 0.6.x. `later` = made by a later task
- * (the firewall stub is B14, M2): shipped once its template exists.
+ * (the firewall stub is B14, M2): shipped once its template exists. "Allow Voidswarm (for IT).cmd" (0.6.0-m1.1) is the
+ * one file meant to run elevated, by IT: it only calls System32's netsh / PowerShell (adds the inbound program rule for
+ * runtime\node.exe on the Domain and Private profiles), never node.exe.
  */
 export const STUBS = Object.freeze([
   { name: 'Start Voidswarm Host.cmd', later: false },
   { name: 'Update Voidswarm.cmd', later: false },
   { name: 'Reset admin password.cmd', later: false },
   { name: 'Restore a backup.cmd', later: false },
+  { name: 'Allow Voidswarm (for IT).cmd', later: false },
   { name: 'Allow through firewall (admin).cmd', later: true },
 ]);
 

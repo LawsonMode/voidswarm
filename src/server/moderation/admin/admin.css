@@ -260,6 +260,10 @@ label.check.role { color: var(--text); font-family: var(--font-display); font-si
 .banner { padding: 0.5rem 0.8rem; border-radius: 6px; border: 1px solid var(--line-strong); border-left: 4px solid var(--cyan); background: var(--glass); }
 .banner-warn { border-left-color: var(--yellow); background: rgba(255, 212, 59, 0.08); }
 .banner-urgent { border-left-color: var(--red); background: rgba(255, 59, 92, 0.14); color: #fff; font-weight: 600; }
+.banner { white-space: pre-line; }
+.banner.has-action { display: flex; gap: 0.8rem; align-items: flex-start; justify-content: space-between; }
+.banner .banner-text { flex: 1 1 auto; }
+.banner .banner-action { flex: 0 0 auto; white-space: nowrap; }
 
 /* Home */
 .home-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.8fr); gap: 1rem; margin-bottom: 1rem; }

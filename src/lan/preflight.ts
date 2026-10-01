@@ -343,6 +343,36 @@ async function measureDisk(dataDir: string, opts: PreflightOptions): Promise<Pre
   }
 }
 
+/** The firewall section of a report from a PowerShell probe that read the rules. */
+function firewallFromProbe(probe: HostProbe, program: string, env: Env): NonNullable<PreflightReport['firewall']> {
+  return {
+    source: 'powershell',
+    rulesRead: true,
+    rules: rulesFromProbe(probe, program, env),
+    profiles: firewallProfilesFromProbe(probe),
+    ...(probe.profilesError ? { error: probe.profilesError } : {}),
+  };
+}
+
+/** The startup firewall re-read's time limit (it takes about a second; the full preflight's PowerShell gets 30 s). */
+export const FIREWALL_REFRESH_TIMEOUT_MS = 15_000;
+
+/**
+ * Re-reads only the firewall section (read-only PowerShell, about a second, no administrator rights): the launcher
+ * runs it at every start when the rest of the preflight came from the cache, so a rule IT added (or a Block rule from
+ * a cancelled Windows prompt) shows at the next start, not a day later. Null when it couldn't be read (keep the
+ * cached section then); never the netsh fallback (that one is slow).
+ */
+export async function readFirewall(
+  opts: { nodeExe: string; platform?: Platform; exec?: ExecFn; env?: Env; timeoutMs?: number },
+): Promise<PreflightReport['firewall']> {
+  if ((opts.platform ?? process.platform) !== 'win32') return null;
+  const env = opts.env ?? process.env;
+  const { probe } = await runHostProbe(['firewall'], { exec: opts.exec, env, program: opts.nodeExe, timeoutMs: opts.timeoutMs ?? FIREWALL_REFRESH_TIMEOUT_MS });
+  if (!probe || probe.rulesError) return null;
+  return firewallFromProbe(probe, opts.nodeExe, env);
+}
+
 /** Runs every check now (no cache). */
 export async function runPreflight(opts: PreflightOptions & { reason?: PreflightReason }): Promise<PreflightReport> {
   const platform = opts.platform ?? process.platform;
@@ -380,13 +410,7 @@ export async function runPreflight(opts: PreflightOptions & { reason?: Preflight
     }
 
     if (probe && !probe.rulesError) {
-      report.firewall = {
-        source: 'powershell',
-        rulesRead: true,
-        rules: rulesFromProbe(probe, opts.nodeExe, env),
-        profiles: firewallProfilesFromProbe(probe),
-        ...(probe.profilesError ? { error: probe.profilesError } : {}),
-      };
+      report.firewall = firewallFromProbe(probe, opts.nodeExe, env);
     } else {
       const ns = await exec(systemTool('netsh', env), ['advfirewall', 'firewall', 'show', 'rule', 'name=all', 'verbose'], { timeoutMs: 30_000 });
       const rules = parseNetshRules(ns.stdout ?? '', opts.nodeExe, env);
@@ -493,6 +517,82 @@ function ruleApplies(rule: FirewallRule, profile: string | null): boolean {
   return p === '' || p.includes('any') || p.includes(profile.toLowerCase());
 }
 
+/** Why other devices are probably blocked (inboundVerdict). */
+export type InboundBlockReason = 'block-rule' | 'policy-ignores-local' | 'no-allow-rule';
+
+export interface InboundVerdict {
+  inboundLikelyBlocked: boolean;
+  reason: InboundBlockReason | null;
+  /** The firewall profile of the active network ('Domain' | 'Private' | 'Public'), null when unknown. */
+  profile: string | null;
+  /** No firewall rule at all for this node.exe yet (the Windows prompt was never answered). */
+  noRules: boolean;
+}
+
+/**
+ * Can other devices reach this node.exe through Windows Firewall on the active network? A pure reading of the
+ * preflight's firewall section and the active network category; it claims "likely blocked" only on evidence:
+ *  - an enabled inbound Block rule for this node.exe covering the active profile ('block-rule': Block wins in Windows
+ *    Firewall, whatever Allow rules exist);
+ *  - the active profile's firewall is on and a policy ignores local rules (AllowLocalFirewallRules False), with no
+ *    Allow rule for it in the active policy ('policy-ignores-local': neither the Windows prompt nor a local rule helps;
+ *    an Allow rule IT pushed by policy shows in the active store and is believed);
+ *  - the active profile's firewall is on, its default inbound action is Block (NotConfigured means Block), and no
+ *    enabled inbound Allow rule for this node.exe covers it ('no-allow-rule').
+ * Unknown or unreadable (no report, an unknown or Public category, rules not read, the profile's state not read for the
+ * last two) makes no claim: no crying wolf. Public is left to the network-public notice (the game stays on this PC).
+ * A port-only rule (no program) is not seen, hence "likely".
+ */
+export function inboundVerdict(fw: PreflightReport['firewall'], category: NetworkCategory | null): InboundVerdict {
+  const profile = profileName(category);
+  const noRules = !!fw && fw.rulesRead && fw.rules.length === 0;
+  const none: InboundVerdict = { inboundLikelyBlocked: false, reason: null, profile, noRules };
+  if (!fw || !fw.rulesRead || !profile || profile === 'Public') return none;
+  const active = fw.profiles.find((p) => p.name.toLowerCase() === profile.toLowerCase()) ?? null;
+  if (active && !active.enabled) return none; // the firewall is off on this network
+  const inbound = fw.rules.filter((r) => r.enabled && /^in/i.test(r.direction) && ruleApplies(r, profile));
+  const allowed = inbound.some((r) => /^allow$/i.test(r.action));
+  const blocked = inbound.some((r) => /^block$/i.test(r.action));
+  const claim = (reason: InboundBlockReason): InboundVerdict => ({ inboundLikelyBlocked: true, reason, profile, noRules });
+  if (blocked) return claim('block-rule');
+  if (!active || allowed) return none;
+  if (!active.allowLocalRules) return claim('policy-ignores-local');
+  if (/^(block|notconfigured)$/i.test(active.defaultInbound.trim())) return claim('no-allow-rule');
+  return none;
+}
+
+/** The IT file (scripts/lan/templates): adds the inbound rule for runtime\node.exe on the Domain and Private profiles. */
+export const IT_FIREWALL_FILE = 'Allow Voidswarm (for IT).cmd';
+
+const ON_THIS_PC = 'or keep using Voidswarm on this PC only: the host PC can always play and use this panel.';
+
+/** The panel banner for a likely-blocked verdict (at most 500 characters: lan:start banners are cut there). */
+export function firewallBlockedText(v: InboundVerdict): string {
+  const where = v.profile ? `this network (the ${v.profile} profile)` : 'this network';
+  const askIt = `ask IT to run "${IT_FIREWALL_FILE}" once (it is in the Voidswarm LAN folder; see FOR SCHOOL IT.txt), ${ON_THIS_PC}`;
+  if (v.reason === 'block-rule') {
+    return `Other devices probably can't connect: Windows Firewall has a Block rule for Voidswarm on ${where}, usually from `
+      + `Cancel on the Windows prompt. Removing it needs an administrator, so either ${askIt}`;
+  }
+  if (v.reason === 'policy-ignores-local') {
+    return `Other devices probably can't connect: this PC's firewall policy (set by IT) ignores local rules on ${where}, `
+      + `so only IT can let Voidswarm in. Either ask IT to add the rule to that policy (FOR SCHOOL IT.txt), ${ON_THIS_PC}`;
+  }
+  return `Other devices probably can't connect: Windows Firewall has no rule allowing Voidswarm on ${where}. Adding one `
+    + `needs an administrator, so either ${askIt}`
+    + (v.noRules ? ' (If Windows asks about "Node.js JavaScript Runtime" and you can approve it, choose Allow.)' : '');
+}
+
+/**
+ * The one console line for a likely-blocked verdict: a note under the console banner, so at most NOTE_MAX_CHARS (110,
+ * banner.ts) or it is cut; the panel banner has the whole story.
+ */
+export function firewallBlockedConsole(v: InboundVerdict): string {
+  if (v.reason === 'policy-ignores-local') return "Firewall: IT's policy blocks other devices. Ask IT to add the rule (FOR SCHOOL IT.txt), or play on this PC.";
+  const why = v.reason === 'block-rule' ? 'a Block rule stops other devices' : 'no rule lets other devices in';
+  return `Firewall: ${why}. Ask IT to run "${IT_FIREWALL_FILE}", or play on this PC.`;
+}
+
 function duration(sec: number): string {
   if (sec < 90) return `${sec} seconds`;
   const min = Math.round(sec / 60);
@@ -507,8 +607,7 @@ function sizeText(bytes: number): string {
 
 export type PreflightNoticeCode =
   | 'network-public'
-  | 'firewall-block'
-  | 'firewall-policy'
+  | 'firewall-blocked'
   | 'firewall-prompt'
   | 'sleep-ac'
   | 'sleep-battery'
@@ -521,10 +620,15 @@ export interface PreflightNotice {
   code: PreflightNoticeCode;
   level: 'info' | 'warn' | 'error';
   text: string;
+  /** A shorter line for the console (default: `text`). */
+  console?: string;
 }
 
-/** The console / panel lines for a report (the panel banners and the first-run Network check). */
-export function preflightNotices(report: PreflightReport, opts: { preset?: Preset } = {}): PreflightNotice[] {
+/**
+ * The console / panel lines for a report (the panel banners and the first-run Network check). `thisPcOnly`: the game
+ * listens on this PC only (--this-pc-only), so the firewall doesn't matter and nothing is said about it.
+ */
+export function preflightNotices(report: PreflightReport, opts: { preset?: Preset; thisPcOnly?: boolean } = {}): PreflightNotice[] {
   const out: PreflightNotice[] = [];
   const category = categoryFor(report, report.primary);
   const profile = profileName(category);
@@ -534,32 +638,21 @@ export function preflightNotices(report: PreflightReport, opts: { preset?: Prese
   }
 
   const fw = report.firewall;
-  if (fw) {
+  if (fw && !opts.thisPcOnly) {
+    const verdict = inboundVerdict(fw, category);
     const inbound = fw.rules.filter((r) => r.enabled && /^in/i.test(r.direction) && ruleApplies(r, profile));
     const blocked = inbound.some((r) => /^block$/i.test(r.action));
     const allowed = inbound.some((r) => /^allow$/i.test(r.action));
-    if (blocked) {
-      out.push({
-        code: 'firewall-block',
-        level: 'warn',
-        text: `Windows Firewall has a Block rule for Voidswarm's engine (runtime\\node.exe), usually from clicking Cancel on the Windows prompt. Run "Allow through firewall (admin).cmd" to replace it.`,
-      });
-    }
     const active = fw.profiles.find((p) => profile && p.name.toLowerCase() === profile.toLowerCase());
-    const policyBlocks = active ? active.enabled && !active.allowLocalRules : false;
-    if (policyBlocks) {
-      out.push({
-        code: 'firewall-policy',
-        level: 'warn',
-        text: `This PC's firewall policy ignores local rules${profile ? ` on the ${profile} profile` : ''}, so neither the Windows prompt nor the Allow file can let players in: IT must add the rule (FOR SCHOOL IT.txt).`,
-      });
-    } else if (fw.rulesRead && !blocked && !allowed && (!active || active.enabled)) {
+    if (verdict.inboundLikelyBlocked) {
+      out.push({ code: 'firewall-blocked', level: 'warn', text: firewallBlockedText(verdict), console: firewallBlockedConsole(verdict) });
+    } else if (category !== 'Public' && fw.rulesRead && !blocked && !allowed && (!active || active.enabled)) {
       out.push({
         code: 'firewall-prompt',
         level: 'info',
         text:
           opts.preset === 'school' && profile === 'Domain'
-            ? 'No firewall rule lets players reach runtime\\node.exe on the school (Domain) network yet: IT must add it (FOR SCHOOL IT.txt).'
+            ? `No firewall rule lets players reach runtime\\node.exe on the school (Domain) network yet: IT must add it ("${IT_FIREWALL_FILE}", or FOR SCHOOL IT.txt).`
             : 'Windows may ask about "Node.js JavaScript Runtime": that is Voidswarm\'s engine. Choose Allow on Private networks.',
       });
     }

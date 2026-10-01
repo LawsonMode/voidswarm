@@ -2,10 +2,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { NOTE_MAX_CHARS } from './banner';
 import { runPowerShell, type ExecFn } from './paths';
 import {
-  categoryFor, getPreflight, hostProbeScript, lanServingAllowed, parseHostProbe, parseNetshRules, parsePowercfg, preflightFilePath,
-  preflightNotices, readPreflightFile, runPreflight, staleReason, volumeLookup, type HostProbe, type PreflightReport,
+  categoryFor, firewallBlockedConsole, firewallBlockedText, getPreflight, hostProbeScript, inboundVerdict, IT_FIREWALL_FILE, lanServingAllowed,
+  parseHostProbe, parseNetshRules, parsePowercfg, preflightFilePath, preflightNotices, readFirewall, readPreflightFile, runPreflight, staleReason,
+  volumeLookup, type FirewallProfile, type FirewallRule, type HostProbe, type InboundVerdict, type PreflightReport,
 } from './preflight';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-preflight-'));
@@ -129,7 +131,8 @@ describe('running the checks', () => {
     expect(r.power).toMatchObject({ acSleepSec: 0, dcSleepSec: 0, hasBattery: false, onBattery: false });
     expect(r.disk?.freeBytes).toBe(50 * 1024 ** 3);
     expect(lanServingAllowed(r, '192.168.1.50')).toEqual({ allowed: true, category: 'Private' });
-    expect(preflightNotices(r).map((x) => x.code)).toEqual(['firewall-prompt']);
+    // Private's firewall is on, inbound Block by default, and no rule lets runtime\node.exe in.
+    expect(preflightNotices(r).map((x) => x.code)).toEqual(['firewall-blocked']);
   });
 
   it('Public network → loopback only, with the Private hint', async () => {
@@ -162,13 +165,16 @@ describe('running the checks', () => {
     const ours = { program: '%USERPROFILE%\\Voidswarm LAN\\runtime\\node.exe', name: 'Node.js JavaScript Runtime', enabled: 'True', direction: 'Inbound', action: 'Block', profile: 'Private, Public' };
     const blocked = await runPreflight(base(newData(), { exec: mockExec({ probe: probeJson({ rules: [ours] }) }) }));
     expect(blocked.firewall?.rules).toHaveLength(1);
-    expect(preflightNotices(blocked).map((x) => x.code)).toEqual(['firewall-block']);
-    expect(preflightNotices(blocked)[0].text).toMatch(/Allow through firewall \(admin\)\.cmd/);
+    expect(preflightNotices(blocked).map((x) => x.code)).toEqual(['firewall-blocked']);
+    expect(preflightNotices(blocked)[0].text).toMatch(/Block rule for Voidswarm/);
+    expect(preflightNotices(blocked)[0].text).toContain(`"${IT_FIREWALL_FILE}"`);
+    expect(preflightNotices(blocked)[0].text).not.toMatch(/Allow through firewall \(admin\)\.cmd/); // that file doesn't ship
 
     const gpo = probeJson({ profiles: [{ name: 'Private', enabled: 'True', inbound: 'Block', allowLocal: 'False' }] });
     const policy = await runPreflight(base(newData(), { exec: mockExec({ probe: gpo }) }));
-    expect(preflightNotices(policy).map((x) => x.code)).toEqual(['firewall-policy']);
-    expect(preflightNotices(policy)[0].text).toMatch(/FOR SCHOOL IT\.txt/);
+    expect(preflightNotices(policy).map((x) => x.code)).toEqual(['firewall-blocked']);
+    expect(preflightNotices(policy)[0].text).toMatch(/ignores local rules.*FOR SCHOOL IT\.txt/);
+    expect(preflightNotices(policy)[0].text).not.toContain(IT_FIREWALL_FILE); // a local rule can't help under that policy
   });
 
   it('falls back to netsh when the firewall cmdlets fail', async () => {
@@ -205,11 +211,115 @@ describe('running the checks', () => {
     expect(preflightNotices(crit).find((x) => x.code === 'disk-critical')).toMatchObject({ level: 'error' });
   });
 
-  it('School on the Domain profile with no rule: IT must add it', async () => {
-    const probe = probeJson({ network: [{ alias: 'Ethernet', index: 12, name: 'caldwellschools.org', category: 'DomainAuthenticated' }] });
-    const r = await runPreflight(base(newData(), { exec: mockExec({ probe }) }));
-    expect(preflightNotices(r, { preset: 'school' }).find((x) => x.code === 'firewall-prompt')?.text).toMatch(/IT must add it/);
-    expect(preflightNotices(r, { preset: 'home' }).find((x) => x.code === 'firewall-prompt')?.text).toMatch(/Node\.js JavaScript Runtime/);
+  it('the Domain profile with no rule: likely blocked, IT runs the IT file; the profiles unread: only the prompt hint', async () => {
+    const domain = [{ alias: 'Ethernet', index: 12, name: 'caldwellschools.org', category: 'DomainAuthenticated' }];
+    const r = await runPreflight(base(newData(), { exec: mockExec({ probe: probeJson({ network: domain }) }) }));
+    const n = preflightNotices(r, { preset: 'school' }).find((x) => x.code === 'firewall-blocked');
+    expect(n).toMatchObject({ level: 'warn' });
+    expect(n?.text).toMatch(/no rule allowing Voidswarm on this network \(the Domain profile\)/);
+    // The profiles couldn't be read (is the firewall even on?): no claim, only the old hint.
+    const unread = await runPreflight(base(newData(), { exec: mockExec({ probe: probeJson({ network: domain, profiles: undefined, profilesError: 'denied' }) }) }));
+    expect(preflightNotices(unread, { preset: 'school' }).map((x) => x.code)).toEqual(['firewall-prompt']);
+    expect(preflightNotices(unread, { preset: 'school' })[0].text).toMatch(/IT must add it \("Allow Voidswarm \(for IT\)\.cmd", or FOR SCHOOL IT\.txt\)/);
+    expect(preflightNotices(unread, { preset: 'home' })[0].text).toMatch(/Node\.js JavaScript Runtime/);
+  });
+
+  it('--this-pc-only: nothing about the firewall (it doesn\'t matter on loopback)', async () => {
+    const r = await runPreflight(base(newData(), { exec: mockExec() }));
+    expect(preflightNotices(r).map((x) => x.code)).toEqual(['firewall-blocked']);
+    expect(preflightNotices(r, { thisPcOnly: true })).toEqual([]);
+  });
+
+  it('readFirewall: the firewall section alone (one PowerShell call, VS_PROGRAM_LEAF only); null when it fails; never off Windows', async () => {
+    const calls: string[] = [];
+    const ours = { program: NODE, name: 'Voidswarm LAN (C:\\Users\\NovaPilot\\Voidswarm LAN)', enabled: 'True', direction: 'Inbound', action: 'Allow', profile: 'Domain, Private' };
+    const fw = await readFirewall({ nodeExe: NODE, platform: 'win32', env: ENV, exec: mockExec({ probe: probeJson({ rules: [ours] }), calls }) });
+    expect(calls).toEqual(['powershell.exe']);
+    expect(fw).toMatchObject({ source: 'powershell', rulesRead: true, rules: [{ action: 'Allow', profiles: 'Domain, Private' }] });
+    expect(inboundVerdict(fw, 'Private').inboundLikelyBlocked).toBe(false);
+    expect(await readFirewall({ nodeExe: NODE, platform: 'win32', env: ENV, exec: mockExec({ probe: null }) })).toBeNull();
+    expect(await readFirewall({ nodeExe: NODE, platform: 'win32', env: ENV, exec: mockExec({ probe: probeJson({ rules: undefined, rulesError: 'Access is denied' }) }) })).toBeNull();
+    expect(await readFirewall({ nodeExe: NODE, platform: 'linux', env: ENV, exec: mockExec() })).toBeNull();
+  });
+});
+
+describe('inboundVerdict: is inbound likely blocked? (pure; no claim without evidence)', () => {
+  const rule = (o: Partial<FirewallRule> = {}): FirewallRule => ({ program: NODE, name: 'r', enabled: true, direction: 'Inbound', action: 'Allow', profiles: 'Private', ...o });
+  const prof = (name: string, o: Partial<FirewallProfile> = {}): FirewallProfile => ({ name, enabled: true, defaultInbound: 'Block', allowLocalRules: true, ...o });
+  const fw = (rules: FirewallRule[], profiles: FirewallProfile[] = [prof('Domain'), prof('Private'), prof('Public')], rulesRead = true): PreflightReport['firewall'] =>
+    ({ source: 'powershell', rulesRead, rules, profiles });
+  const v = (f: PreflightReport['firewall'], c: string | null) => { const r = inboundVerdict(f, c); return r.inboundLikelyBlocked ? r.reason : null; };
+
+  it('no rule, the profile on with inbound Block (or NotConfigured, which is Block): no-allow-rule', () => {
+    expect(inboundVerdict(fw([]), 'Private')).toEqual({ inboundLikelyBlocked: true, reason: 'no-allow-rule', profile: 'Private', noRules: true });
+    expect(v(fw([], [prof('Domain', { defaultInbound: 'NotConfigured' })]), 'DomainAuthenticated')).toBe('no-allow-rule');
+    // An Allow rule for another profile only doesn't help this one.
+    expect(inboundVerdict(fw([rule({ profiles: 'Public' })]), 'Private')).toMatchObject({ reason: 'no-allow-rule', noRules: false });
+    // A disabled or outbound Allow doesn't count.
+    expect(v(fw([rule({ enabled: false }), rule({ direction: 'Outbound' })]), 'Private')).toBe('no-allow-rule');
+  });
+
+  it('an enabled inbound Allow rule covering the profile (Any, a list, the profile itself): not blocked', () => {
+    for (const profiles of ['Private', 'Domain, Private', 'Any', '']) expect(v(fw([rule({ profiles })]), 'Private'), profiles).toBeNull();
+    expect(v(fw([rule({ profiles: 'Domain, Private' })]), 'DomainAuthenticated')).toBeNull();
+  });
+
+  it('an enabled inbound Block rule covering the profile wins over any Allow rule: block-rule', () => {
+    expect(v(fw([rule(), rule({ action: 'Block', profiles: 'Private, Public' })]), 'Private')).toBe('block-rule');
+    expect(v(fw([rule({ action: 'Block', profiles: 'Any' })]), 'DomainAuthenticated')).toBe('block-rule');
+    // A Block rule for Public only, or a disabled one, doesn't block Private.
+    expect(v(fw([rule(), rule({ action: 'Block', profiles: 'Public' })]), 'Private')).toBeNull();
+    expect(v(fw([rule(), rule({ action: 'Block', enabled: false })]), 'Private')).toBeNull();
+    // The profile's state unread: a Block rule is still evidence (the firewall is on by default).
+    expect(v(fw([rule({ action: 'Block' })], []), 'Private')).toBe('block-rule');
+  });
+
+  it('a policy that ignores local rules (AllowLocalFirewallRules False), with no Allow rule in the active policy: policy-ignores-local', () => {
+    expect(v(fw([], [prof('Domain', { allowLocalRules: false })]), 'DomainAuthenticated')).toBe('policy-ignores-local');
+    // Even with the default inbound action Allow: local rules can't help, and nothing says the policy allows us.
+    expect(v(fw([], [prof('Domain', { allowLocalRules: false, defaultInbound: 'Allow' })]), 'DomainAuthenticated')).toBe('policy-ignores-local');
+    // IT pushed an Allow rule by policy (it shows in the active store): believed.
+    expect(v(fw([rule({ profiles: 'Domain' })], [prof('Domain', { allowLocalRules: false })]), 'DomainAuthenticated')).toBeNull();
+  });
+
+  it('no claim when unknown or unreadable: no report, rules unread, an unknown or Public category, the firewall off, inbound Allow, the profile unread', () => {
+    expect(v(null, 'Private')).toBeNull();
+    expect(v(fw([], undefined, false), 'Private')).toBeNull();
+    expect(v(fw([rule({ action: 'Block' })], undefined, false), 'Private')).toBeNull();
+    expect(v(fw([]), null)).toBeNull();
+    expect(v(fw([]), 'SomethingNew')).toBeNull();
+    expect(v(fw([]), 'Public')).toBeNull(); // the network-public notice covers it (the game stays on this PC)
+    expect(v(fw([rule({ action: 'Block' })], [prof('Private', { enabled: false })]), 'Private')).toBeNull();
+    expect(v(fw([], [prof('Private', { defaultInbound: 'Allow' })]), 'Private')).toBeNull();
+    expect(v(fw([], [prof('Private', { defaultInbound: '' })]), 'Private')).toBeNull();
+    expect(v(fw([], []), 'Private')).toBeNull();
+    expect(v(fw([], [prof('Domain')]), 'Private')).toBeNull(); // Private's own state wasn't read
+  });
+
+  it('the banner and console words: plain, with the IT file or this PC only, never over 500 characters', () => {
+    const verdicts: InboundVerdict[] = [];
+    for (const reason of ['no-allow-rule', 'block-rule', 'policy-ignores-local'] as const) {
+      for (const profile of ['Domain', 'Private', null]) for (const noRules of [true, false]) verdicts.push({ inboundLikelyBlocked: true, reason, profile, noRules });
+    }
+    for (const x of verdicts) {
+      const t = firewallBlockedText(x);
+      expect(t.length, t).toBeLessThanOrEqual(500);
+      expect(t).toMatch(/^Other devices probably can't connect/);
+      expect(t).toMatch(/keep using Voidswarm on this PC only: the host PC can always play and use this panel\.$|choose Allow\.\)$/);
+      expect(t).toContain('FOR SCHOOL IT.txt');
+      expect(/^[\x20-\x7e]*$/.test(t)).toBe(true);
+      const c = firewallBlockedConsole(x);
+      expect(c).not.toContain('\n');
+      expect(c.length, c).toBeLessThanOrEqual(NOTE_MAX_CHARS); // a console note is cut there
+      expect(c).toMatch(/^Firewall: .* or play on this PC\.$/);
+      expect(c).toMatch(x.reason === 'policy-ignores-local' ? /FOR SCHOOL IT\.txt/ : /"Allow Voidswarm \(for IT\)\.cmd"/);
+    }
+    const plain = firewallBlockedText({ inboundLikelyBlocked: true, reason: 'no-allow-rule', profile: 'Domain', noRules: false });
+    expect(plain).toBe('Other devices probably can\'t connect: Windows Firewall has no rule allowing Voidswarm on this network (the Domain profile). '
+      + 'Adding one needs an administrator, so either ask IT to run "Allow Voidswarm (for IT).cmd" once (it is in the Voidswarm LAN folder; '
+      + 'see FOR SCHOOL IT.txt), or keep using Voidswarm on this PC only: the host PC can always play and use this panel.');
+    expect(firewallBlockedConsole({ inboundLikelyBlocked: true, reason: 'no-allow-rule', profile: 'Domain', noRules: false }))
+      .toBe('Firewall: no rule lets other devices in. Ask IT to run "Allow Voidswarm (for IT).cmd", or play on this PC.');
   });
 });
 

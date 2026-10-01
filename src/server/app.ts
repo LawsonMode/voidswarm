@@ -925,7 +925,9 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
   /** The panel's banners: the launcher's findings, backups and disk, alerts, and whether chat is being logged. */
   const lanBanners = (): Banner[] => {
     const out: Banner[] = [];
-    for (const b of lanOpts.banners ?? []) out.push({ code: b.code, level: (b.level as string) === 'error' ? 'urgent' : b.level, text: b.text });
+    let permissions: string | undefined;
+    try { permissions = settings?.get().launcher.permissions; } catch { /* shown */ }
+    out.push(...launcherBanners(lanOpts.banners ?? [], permissions));
     if (!mod) out.push({ code: 'chat-not-logged', level: 'urgent', text: 'Chat is NOT being logged (the database is not open). Restart the host.' });
     else if (mod.store.dropped > 0) out.push({ code: 'chat-dropped', level: 'urgent', text: `Chat is NOT being logged right now: ${mod.store.dropped} line(s) could not be written (the database is busy or the disk is full).` });
     if (lan && !maintClient) out.push({ code: 'maint-down', level: 'warn', text: 'The maintenance worker is not running: Chat log searches, reveals and exports are unavailable until the host restarts.' });
@@ -1356,6 +1358,22 @@ export interface LanStart extends StartServerOptions {
 }
 
 const SETUP_CODE_SHAPE = /^[0-9A-HJKMNP-TV-Z]{8}$/;
+
+/** The launcher's folder-permission banners (src/lan/launch.ts step 3): hidden while launcher.permissions is 'off'. */
+export const PERMISSION_BANNERS: ReadonlySet<string> = new Set(['permissions', 'permissions-unchecked']);
+
+/**
+ * The launcher's banners as the panel gets them now. The list is fixed for this run (lan:start) but the setting is
+ * live: once the host chose "Don't warn me again" (launcher.permissions = 'off') the folder-permission ones stop.
+ */
+export function launcherBanners(banners: readonly Banner[], permissions: string | undefined): Banner[] {
+  const out: Banner[] = [];
+  for (const b of banners) {
+    if (permissions === 'off' && PERMISSION_BANNERS.has(b.code)) continue;
+    out.push({ code: b.code, level: (b.level as string) === 'error' ? 'urgent' : b.level, text: b.text });
+  }
+  return out;
+}
 
 function lanBannersOf(v: unknown): Banner[] {
   if (!Array.isArray(v)) return [];

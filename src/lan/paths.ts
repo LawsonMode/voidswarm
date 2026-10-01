@@ -23,6 +23,7 @@ export const STUB_FILES = [
   'Update Voidswarm.cmd',
   'Reset admin password.cmd',
   'Restore a backup.cmd',
+  'Allow Voidswarm (for IT).cmd',
   'Allow through firewall (admin).cmd',
 ] as const;
 

@@ -17,7 +17,7 @@ import { TICK_RATE } from '../shared/constants';
 import type { ClientMsg, ServerMsg } from '../shared/protocol';
 import { PROTOCOL_VERSION } from '../shared/version';
 import {
-  EXIT_CRASH, EXIT_DATA, EXIT_LISTEN, EXIT_OK, EXIT_USAGE, STOP_NOTICE, StartupError, installProcessHandlers, parseLanStart,
+  EXIT_CRASH, EXIT_DATA, EXIT_LISTEN, EXIT_OK, EXIT_USAGE, STOP_NOTICE, StartupError, installProcessHandlers, launcherBanners, parseLanStart,
   startServer, waitForLanStart, type RunningServer, type ServerIpc, type ServerToParent, type StartServerOptions,
 } from './app';
 
@@ -410,6 +410,18 @@ describe('process handling', () => {
     expect(a).toBe(b);
     await a;
     expect(await accepts(server.port)).toBe(false);
+  });
+
+  it("launcherBanners: the folder-permission ones stop once launcher.permissions is 'off' (Don't warn me again); the rest stay", () => {
+    const list = [
+      { code: 'permissions', level: 'warn' as const, text: 'Other accounts can reach the folder.' },
+      { code: 'permissions-unchecked', level: 'warn' as const, text: "Voidswarm couldn't check." },
+      { code: 'preflight-firewall-blocked', level: 'warn' as const, text: "Other devices probably can't connect." },
+      { code: 'elevated', level: 'urgent' as const, text: 'Running as administrator.' },
+    ];
+    expect(launcherBanners(list, 'warn').map((b) => b.code)).toEqual(['permissions', 'permissions-unchecked', 'preflight-firewall-blocked', 'elevated']);
+    expect(launcherBanners(list, undefined)).toHaveLength(4);
+    expect(launcherBanners(list, 'off').map((b) => b.code)).toEqual(['preflight-firewall-blocked', 'elevated']);
   });
 
   it('parseLanStart accepts only a well-formed start message', () => {

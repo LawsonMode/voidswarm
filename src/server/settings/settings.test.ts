@@ -676,7 +676,7 @@ describe('T-SET-7 presets', () => {
     ['network.newRoot', 'ask', 'never'],
     ['network.portAutoPick', 'firstRun', 'never'],
     ['launcher.elevated', 'warn', 'refuse'],
-    ['launcher.permissions', 'warn', 'refuse'],
+    ['launcher.permissions', 'warn', 'warn'], // 0.6.0-m1.1: the folder check never blocks by default
     ['moderators.tier', 'limited', 'limited'],
     ['accounts.rateLimits', 'normal', 'scaled'],
     ['admin.presentingAtLogin', false, true],
@@ -927,6 +927,31 @@ describe('validation', () => {
     expect(r.warnings.join(' ')).toMatch(/alias domain/);
     expect(r.warnings.join(' ')).toMatch(/until then remote sessions are limited/);
     expect(r.restartNeeded).toBe(true);
+  });
+
+  it("launcher.permissions (0.6.0-m1.1): 'off' is a value (elevated still isn't); a version-1 'refuse' loads as 'warn'", async () => {
+    const dir = tempDir();
+    const { svc } = open(dir, { lan: true, preset: 'school' });
+    expect(svc.get().launcher).toEqual({ elevated: 'refuse', permissions: 'warn' });
+    okOf(await svc.update({ rev: svc.rev, patch: { launcher: { permissions: 'off' } } }, HOST));
+    expect(svc.get().launcher.permissions).toBe('off');
+    expect(stored(dir).launcher.permissions).toBe('off');
+    expect(failOf(await svc.update({ rev: svc.rev, patch: { launcher: { elevated: 'off' } } } as never, HOST))).toMatchObject({ status: 400, field: 'launcher.elevated' });
+    expect(failOf(await svc.update({ rev: svc.rev, patch: { launcher: { permissions: 'never' } } } as never, HOST))).toMatchObject({ status: 400, field: 'launcher.permissions' });
+    okOf(await svc.update({ rev: svc.rev, patch: { launcher: { permissions: 'refuse' } } }, HOST)); // still a choice
+    expect(svc.get().launcher.permissions).toBe('refuse');
+    await svc.close();
+    // Reopened: 'off' and an explicit 'refuse' saved by this version (configVersion 2) are kept as they are.
+    expect(stored(dir).configVersion).toBe(2);
+    expect(open(dir).svc.get().launcher.permissions).toBe('refuse');
+    // A version-1 file: its 'refuse' was the old School default (no page set it), so it becomes 'warn'; the others stay.
+    const w: string[] = [];
+    expect(settingsFromRaw({ configVersion: 1, preset: 'school', launcher: { elevated: 'refuse', permissions: 'refuse' } }, { lan: true }, w).launcher)
+      .toEqual({ elevated: 'refuse', permissions: 'warn' });
+    expect(settingsFromRaw({ configVersion: 1, preset: 'home', launcher: { elevated: 'warn', permissions: 'warn' } }, { lan: true }, []).launcher.permissions).toBe('warn');
+    expect(settingsFromRaw({ configVersion: 2, preset: 'school', launcher: { permissions: 'off' } }, { lan: true }, []).launcher.permissions).toBe('off');
+    expect(settingsFromRaw({ configVersion: 1, preset: 'school' }, { lan: true }, []).launcher.permissions).toBe('warn');
+    expect(w.filter((x) => x.includes('launcher'))).toEqual([]);
   });
 
   it('load is field by field: a bad leaf falls back to its default, unknown keys are dropped', () => {

@@ -26,8 +26,12 @@ import {
 // Types
 // ------------------------------------------------------------------------------------------
 
-/** The config file's own format version (migrateConfig in store.ts upgrades older ones). */
-export const CONFIG_VERSION = 1;
+/**
+ * The config file's own format version (migrateConfig in store.ts upgrades older ones). 2 (0.6.0-m1.1): the folder
+ * permission check never blocks by default, so a version-1 `launcher.permissions: 'refuse'` (only ever the old School
+ * preset default: no page could set it) becomes 'warn'.
+ */
+export const CONFIG_VERSION = 2;
 
 export type Preset = 'home' | 'school';
 export const PRESETS: readonly Preset[] = ['home', 'school'];
@@ -54,6 +58,8 @@ export type PortAutoPick = 'firstRun' | 'never';
 export type CertScope = 'pc' | 'network';
 export type NewRootPolicy = 'ask' | 'never';
 export type LauncherPolicy = 'warn' | 'refuse';
+/** The folder permission check (§2.2 step 3): 'off' skips it (a host without administrator rights who doesn't mind). */
+export type PermissionsPolicy = LauncherPolicy | 'off';
 
 /** One allowed email domain (§4.3), stored in ASCII (punycode). `subdomains` also allows `*.domain`. */
 export interface EmailDomain { domain: string; subdomains: boolean }
@@ -215,8 +221,8 @@ export interface NetworkSettings {
 export interface LauncherSettings {
   /** Started as administrator. */
   elevated: LauncherPolicy;
-  /** Folder permission problems. */
-  permissions: LauncherPolicy;
+  /** Folder permission problems ('off': not checked at all; the panel's "Don't warn me again"). */
+  permissions: PermissionsPolicy;
 }
 
 export interface BackupSettings {
@@ -393,7 +399,9 @@ export function presetValues(preset: Preset, opts: { lan?: boolean; accountsMode
     moderators: { tier: 'limited' },
     rooms: { maxRoomsPerAddress: school ? 6 : lan ? 3 : 6, maxConnectionsPerAddress: school ? 128 : 64 },
     network: { certScope: school ? 'pc' : 'network', newRoot: school ? 'never' : 'ask', portAutoPick: school ? 'never' : 'firstRun' },
-    launcher: { elevated: school ? 'refuse' : 'warn', permissions: school ? 'refuse' : 'warn' },
+    // The permission check warns in both presets (0.6.0-m1.1): a teacher without administrator rights must be able
+    // to host; 'refuse' stays available.
+    launcher: { elevated: school ? 'refuse' : 'warn', permissions: 'warn' },
   };
 }
 
@@ -835,7 +843,7 @@ export const SETTINGS_SPEC: ObjSpec = obj({
   }),
   launcher: obj({
     elevated: oneOf('launcher.elevated', ['warn', 'refuse'] as const),
-    permissions: oneOf('launcher.permissions', ['warn', 'refuse'] as const),
+    permissions: oneOf('launcher.permissions', ['warn', 'refuse', 'off'] as const),
   }),
   backups: obj({
     daily: bool('backups.daily'),

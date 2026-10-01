@@ -151,6 +151,7 @@
       <li><b>Bitdefender:</b> allow <code>runtime\node.exe</code> under <b>Protection → Firewall → Rules</b> (Home/Office networks). If Bitdefender ever flags it, add an exception under <b>Protection → Advanced Threat Defense</b>.</li>
       <li><b>If <code>runtime\node.exe</code> disappeared</b> (the black window says your antivirus may have removed it): open <b>Bitdefender → Protection → Quarantine</b>, restore the file, and add an exception for it.</li>
       <li>Router guest networks and "AP isolation" stop players from reaching this PC. Use the main Wi-Fi, and plug this PC in with a cable if you can.</li>
+      <li><b>No administrator rights</b> (a school PC)? The Windows prompt then asks for an administrator's password, so other devices can't connect yet. Ask IT to run <code>Allow Voidswarm (for IT).cmd</code> once (it is in this folder; <code>FOR SCHOOL IT.txt</code> explains it). Until then you can still play and use the control panel on this PC. The control panel warns you while other devices probably can't connect.</li>
     </ul>
     <figure>
       <svg viewBox="0 0 520 170" role="img" aria-label="Bitdefender: Protection, then Quarantine, then Restore the file and add an exception">
@@ -188,6 +189,8 @@
       <tr><td>go back to the old version</td><td>run <code>Update Voidswarm.cmd --rollback</code> from a Command Prompt in this folder (host stopped).</td></tr>
       <tr><td>reset a forgotten admin password</td><td>double-click <code>Reset admin password.cmd</code> on this PC. It prints a new setup code; then open the control panel and set a new password.</td></tr>
       <tr><td>restore a backup</td><td>stop the host and double-click <code>Restore a backup.cmd</code>, or use <b>Server → Backups</b> in the control panel.</td></tr>
+      <tr><td>let other devices in without admin rights</td><td>give IT <code>Allow Voidswarm (for IT).cmd</code> (in this folder) and <code>FOR SCHOOL IT.txt</code>: IT runs it once as administrator.</td></tr>
+      <tr><td>stop the folder-permission warning</td><td>click <b>Don't warn me again</b> on it in the control panel (or extract Voidswarm into your user folder, <code>%USERPROFILE%</code>).</td></tr>
     </table>
   </section>
 

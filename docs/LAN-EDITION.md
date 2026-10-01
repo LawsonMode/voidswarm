@@ -57,6 +57,27 @@ skips opening the panel.
 The ports are 7777 (the game) and 7778 (the panel). If either is busy, a Home host picks the next free pair once and
 keeps it; a School host refuses and names the program holding the port.
 
+### No administrator rights? (0.6.0-m1.1)
+
+Most teachers can't run anything as administrator on a school PC. Voidswarm doesn't need it:
+
+- **Extract into your own user folder** (`%USERPROFILE%\Voidswarm LAN`, step 1). Other accounts on the PC then can't
+  change the files, and you need no rights you don't have.
+- **The folder-permission check only warns.** If other accounts can reach the folder, the panel says so, and the host
+  still starts (Home and School alike; it used to refuse in School mode). To tighten the folder yourself, stop the host
+  and run `"Start Voidswarm Host.cmd" --fix-permissions` from a Command Prompt in the folder (no administrator rights
+  needed). If you don't mind who can change the files, click **Don't warn me again** on that warning in the panel: the
+  check is then skipped on every start (`launcher.permissions = off`; `--fix-permissions` still works).
+- **The firewall.** Other devices reach the host only through a Windows Firewall rule for `runtime\node.exe`, and adding
+  one needs an administrator (the Windows prompt asks for an administrator's password; Cancel records a Block rule). At
+  every start the launcher reads the firewall rules (read-only, about a second) and, when other devices probably can't
+  connect, the panel shows a warning and the console one line. Ask IT to run **`Allow Voidswarm (for IT).cmd`** once (it
+  is in the Voidswarm LAN folder; `FOR SCHOOL IT.txt` explains it): it adds an inbound rule for this copy's
+  `runtime\node.exe` on the Domain and Private profiles (never Public), on any TCP port, and replaces its own rule when
+  run again. **Dismiss** hides the warning until you close that browser tab.
+- **Or keep it on this PC only.** Without the rule, the host PC can always play (`http://localhost:7777`) and use the
+  panel; `--this-pc-only` makes that explicit and skips the firewall check.
+
 ## 3. First-run setup: the admin login
 
 On the setup page:

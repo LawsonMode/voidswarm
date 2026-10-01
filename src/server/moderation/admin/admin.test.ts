@@ -29,7 +29,7 @@ import {
   isDashboardRead, isReauth, isWellbeingRow, latestOnly, liveRequestBody, makeH, manualBanBody, mergeLive, nextTabIndex, normalizeSetupCode,
   pagerCursor, pagerInit, pagerLabel, pagerLoaded, pagerNewer, pagerOlder, parseLocalDate, parseLocalDateTime, periodRanges, presentingAtStart,
   principalText, renderLiveLine, renderLogRow, retentionPatch, retentionText, roomSpanText, rowTags, scopeChoices, sessionClock, setupBody,
-  DOMAINS_MAX, domainListOf,
+  DOMAINS_MAX, domainListOf, BANNER_ACTIONS, DISMISSED_KEY, bannerAction,
   setupCodeFromHash, shownView, statsText, tagClass, toSubject, visibleTabs, whereLabel,
 } from './admin.js';
 import {
@@ -2082,5 +2082,99 @@ describe('Presenting shows rooms by number, never by name (a room is named after
     expect(p.$('chat-body').textContent).toContain("NovaPilot's Arena");
     expect(p.$('chat-room').textContent).toContain("NovaPilot's Arena");
     expect(p.$('live-room').textContent).toContain("NovaPilot's Arena");
+  });
+});
+
+// ====================================================================================================================
+// 0.6.0-m1.1: banner buttons for a host without administrator rights ("Don't warn me again", the firewall's Dismiss)
+// ====================================================================================================================
+
+describe('banner buttons (0.6.0-m1.1)', () => {
+  const PERM = { code: 'permissions', level: 'warn', text: "Other accounts on this PC can change Voidswarm's files or read its data." };
+  const FIREWALL = { code: 'preflight-firewall-blocked', level: 'warn', text: "Other devices probably can't connect: Windows Firewall has no rule allowing Voidswarm on this network (the Domain profile)." };
+  const OTHER = { code: 'x', level: 'warn', text: 'No recovery file yet.' };
+  const meWith = (banners: unknown[], session = hostSession()) => ({ body: { ...meReply(session).body, banners } });
+
+  it('bannerAction: by code; the setting needs the settings capability; unknown codes and inherited keys have none', () => {
+    expect(bannerAction(PERM, HOST_CAPS)).toMatchObject({ kind: 'setting', label: "Don't warn me again", patch: { launcher: { permissions: 'off' } } });
+    expect(bannerAction({ code: 'permissions-unchecked' }, HOST_CAPS)).toBe(BANNER_ACTIONS.permissions);
+    expect(bannerAction(PERM, MOD_CAPS)).toBeNull();
+    expect(bannerAction(FIREWALL, MOD_CAPS)).toMatchObject({ kind: 'session', label: 'Dismiss' });
+    for (const b of [OTHER, { code: 'toString' }, { code: '__proto__' }, {}, null, { text: 'x' }]) expect(bannerAction(b, HOST_CAPS)).toBeNull();
+  });
+
+  it('"Don\'t warn me again": settings/get, then settings/update with its rev and launcher.permissions = off; the banner goes now and stays gone', async () => {
+    const p = await bootPanel({
+      token: 'tok-host-0123456789abcdef',
+      routes: {
+        me: meWith([PERM, OTHER]), home: HOME, reports: { body: { ok: true, reports: [], nextBefore: null } },
+        'settings/get': { body: { ok: true, rev: 7, settings: { preset: 'home', launcher: { elevated: 'warn', permissions: 'warn' } } } },
+        'settings/update': { body: { ok: true, rev: 8 } },
+      },
+    });
+    const banners = p.$('banners');
+    expect(banners.textContent).toContain("Other accounts on this PC can change Voidswarm's files");
+    const btn = buttonIn(banners, "Don't warn me again");
+    expect(btn).toHaveLength(1);
+    expect(buttonIn(banners, 'Dismiss')).toHaveLength(0); // the other banner has no button
+    btn[0]!.click();
+    await settle();
+    expect(p.f.of('settings/get')).toHaveLength(1);
+    expect(p.f.of('settings/update').map((c) => c.body)).toEqual([{ rev: 7, patch: { launcher: { permissions: 'off' } } }]);
+    expect(banners.textContent).not.toContain("Other accounts on this PC can change Voidswarm's files");
+    expect(banners.textContent).toContain('No recovery file yet.');
+    expect(p.$('toasts').textContent).toMatch(/won't check who can reach its folder/);
+  });
+
+  it('"Don\'t warn me again": a 409 (changed in between) reads the rev again once; a failure keeps the banner and says why', async () => {
+    let updates = 0;
+    const p = await bootPanel({
+      token: 'tok-host-0123456789abcdef',
+      routes: {
+        me: meWith([PERM]), home: HOME, reports: { body: { ok: true, reports: [], nextBefore: null } },
+        'settings/get': () => ({ body: { ok: true, rev: 7 + updates, settings: {} } }),
+        'settings/update': () => (++updates === 1 ? { status: 409, body: { error: 'The settings changed.', rev: 8 } } : { status: 500, body: { error: 'Disk full.' } }),
+      },
+    });
+    buttonIn(p.$('banners'), "Don't warn me again")[0]!.click();
+    await settle(16);
+    expect(p.f.of('settings/update').map((c) => c.body.rev)).toEqual([7, 8]);
+    expect(p.$('banners').textContent).toContain("Other accounts on this PC can change Voidswarm's files");
+    expect(buttonIn(p.$('banners'), "Don't warn me again")[0]!.disabled).toBe(false);
+    expect(p.$('toasts').textContent).toContain('Disk full.');
+  });
+
+  it('a moderator sees the permission banner (if sent) without the button; the firewall banner\'s Dismiss hides it for this tab only', async () => {
+    const mod = await bootPanel({ token: 'tok-mod-0123456789abcdef', routes: { me: { body: { ...modMe().body, banners: [PERM] } }, reports: { body: { ok: true, reports: [] } } } });
+    expect(buttonIn(mod.$('banners'), "Don't warn me again")).toHaveLength(0);
+
+    const p = await bootPanel({ token: 'tok-host-0123456789abcdef', routes: { me: meWith([FIREWALL, OTHER]), home: HOME, reports: { body: { ok: true, reports: [], nextBefore: null } } } });
+    expect(p.$('banners').textContent).toContain("Other devices probably can't connect");
+    buttonIn(p.$('banners'), 'Dismiss')[0]!.click();
+    await settle();
+    expect(p.$('banners').textContent).not.toContain("Other devices probably can't connect");
+    expect(p.$('banners').textContent).toContain('No recovery file yet.');
+    expect(p.f.of('settings/update')).toHaveLength(0); // nothing saved on the server
+    expect(JSON.parse(p.win.sessionStorage.getItem(DISMISSED_KEY) ?? '[]')).toEqual(['preflight-firewall-blocked']);
+
+    // A new tab (its own sessionStorage): shown again while it is still true (the next test: the same tab).
+    const again = await bootPanel({ token: 'tok-host-0123456789abcdef', routes: { me: meWith([FIREWALL]), home: HOME, reports: { body: { ok: true, reports: [], nextBefore: null } } } });
+    expect(again.$('banners').textContent).toContain("Other devices probably can't connect");
+  });
+
+  it('a dismissal remembered in this tab hides the firewall banner from the start', async () => {
+    const doc = parseHtml(read('admin.html'));
+    const f = fakeFetch({ me: meWith([FIREWALL]), home: HOME, reports: { body: { ok: true, reports: [], nextBefore: null } } });
+    const win = fakeWindow({ fetch: f.fn as never, session: { [TOKEN_KEY]: 'tok-host-0123456789abcdef', [DISMISSED_KEY]: JSON.stringify(['preflight-firewall-blocked']) } });
+    const app = boot({ doc, win });
+    cleanups.push(() => app.stop());
+    await settle();
+    expect(doc.getElementById('banners')!.textContent).not.toContain("Other devices probably can't connect");
+  });
+
+  it('the page wires the buttons with listeners (no inline handlers: the CSP)', () => {
+    const js = read('admin.js');
+    expect(js).toContain("btn.addEventListener('click'");
+    expect(read('admin.html')).not.toMatch(/\son[a-z]+=/i);
   });
 });

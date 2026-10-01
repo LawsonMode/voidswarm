@@ -17,7 +17,8 @@ PROCESS TREE AND WRITES
 
 THE HOST PC
 - Install location: %USERPROFILE%\Voidswarm LAN for the teacher's account. The launcher refuses OneDrive,
-  Temp, Downloads, network (UNC) and FAT locations, and in School mode refuses folders other users can write.
+  Temp, Downloads, network (UNC) and FAT locations. A folder other users can write is a warning (the
+  teacher can turn it off; no administrator rights are needed to fix it either).
 - AppLocker or WDAC: allow runtime\node.exe (publisher: OpenJS Foundation) AND a script rule for
   ...\Voidswarm LAN\*.cmd. Scope both to the teacher's user or group plus this path: a global OpenJS allow
   would give every student a script runtime. The default script rules (%WINDIR% and %PROGRAMFILES% only)
@@ -27,8 +28,19 @@ THE HOST PC
   administrator (School mode refuses to).
 - SmartScreen and Smart App Control: unblock the zip before extracting it (Properties -> Unblock), or
   deliver the folder from a network share or USB stick.
-- Firewall: by GPO, an inbound PROGRAM rule for ...\runtime\node.exe (no port) on the Domain and Private
-  profiles. Never run the .cmd files elevated from a user folder.
+- Firewall: other devices can reach the host only through an inbound rule for ...\runtime\node.exe. The
+  teacher usually has no administrator rights, so the Windows prompt can't add it. Either:
+  * run "Allow Voidswarm (for IT).cmd" once, as an administrator, from the teacher's Voidswarm LAN folder.
+    It adds one inbound PROGRAM rule, "Voidswarm LAN (<that folder>)": TCP, any local port (the teacher can
+    change the port), Domain and Private profiles only, never Public. It replaces its own rule when run
+    again, and stops Block rules for that node.exe (from a cancelled prompt) applying to Domain and Private
+    (one that also covers Public keeps blocking Public). It runs only netsh and PowerShell from System32,
+    never node.exe; it is 8 lines, so read it first (the folder is the teacher's, so they can edit it).
+    To remove: netsh advfirewall firewall delete rule name="Voidswarm LAN (<that folder>)"
+  * or, by GPO, the same inbound PROGRAM rule (no port) on the Domain and Private profiles. If a GPO sets
+    "Apply local firewall rules: No", the .cmd's local rule is ignored: use the GPO rule.
+  Never run the other .cmd files elevated. Without the rule, the teacher can still play and moderate on
+  the host PC itself.
 - Addresses: a DHCP reservation for the host PC (with a USB-C dock, reserve the DOCK's MAC address).
   Wired Ethernet is best.
 - BitLocker and a Windows password: the chat log and account records are on this PC.
