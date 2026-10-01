@@ -2570,4 +2570,4 @@ Open items the M1 checkpoint handed forward. Each is picked up by the task named
 - B28–B30 need the M3/M4 accounts and conduct work.
 - B31 is independent of the LAN work.
 - Privacy guardrails: B28 and B29 get a dedicated privacy review (same critic as section 8) before release.
-- The title-animation toggle (Auto/On/Off) is still waiting on an owner answer and is not in M5.
+- Title animation: decided (owner, 2026-10-01). It is always on, even with OS reduced motion, as a check that the machine can run the game. It shipped outside M5.
