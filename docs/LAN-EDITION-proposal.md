@@ -2576,3 +2576,5 @@ Open items the M1 checkpoint handed forward. Each is picked up by the task named
 ## Moved to Quark (owner, 2026-10-01)
 
 The remaining LAN Edition milestones (**M2, M3, M4 and M5**) move into the planned **Quark** project (`A:\Code\Quark\docs\QUARK-PLAN.md`): a local hub for accounts/SSO, chat and standards progress shared by all of the owner's apps. Voidswarm becomes Quark's first client. The LAN release stays at **0.6.0-m1** until then. This spec stays the canon for those features' detail when they are rebuilt in Quark.
+
+- **Known gap (owner report, 2026-10-01):** the panel has no **Fix permissions** button yet. The server -> launcher action path (the same one as open-folder) isn't wired on the server side. The banner now points to `"Start Voidswarm Host.cmd" --fix-permissions`. Build the button together with B15's open-folder actions (Quark Q5).

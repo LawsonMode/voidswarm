@@ -669,8 +669,11 @@ function checkPosix(opts: AclOptions, targets: AclTarget[], walk: TreeWalk): Fou
 }
 
 export const DEFAULT_FIX_HINT =
-  'To fix it, click Fix permissions in the control panel, or run "Start Voidswarm Host.cmd --fix-permissions". ' +
-  'That gives only you, SYSTEM and Administrators access to this folder and everything in it.';
+  // The panel button needs the server -> launcher action path (planned with the M2 work, now in Quark); until then
+  // the hint names only what works today (owner report, 2026-10-01).
+  'To fix it, stop the host (close its black console window), open a Command Prompt in the Voidswarm LAN folder and run ' +
+  '"Start Voidswarm Host.cmd" --fix-permissions. ' +
+  'That gives only you, SYSTEM and Administrators access to this folder and everything in it, then starts the host.';
 
 const IT_HINT = "If that doesn't help, give FOR SCHOOL IT.txt to IT.";
 
