@@ -9,7 +9,7 @@
 | Game version | `package.json` **0.6.0-m1.1** (canonical spot; `src/shared/version.ts` reads it). `PROTOCOL_VERSION` 5. |
 | Live web build | https://lawsonmode.github.io/voidswarm/ (deploys on every push to `main` via `.github/workflows/pages.yml`). |
 | Latest LAN release | **lan-v0.6.0-m1.1**: https://github.com/LawsonMode/voidswarm/releases/latest. It is built and attested by `.github/workflows/lan-package.yml`. Push a `lan-v*` tag to publish a new one; verify with `gh attestation verify <zip> --repo LawsonMode/voidswarm`. |
-| Git | `main` is clean and in sync with GitHub. The repo is public. |
+| Git | `main` is in sync with GitHub (last commit 1fa4280) **plus uncommitted local work**: the Quark client and the Lag Lab (`git status` lists it; `docs/QUARK.md`, `docs/LAG-LAB.md`). Nothing from it is pushed. The repo is public. |
 | Tests | 145 files / 2,835 tests pass (`npx vitest run`); typecheck is clean; smoke and parity gates pass. |
 | Shipped | v0.2 classes/turret kits/accounts · v0.3 game types, Command screen, loot, music · v0.4 chat moderation · v0.5 hardpoints, capital ships, mobile · 0.6.0-m1 LAN Edition M1 · m1.1 no-admin-rights fixes · the title always animates. |
 
@@ -18,6 +18,7 @@
 1. **Quark** (separate project, `A:\Code\Quark\`, **PLAN ONLY, do not build until the owner says so**).
    - It is a local hub for all the owner's digital-literacy apps: student SSO, chat as a service, and Idaho standards progress (apps propose, the teacher confirms).
    - **The remaining LAN Edition work (M2 HTTPS, M3 accounts/email/domain lock/rosters, M4 conduct/custom-term import/moderator limits/privacy, M5 classroom features) moved INTO Quark.** Voidswarm becomes Quark's first client.
+   - **Voidswarm's side is started** (uncommitted): `docs/QUARK.md`. Waiting on Quark: networking standards in its catalog, then the Lag Lab manifest entries and `LAG_LAB_REPORTING = true`.
    - Plans: `Quark\docs\QUARK-PLAN.md`, `Quark\docs\CHAT-INTERFACE-CHANGES.md` (built vs planned chat features).
    - The detail for those features is still canon in `docs/LAN-EDITION-proposal.md` (sections 3–5, 11, 14, "M5", and the owner decisions at the end).
 2. **v1.0.0, the combat overhaul.** The spec is final: `docs/v1.0-power-proposal.md` (owner decisions in section 14.3) and `docs/v1.0-presentation-proposal.md`. Design models are in `docs/design-models/`. It is a MAJOR bump, with `PROTOCOL_VERSION` going 5 → 6.
@@ -93,6 +94,9 @@
 **CI**
 - The Pages workflow (Linux) skips the Windows-only LAN suite and the heavy DB perf suites. The LAN workflow (Windows) runs them with a 30 s test timeout.
 - Perf budgets get CI headroom; timing tests flake on shared runners.
+
+**Git**
+- Commit messages end with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. Stage files by name. Commit and push only when the owner asks: a push to `main` deploys the public Pages site.
 
 **Releases**
 - Fresh-clone check before a first push.

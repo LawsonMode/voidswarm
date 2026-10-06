@@ -38,6 +38,15 @@ The stack is TypeScript + Vite + PixiJS v8 on the client and an authoritative No
 ode.exe`, Domain + Private, never Public). Host guide: `docs/LAN-EDITION.md` "No administrator rights?".
 - **Gotchas:** under `--permission`, `fs.fsyncSync` throws ERR_ACCESS_DENIED (use `src/server/durable.ts fsyncBestEffort`); a worker thread would escape the sandbox, so never pass `--allow-worker`. `--this-pc-only` keeps the game on loopback (a try-out, or a gate run with no firewall prompt). Test the LAN package on ports other than 7777/7778 (`PORT=27777` seeds a first run).
 
+**Quark client + Lag Lab (uncommitted work on top of 0.6.0-m1.1, see `docs/QUARK.md` and `docs/LAG-LAB.md`):**
+- **Quark:** an optional school-hub client (`src/client/quark.ts`, `src/client/ui/QuarkPanel.ts`, `quark-manifest.json`). It is inert unless the page is served by Quark's games host (`/quark-hub.js`); it is skipped in the Pages build. Menu entry: **School sign-in**. Reports only student-written work, never play. Activity ids (`app_voidswarm`, `after-action-note`) are permanent.
+- **Lag Lab:** a docked panel (Esc menu > Lag Lab, offline play only) with simulated ping, jitter and TCP-style loss (`src/client/net/lagModel.ts`, `LocalTransport`), a prediction switch (`GameClient.predictionEnabled`), a notebook, a quiz and a lab report. Its Quark reporting is off (`LAG_LAB_REPORTING`) until Quark's catalog has `9-12.CS.4.2` / `4.3` (draft manifest: `quark-manifest.lag-lab.draft.json`).
+
+## Git
+- Work on `main`; a push deploys the Pages site, so push (and tag `lan-v*` releases) only when the owner says so.
+- Commit messages end with the line `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`; pull request descriptions end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+- Never commit `data/`, `dist/` or `release/`. Stage files by name (no `git add -A`), and run `npx tsc --noEmit -p .` plus `npx vitest run` first.
+
 ## Version location
 The root `package.json` `version` (currently 0.6.0-m1.1, the LAN Edition's no-admin-rights fix release on top of M1; `package-lock.json` carries the same, keep them in step: `npm version <v> --no-git-tag-version`). `src/shared/version.ts` reads it, and it also holds `PROTOCOL_VERSION` (currently 5, bumped in v0.5 because the capital skill knobs changed the codec's knob table; bump it on wire changes). Don't hardcode versions anywhere else.
 

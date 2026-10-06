@@ -16,6 +16,7 @@ import { apiBaseFromServerUrl, isSessionExpiredMessage, SESSION_EXPIRED_MSG } fr
 import { classifyClose, closeNoticeText, retryStatusParts, SessionRetry, type RedialSession } from './net/reconnect';
 import { fetchChatNotice } from './net/serverInfo';
 import { defaultServerUrl, normalizeServerUrl, resolveServer } from './net/serverUrl';
+import { QuarkLink } from './quark';
 import { loadSettings, saveSettings, type ClientSettings } from './settings';
 import { loadStr, saveStr } from './storage';
 import { CommandScreen } from './ui/CommandScreen';
@@ -25,6 +26,8 @@ import { Hud } from './ui/Hud';
 import { grantSummary } from './ui/lootInfo';
 import { MobileSupport } from './ui/mobile';
 import { ControlsModal, CreateGameModal, MenuModal, SettingsModal, Toasts, type Modal } from './ui/Overlays';
+import { LagLabPanel } from './ui/LagLabPanel';
+import { QuarkLimitNotice, QuarkModal } from './ui/QuarkPanel';
 import { RoomLobby } from './ui/RoomLobby';
 import { ResultsScreen, Scoreboard } from './ui/Scoreboard';
 import { TitleScreen } from './ui/TitleScreen';
@@ -206,19 +209,31 @@ async function boot(): Promise<void> {
     showTitle('');
     title.showView('register');
   };
+  // Optional school sign-in (Quark): inert unless the page is served by a Quark games host (quark.ts).
+  const quark = new QuarkLink();
+  const quarkModal = new QuarkModal(quark);
+  const quarkLimit = new QuarkLimitNotice(quark);
+  // Lag Lab (docs/LAG-LAB.md): a docked panel, so the match keeps running while the network is made worse (offline play only).
+  const lagLab = new LagLabPanel(client, {
+    onQuiz: (score) => quark.reportLagQuiz(score),
+    onReport: (text) => quark.submitLagReport(text),
+    canSend: () => quark.canReportLagLab,
+  }, ui);
   const menu = new MenuModal(() => {
     const items: { label: string; action: () => void; danger?: boolean }[] = [
       { label: 'Resume', action: () => menu.close() },
       { label: 'Settings', action: () => { menu.close(); openModal(settingsModal); } },
       { label: 'Controls', action: () => { menu.close(); openModal(controlsModal); } },
     ];
+    if (quark.available) items.push({ label: quark.user ? `School sign-in (${quark.user.name})` : 'School sign-in', action: () => { menu.close(); openModal(quarkModal); } });
+    if (client.offline && screen !== 'title') items.push({ label: lagLab.visible ? 'Close Lag Lab' : 'Lag Lab', action: () => { menu.close(); lagLab.toggle(); } });
     if (screen === 'command') items.push({ label: 'Hangar', action: () => { menu.close(); openModal(hangar); } });
     if (screen === 'game') items.push({ label: 'Leave Match', action: leave, danger: true });
     if (screen === 'room') items.push({ label: 'Back to Command', action: leave, danger: true });
     if (screen !== 'title') items.push({ label: exitLabel(), action: exit, danger: true });
     return items;
   });
-  const modals: Modal[] = [menu, settingsModal, controlsModal, createGame, hangar];
+  const modals: Modal[] = [menu, settingsModal, controlsModal, createGame, hangar, quarkModal];
   const modalStack: Modal[] = [];
   for (const m of modals) {
     overlayHost.appendChild(m.root);
@@ -270,6 +285,11 @@ async function boot(): Promise<void> {
   uiHost.append(title.root, command.root, room.root, hud.root);
   overlayHost.prepend(scoreboard.root, results.root);
   overlayHost.appendChild(toasts.root);
+  overlayHost.appendChild(quarkLimit.root);
+  overlayHost.appendChild(lagLab.root);
+  // A teacher's access limit stops play: leave the match and keep the controls dead until it lapses (the server enforces it).
+  quark.onChange(() => { if (quark.blocked && screen === 'game') leave(); });
+  void quark.start();
   // v0.5 mobile (phones / tablets without a mouse only): controller card + "Play fullscreen" on Title and Command,
   // "Rotate to landscape" over the room lobby and the match in portrait. Only covers the view: the sim never pauses.
   // While it covers, #overlays (modals, debrief, scoreboard) and the room lobby are inert, so Tab / Enter can't reach
@@ -457,7 +477,7 @@ async function boot(): Promise<void> {
       case 'menu': {
         const m = topModal();
         if (m) { m.close(); return; }
-        if (screen !== 'title') openModal(menu);
+        if (screen !== 'title' || quark.available) openModal(menu);
         return;
       }
       case 'controls':
@@ -533,7 +553,7 @@ async function boot(): Promise<void> {
     if (dt > 0) fps = fps * 0.95 + (1 / dt) * 0.05;
     try {
       input.modalOpen = !!topModal();
-      input.gameplayEnabled = screen === 'game' && !topModal() && !chatFocused && !results.visible;
+      input.gameplayEnabled = screen === 'game' && !topModal() && !chatFocused && !results.visible && !quark.blocked;
       input.poll(now);
       if (screen === 'game') {
         acc += dt;

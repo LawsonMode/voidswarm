@@ -1341,3 +1341,24 @@ body:has(.screen-title.active.scene-live) #bg { display: none; }
   .screen-command.chat-open .cmd-chat { left: calc(16px + var(--safe-l)); right: calc(16px + var(--safe-r)); bottom: calc(0.6rem + var(--safe-b)); }
   .chat-toggle { right: calc(16px + var(--safe-r)); bottom: calc(0.8rem + var(--safe-b)); }
 }
+
+/* Quark school sign-in (src/client/ui/QuarkPanel.ts) */
+.quark-modal textarea { width: 100%; box-sizing: border-box; margin: 0.4rem 0; padding: 0.5rem; background: rgba(4, 2, 10, 0.6); border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.25)); border-radius: 0.3rem; resize: vertical; }
+.quark-modal .quark-chat { margin-top: 0.4rem; }
+.quark-limit { z-index: 1000; background: rgba(4, 2, 10, 0.92); }
+
+/* Lag Lab (src/client/ui/LagLabPanel.ts): docked, so the match keeps running */
+.lablab { position: absolute; top: 3.2rem; right: 0.6rem; width: min(24rem, 92vw); max-height: calc(100% - 4rem); overflow-y: auto; pointer-events: auto;
+  background: var(--glass-strong); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 0.5rem; padding: 0.6rem 0.8rem; font-size: 0.9rem; }
+.lablab-head { display: flex; justify-content: space-between; align-items: center; }
+.lablab-head h2 { margin: 0; font-size: 1.1rem; }
+.lablab details { margin: 0.5rem 0; }
+.lablab summary { cursor: pointer; font-weight: 700; }
+.lablab-hint { display: block; }
+.lablab-read { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; padding: 0.3rem 0; font-variant-numeric: tabular-nums; }
+.lablab-trials { padding-left: 1.2rem; margin: 0.4rem 0; }
+.lablab-q { border: 0; padding: 0; margin: 0.5rem 0; }
+.lablab-opt { display: block; padding: 0.15rem 0; }
+.lablab-opt.right { color: var(--good, #6cff9a); }
+.lablab textarea { width: 100%; box-sizing: border-box; padding: 0.5rem; background: rgba(4, 2, 10, 0.6); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 0.3rem; resize: vertical; }
+.lablab .range-out { white-space: nowrap; }

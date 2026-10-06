@@ -1,0 +1,16 @@
+{
+  "v": 1,
+  "appId": "app_voidswarm",
+  "name": "Voidswarm",
+  "version": "0.1.0",
+  "origins": ["http://127.0.0.1:4200"],
+  "features": { "chat": "widget", "reports": true },
+  "activities": [
+    {
+      "id": "after-action-note",
+      "label": "After-action note (teamwork and online conduct)",
+      "kind": "evidence",
+      "standards": [ { "id": "9-12.ICT.2.2", "evidence": "explanation" } ]
+    }
+  ]
+}

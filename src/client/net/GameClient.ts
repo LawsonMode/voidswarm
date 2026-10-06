@@ -169,6 +169,8 @@ export class GameClient {
 
   scores = new Map<PlayerId, PlayerScore>();
   pingMs = 0;
+  /** Lag Lab: client-side prediction of the own ship. Off = the ship waits for the server (shows why prediction exists). */
+  predictionEnabled = true;
 
   // --- match ---
   matchActive = false;
@@ -262,6 +264,7 @@ export class GameClient {
    */
   async connectTransport(t: Transport, name: string, token?: string): Promise<void> {
     this.disconnect(true); // also supersedes any attempt still in flight
+    this.predictionEnabled = true;
     const attempt = ++this.connectAttempt;
     const current = () => attempt === this.connectAttempt && this.transport === t;
     this.resetSession();
@@ -305,6 +308,12 @@ export class GameClient {
     this.pingTimer = setInterval(ping, this.pingIntervalMs);
     ping();
   }
+
+  /** Lag Lab: the offline in-page transport (the only one that can simulate a bad network), else null. */
+  get lagTransport(): LocalTransport | null { return this.transport instanceof LocalTransport ? this.transport : null; }
+  /** Lag Lab readouts: how uneven snapshot arrival is, and how far behind the server other ships are drawn. */
+  get netJitterMs(): number { return this.clock.jitterMs; }
+  get interpDelayMs(): number { return (this.clock.delayTicks() * 1000) / TICK_RATE; }
 
   /** Close the connection. `silent` = no 'close' event. Supersedes a connect still in flight. */
   disconnect(silent = false): void {
@@ -824,6 +833,7 @@ export class GameClient {
   }
 
   private reconcile(s: Snapshot): void {
+    if (!this.predictionEnabled) { this.predictor.suspend(); return; }
     const you = s.you;
     this.trackCarry(s, you ? s.ships.find((v) => v.id === you.shipId) : undefined);
     if (!you || !you.alive || you.attachedTo !== 0 || !this.map) { this.predictor.suspend(); return; }
@@ -874,7 +884,7 @@ export class GameClient {
     const you = latest?.you;
     const ctx = latest && you && you.alive && you.attachedTo === 0 && this.map
       ? this.predictCtx(you, latest.ships.find((v) => v.id === you.shipId), this.map) : null;
-    this.predictor.applyLocal(input, ctx);
+    if (this.predictionEnabled) this.predictor.applyLocal(input, ctx); else this.predictor.suspend();
   }
 
   /**
