@@ -1,5 +1,7 @@
 # Claude Context — Voidswarm (Subspace Clone)
 
+> **Picking this up? Read `docs/HANDOFF.md` first.** It has the current state, what's next (Quark plan → v1.0 → v1.1), and the owner decisions to keep.
+
 **Voidswarm** is a SubSpace/Continuum-inspired browser arena shooter for up to 32 players. Modes are FFA or 2–8 teams, with a PvPvE layer: Geometry Wars–style swarms, Vampire Survivors–style XP and level-up cards, and auto-weapons.
 
 v0.2 added:
