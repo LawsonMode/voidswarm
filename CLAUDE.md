@@ -42,6 +42,8 @@ ode.exe`, Domain + Private, never Public). Host guide: `docs/LAN-EDITION.md` "No
 - **Quark:** an optional school-hub client (`src/client/quark.ts`, `src/client/ui/QuarkPanel.ts`, `quark-manifest.json`). It is inert unless the page is served by Quark's games host (`/quark-hub.js`); it is skipped in the Pages build. Menu entry: **School sign-in**. Reports only student-written work, never play. Activity ids (`app_voidswarm`, `after-action-note`) are permanent.
 - **Lag Lab:** a docked panel (Esc menu > Lag Lab, offline play only) with simulated ping, jitter and TCP-style loss (`src/client/net/lagModel.ts`, `LocalTransport`), a prediction switch (`GameClient.predictionEnabled`), a notebook, a quiz and a lab report. Its Quark reporting is off (`LAG_LAB_REPORTING`) until Quark's catalog has `9-12.CS.4.2` / `4.3` (draft manifest: `quark-manifest.lag-lab.draft.json`).
 
+- **Chat Filter Case Study:** Esc menu lab (`src/client/ui/FilterLabModal.ts`, content in `filterLabInfo.ts`, `docs/CHAT-FILTER-LAB.md`). Case outcomes come from the real filter and are pinned by a test; the lines are harmless on purpose (never add a blocked term, a decoded list entry or a free-text filter tester). Reports to Quark are on (`FILTER_LAB_REPORTING`); needs the manifest (0.2.0) approved.
+
 ## Git
 - Work on `main`; a push deploys the Pages site, so push (and tag `lan-v*` releases) only when the owner says so.
 - Commit messages end with the line `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`; pull request descriptions end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.

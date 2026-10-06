@@ -1,29 +1,87 @@
 {
-  "_note": "DRAFT, not registrable yet. Quark's standards index has no networking ids, so 9-12.CS.4.2 and 9-12.CS.4.3 (from the Idaho 9-12 CS 2024 document) must be added to Quark's catalog first. Then: copy these two activities into quark-manifest.json, bump its version, set LAG_LAB_REPORTING = true in src/client/quark.ts, and have a teacher re-approve.",
+  "_note": "DRAFT, not registrable yet. Quark's standards index has no networking ids, so 9-12.CS.4.2 and 9-12.CS.4.3 (from the Idaho 9-12 CS 2024 document) must be added to Quark's catalog first. Then: copy the two lag-lab activities into quark-manifest.json (the rest already match), set its version to 0.3.0, set LAG_LAB_REPORTING = true in src/client/quark.ts, and have a teacher re-approve.",
   "v": 1,
   "appId": "app_voidswarm",
   "name": "Voidswarm",
-  "version": "0.2.0",
-  "origins": ["http://127.0.0.1:4200"],
-  "features": { "chat": "widget", "reports": true },
+  "version": "0.3.0",
+  "origins": [
+    "http://127.0.0.1:4200"
+  ],
+  "features": {
+    "chat": "widget",
+    "reports": true
+  },
   "activities": [
     {
       "id": "after-action-note",
       "label": "After-action note (teamwork and online conduct)",
       "kind": "evidence",
-      "standards": [ { "id": "9-12.ICT.2.2", "evidence": "explanation" } ]
+      "standards": [
+        {
+          "id": "9-12.ICT.2.2",
+          "evidence": "explanation"
+        }
+      ]
+    },
+    {
+      "id": "chat-filter-quiz",
+      "label": "Chat Filter Case Study: check your thinking",
+      "kind": "practice",
+      "standards": [
+        {
+          "id": "9-12.AITA.AIM.4",
+          "evidence": "practice"
+        },
+        {
+          "id": "9-12.CS.3.3",
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "chat-filter-report",
+      "label": "Chat Filter Case Study: report",
+      "kind": "evidence",
+      "standards": [
+        {
+          "id": "9-12.AITA.AIM.4",
+          "evidence": "evaluation"
+        },
+        {
+          "id": "9-12.CS.3.3",
+          "evidence": "evaluation"
+        },
+        {
+          "id": "9-12.CS.3.4",
+          "evidence": "evaluation"
+        }
+      ]
     },
     {
       "id": "lag-lab-quiz",
       "label": "Lag Lab: predict and check",
       "kind": "practice",
-      "standards": [ { "id": "9-12.CS.4.2", "evidence": "practice" } ]
+      "standards": [
+        {
+          "id": "9-12.CS.4.2",
+          "evidence": "practice"
+        }
+      ]
     },
     {
       "id": "lag-lab-report",
       "label": "Lag Lab: report",
       "kind": "evidence",
-      "standards": [ { "id": "9-12.CS.4.2", "evidence": "explanation" }, { "id": "9-12.CS.4.3", "evidence": "explanation" } ]
+      "standards": [
+        {
+          "id": "9-12.CS.4.2",
+          "evidence": "explanation"
+        },
+        {
+          "id": "9-12.CS.4.3",
+          "evidence": "explanation"
+        }
+      ]
     }
   ]
 }

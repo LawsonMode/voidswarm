@@ -16,6 +16,10 @@ export const AFTER_ACTION_MIN = 20;
 export const ACTIVITY_LAG_QUIZ = 'lag-lab-quiz';
 export const ACTIVITY_LAG_REPORT = 'lag-lab-report';
 export const LAG_LAB_REPORTING = false;
+/** Chat Filter Case Study (docs/CHAT-FILTER-LAB.md). Its standards already exist in Quark's catalog, so it reports as soon as a teacher approves a manifest that lists these ids. */
+export const ACTIVITY_FILTER_QUIZ = 'chat-filter-quiz';
+export const ACTIVITY_FILTER_REPORT = 'chat-filter-report';
+export const FILTER_LAB_REPORTING = true;
 export const AFTER_ACTION_MAX = 2000;
 
 export interface QuarkUser { id: string; name: string; role: string }
@@ -130,6 +134,22 @@ export class QuarkLink {
     const response = text.slice(0, 8000);
     if (!this.canReportLagLab || response.trim().length < 60) return false;
     this.sdk?.report({ verb: 'submitted', activity: ACTIVITY_LAG_REPORT, result: { response } });
+    return true;
+  }
+
+  get canReportFilterLab(): boolean { return FILTER_LAB_REPORTING && !!this.sdk && !!this.user; }
+
+  /** Chat Filter quiz: one report per session, an honest fraction-right score (1.0 is `completed`, otherwise `failed`). */
+  reportFilterQuiz(score: number): void {
+    if (!this.canReportFilterLab || !(score >= 0 && score <= 1)) return;
+    this.sdk?.report({ verb: score >= 1 ? 'completed' : 'failed', activity: ACTIVITY_FILTER_QUIZ, result: { score } });
+  }
+
+  /** Chat Filter report: the student's own case table and analysis (private student work). No score. */
+  submitFilterReport(text: string): boolean {
+    const response = text.slice(0, 8000);
+    if (!this.canReportFilterLab || response.trim().length < 150) return false;
+    this.sdk?.report({ verb: 'evaluated', activity: ACTIVITY_FILTER_REPORT, result: { response } });
     return true;
   }
 

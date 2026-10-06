@@ -26,6 +26,7 @@ import { Hud } from './ui/Hud';
 import { grantSummary } from './ui/lootInfo';
 import { MobileSupport } from './ui/mobile';
 import { ControlsModal, CreateGameModal, MenuModal, SettingsModal, Toasts, type Modal } from './ui/Overlays';
+import { FilterLabModal } from './ui/FilterLabModal';
 import { LagLabPanel } from './ui/LagLabPanel';
 import { QuarkLimitNotice, QuarkModal } from './ui/QuarkPanel';
 import { RoomLobby } from './ui/RoomLobby';
@@ -219,6 +220,12 @@ async function boot(): Promise<void> {
     onReport: (text) => quark.submitLagReport(text),
     canSend: () => quark.canReportLagLab,
   }, ui);
+  // Chat Filter Case Study (docs/CHAT-FILTER-LAB.md): runs the shared filter on fixed harmless lines, so it works anywhere.
+  const filterLab = new FilterLabModal({
+    onQuiz: (score) => quark.reportFilterQuiz(score),
+    onReport: (text) => quark.submitFilterReport(text),
+    canSend: () => quark.canReportFilterLab,
+  });
   const menu = new MenuModal(() => {
     const items: { label: string; action: () => void; danger?: boolean }[] = [
       { label: 'Resume', action: () => menu.close() },
@@ -227,13 +234,14 @@ async function boot(): Promise<void> {
     ];
     if (quark.available) items.push({ label: quark.user ? `School sign-in (${quark.user.name})` : 'School sign-in', action: () => { menu.close(); openModal(quarkModal); } });
     if (client.offline && screen !== 'title') items.push({ label: lagLab.visible ? 'Close Lag Lab' : 'Lag Lab', action: () => { menu.close(); lagLab.toggle(); } });
+    if (screen !== 'title') items.push({ label: 'Chat Filter Case Study', action: () => { menu.close(); openModal(filterLab); } });
     if (screen === 'command') items.push({ label: 'Hangar', action: () => { menu.close(); openModal(hangar); } });
     if (screen === 'game') items.push({ label: 'Leave Match', action: leave, danger: true });
     if (screen === 'room') items.push({ label: 'Back to Command', action: leave, danger: true });
     if (screen !== 'title') items.push({ label: exitLabel(), action: exit, danger: true });
     return items;
   });
-  const modals: Modal[] = [menu, settingsModal, controlsModal, createGame, hangar, quarkModal];
+  const modals: Modal[] = [menu, settingsModal, controlsModal, createGame, hangar, quarkModal, filterLab];
   const modalStack: Modal[] = [];
   for (const m of modals) {
     overlayHost.appendChild(m.root);
