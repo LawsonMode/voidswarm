@@ -412,7 +412,9 @@ describe('searchChatLog', () => {
     ];
     for (const s of scopes) {
       for (const [text, want] of expected) {
-        for (const opts of [{}, { maxMs: 35 }]) {
+        // `now` pinned near the fixtures: 1-2 character searches only look back SHORT_TEXT_WINDOW_MS from now, so
+        // the real clock made this a time bomb once the fixture date (T0) fell out of the window.
+        for (const opts of [{ now: T0 + 60_000 }, { maxMs: 35, now: T0 + 60_000 }]) {
           const got = ids(searchChatLog(db, { ...s, q: text }, opts).lines);
           expect(got, `${JSON.stringify(s)} ${text} ${JSON.stringify(opts)}`).toEqual([...want].reverse());
         }

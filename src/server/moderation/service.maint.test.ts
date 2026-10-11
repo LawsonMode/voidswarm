@@ -474,7 +474,8 @@ describe('log/export, log/purge, log/stats, alerts over the admin API', () => {
     expect((ctx.json.after as unknown[]).length).toBe(2);
     expect(ctx.text).not.toContain('the words they typed');
     expect((await post(port, 'log/context', { id: 999_999 }, token)).status).toBe(404);
-    const rooms = await post(port, 'log/rooms', { since: '7d' }, token);
+    // An absolute since (the fixtures are dated 2026-09-28): '7d' resolves against the real clock and expired.
+    const rooms = await post(port, 'log/rooms', { since: Date.UTC(2026, 8, 21) }, token);
     expect(rooms.status, rooms.text).toBe(200);
     expect((rooms.json.rooms as { roomUid: string; lines: number }[])[0]).toMatchObject({ roomUid: 'boot1:r2', lines: 4 });
     const reveal = await post(port, 'log/reveal', { ids: [substituted.id] }, token);
